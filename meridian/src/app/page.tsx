@@ -53,7 +53,11 @@ export default function LandingPage() {
         </div>
         <p className="text-xs text-ink-500">
           Demo data only. Triton does not contact consumers. Aether is institutional crypto — replace
-          branding when the second firm is named.
+          branding when the second firm is named. Consumer collections live in{" "}
+          <a className="underline" href="http://localhost:3001">
+            Cove
+          </a>{" "}
+          (unlicensed-state floor).
         </p>
       </div>
     </div>
