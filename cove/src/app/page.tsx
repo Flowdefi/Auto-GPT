@@ -41,16 +41,22 @@ export default function ClockPage() {
             </Card>
           ))}
         </div>
-        <div className="mt-8 flex flex-wrap gap-3 text-sm">
+        <div className="mt-8 flex flex-wrap gap-4 text-sm">
           <Link href="/compliance" className="text-cove-teal">
             Open-state map
+          </Link>
+          <Link href="/portfolios" className="text-cove-mute">
+            Liquidation tracker
+          </Link>
+          <Link href="/import" className="text-cove-mute">
+            Import a portfolio
+          </Link>
+          <Link href="/pay" className="text-cove-mute">
+            TF Recovery pay portal
           </Link>
           <button type="button" className="text-cove-mute" onClick={() => reset()}>
             Reset demo
           </button>
-          <a href="http://localhost:3000" className="text-cove-mute">
-            Meridian brokerage CRM
-          </a>
         </div>
       </div>
     </HydrateGate>
