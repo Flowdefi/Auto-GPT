@@ -29,8 +29,22 @@ export function accountName(first: string, last: string): string {
   return `${first} ${last}`;
 }
 
+/**
+ * Early in a portfolio's life the liquidation rate is a fraction of a percent,
+ * and rounding it to "0.0%" reads as "we have collected nothing". Borrow
+ * precision until the figure is visible, so real dollars never display as zero.
+ */
 export function pct(value: number, digits = 1): string {
-  return `${(value * 100).toFixed(digits)}%`;
+  const scaled = value * 100;
+  if (scaled === 0) return `${scaled.toFixed(digits)}%`;
+
+  let places = digits;
+  while (places < 3 && Number.parseFloat(scaled.toFixed(places)) === 0) places += 1;
+  if (Number.parseFloat(scaled.toFixed(places)) === 0) {
+    // Too small to render honestly at this precision, but it is not nothing.
+    return scaled < 0 ? ">-0.001%" : "<0.001%";
+  }
+  return `${scaled.toFixed(places)}%`;
 }
 
 export function cents(value: number): string {
