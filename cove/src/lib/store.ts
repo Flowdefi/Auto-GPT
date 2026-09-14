@@ -6,12 +6,18 @@ import { firstPartySafeCopy, miniMiranda, outreachBlock } from "./compliance";
 import { id, nowIso } from "./format";
 import { seedCove } from "./seed";
 import { canDialState } from "./states";
+import { AGENCY_NAME, payUrlFor, renderTemplate, templateBlocked } from "./templates";
+import { reviewCall } from "./tts-review";
 import type {
   Account,
   AgentStatus,
   AppData,
   Channel,
+  Disposition,
+  DocumentKind,
   LiveCall,
+  PaymentChannel,
+  Portfolio,
 } from "./types";
 
 interface Store extends AppData {
@@ -19,7 +25,13 @@ interface Store extends AppData {
   clockOut: (agentId: string) => void;
   setStatus: (agentId: string, status: AgentStatus) => void;
   addNote: (accountId: string, body: string, actor: string) => void;
-  takePayment: (accountId: string, amount: number, method: "card" | "ach", last4: string) => void;
+  takePayment: (
+    accountId: string,
+    amount: number,
+    method: "card" | "ach",
+    last4: string,
+    channel?: PaymentChannel,
+  ) => void;
   startPlan: (accountId: string, installment: number, cadence: "weekly" | "biweekly" | "monthly") => void;
   skipTrace: (accountId: string) => void;
   queueDialer: () => void;
@@ -32,6 +44,23 @@ interface Store extends AppData {
   improveScript: () => void;
   setAutoBot: (value: boolean) => void;
   runBotAction: (accountId: string, kind: "validate" | "call" | "sms" | "email" | "skip" | "plan" | "hold" | "callback") => void;
+  importPortfolio: (portfolio: Portfolio, accounts: Account[]) => void;
+  setDisposition: (accountId: string, disposition: Disposition) => void;
+  addDocument: (accountId: string, kind: DocumentKind, name: string, source: string) => void;
+  sendTemplate: (accountId: string, templateId: string) => string | null;
+  sendPayLink: (accountId: string) => string | null;
+  grantAccess: (agentId: string, accountIds: string[], hours: number, reason: string) => string | null;
+  revokeGrant: (grantId: string) => void;
+  extendGrant: (grantId: string, hours: number) => void;
+  acknowledgeReview: (reviewId: string) => void;
+  reviewTranscriptNow: (accountId: string, agentId: string, transcript: string) => void;
+  portalPay: (
+    portalCode: string,
+    amount: number,
+    method: "card" | "ach",
+    last4: string,
+  ) => { ok: boolean; message: string };
+  portalPlan: (portalCode: string, installment: number, cadence: "weekly" | "biweekly" | "monthly") => boolean;
   reset: () => void;
 }
 
@@ -105,7 +134,7 @@ export const useCove = create<Store>()(
         })),
       addNote: (accountId, body, actor) =>
         set((state) => log(state, accountId, "note", "Note", body, actor)),
-      takePayment: (accountId, amount, method, last4) =>
+      takePayment: (accountId, amount, method, last4, channel = "agent") =>
         set((state) => {
           const account = state.accounts.find((item) => item.id === accountId);
           if (!account || amount <= 0) return state;
@@ -113,13 +142,15 @@ export const useCove = create<Store>()(
           let next = log(
             patchAccount(state, accountId, {
               balance: nextBalance,
+              collected: account.collected + amount,
               status: nextBalance === 0 ? "paid" : account.status,
+              disposition: nextBalance === 0 ? "paid" : account.disposition,
             }),
             accountId,
             "payment",
             `${method.toUpperCase()} payment ${amount}`,
-            `${method} •${last4} authorized. New balance ${nextBalance}.`,
-            "Cove Pay",
+            `${method} •${last4} authorized via ${channel}. Descriptor ${AGENCY_NAME}. New balance ${nextBalance}.`,
+            channel === "portal" || channel === "sms" ? "TF Recovery portal" : "Cove Pay",
             "approved",
           );
           next = {
@@ -133,11 +164,36 @@ export const useCove = create<Store>()(
                 at: nowIso(),
                 last4,
                 status: "approved",
+                channel,
+                descriptor: AGENCY_NAME.toUpperCase(),
+                processorRef: id("rp"),
               },
               ...next.payments,
             ],
           };
-          return next;
+          return {
+            ...next,
+            accounts: next.accounts.map((item) =>
+              item.id === accountId
+                ? {
+                    ...item,
+                    documents: [
+                      {
+                        id: id("doc"),
+                        accountId,
+                        kind: "payment_receipt" as const,
+                        name: `Receipt ${method.toUpperCase()} $${amount} •${last4}`,
+                        addedAt: nowIso(),
+                        source: `${AGENCY_NAME} payments`,
+                        verified: true,
+                        sizeKb: 22,
+                      },
+                      ...item.documents,
+                    ],
+                  }
+                : item,
+            ),
+          };
         }),
       startPlan: (accountId, installment, cadence) =>
         set((state) => {
@@ -174,7 +230,19 @@ export const useCove = create<Store>()(
             confidence: 64,
             source: "header + utilities",
           };
-          const next = patchAccount(state, accountId, { skipHits: [hit, ...account.skipHits] });
+          const next = patchAccount(state, accountId, {
+            skipHits: [hit, ...account.skipHits],
+            phones: [
+              ...account.phones,
+              {
+                id: id("ph"),
+                number: hit.value,
+                label: "skip" as const,
+                status: "unverified" as const,
+                attempts: 0,
+              },
+            ],
+          });
           return log(next, accountId, "skip", "Skip trace complete", `New phone ${hit.value} · ${hit.confidence}%`, "Skip", "hit");
         }),
       queueDialer: () =>
@@ -239,15 +307,11 @@ export const useCove = create<Store>()(
           if (!state.liveCall) return state;
           const accountId = state.liveCall.accountId;
           const agentId = state.liveCall.agentId;
-          let next = log(
-            state,
-            accountId,
-            "call",
-            "Call ended",
-            state.liveCall.transcript.map((line) => `${line.who}: ${line.text}`).join("\n"),
-            actorName(state),
-            outcome,
-          );
+          const started = new Date(state.liveCall.startedAt).getTime();
+          const transcript = state.liveCall.transcript
+            .map((line) => `${line.who}: ${line.text}`)
+            .join("\n");
+          let next = log(state, accountId, "call", "Call ended", transcript, actorName(state), outcome);
           next = {
             ...next,
             liveCall: null,
@@ -259,6 +323,40 @@ export const useCove = create<Store>()(
           };
           if (outcome === "no_contact") {
             next = patchAccount(next, accountId, { nextCallAfter: new Date(Date.now() + 36e5).toISOString() });
+          }
+
+          // Every call goes straight to the TTS review bot — no sampling.
+          const account = next.accounts.find((item) => item.id === accountId);
+          const agent = next.agents.find((item) => item.id === agentId);
+          if (account && agent) {
+            const review = reviewCall(
+              accountId,
+              agentId,
+              agent.name,
+              transcript,
+              account,
+              Math.max(1, Math.round((Date.now() - started) / 1000)),
+            );
+            next = {
+              ...next,
+              reviews: [review, ...next.reviews],
+              agents: next.agents.map((item) =>
+                item.id === agentId
+                  ? { ...item, qaScore: Math.round(item.qaScore * 0.7 + review.score * 0.3) }
+                  : item,
+              ),
+            };
+            next = log(
+              next,
+              accountId,
+              "qa",
+              `TTS review · ${review.verdict} (${review.score}/100)`,
+              review.findings.length
+                ? review.findings.map((finding) => `${finding.severity.toUpperCase()}: ${finding.rule}`).join("\n")
+                : "No findings. Disclosures complete.",
+              "Review bot",
+              review.verdict,
+            );
           }
           return next;
         }),
@@ -394,7 +492,237 @@ export const useCove = create<Store>()(
           set((current) => log(current, accountId, "bot", `Bot ran ${kind}`, "Autonomous recovery step from timeline.", "Recovery bot", kind));
         }
       },
+      importPortfolio: (portfolio, accounts) =>
+        set((state) => {
+          const next: AppData = {
+            ...state,
+            portfolios: [portfolio, ...state.portfolios.filter((item) => item.id !== portfolio.id)],
+            accounts: [...accounts, ...state.accounts],
+          };
+          return log(
+            next,
+            accounts[0]?.id ?? "",
+            "system",
+            `Portfolio imported · ${portfolio.name}`,
+            `${accounts.length} accounts, ${portfolio.faceValue} face, ${portfolio.purchasePrice} cost.`,
+            "Import",
+            "imported",
+          );
+        }),
+      setDisposition: (accountId, disposition) =>
+        set((state) => {
+          const closing = disposition === "bankrupt" || disposition === "deceased" || disposition === "refusal";
+          return log(
+            patchAccount(state, accountId, {
+              disposition,
+              ...(closing ? { cease: true, dnc: true, status: "hold" as const } : {}),
+            }),
+            accountId,
+            "system",
+            `Disposition → ${disposition.replace(/_/g, " ")}`,
+            closing ? "Outreach locked on this disposition." : "Liquidation tracker updated.",
+            actorName(state),
+            disposition,
+          );
+        }),
+      addDocument: (accountId, kind, name, source) =>
+        set((state) => {
+          const next: AppData = {
+            ...state,
+            accounts: state.accounts.map((account) =>
+              account.id === accountId
+                ? {
+                    ...account,
+                    documents: [
+                      {
+                        id: id("doc"),
+                        accountId,
+                        kind,
+                        name,
+                        addedAt: nowIso(),
+                        source,
+                        verified: false,
+                        sizeKb: 40,
+                      },
+                      ...account.documents,
+                    ],
+                  }
+                : account,
+            ),
+          };
+          return log(next, accountId, "document", `Document added · ${name}`, source, actorName(state), kind);
+        }),
+      sendTemplate: (accountId, templateId) => {
+        const state = get();
+        const account = state.accounts.find((item) => item.id === accountId);
+        const template = state.templates.find((item) => item.id === templateId);
+        if (!account || !template) return "Template or account missing.";
+        const gate = templateBlocked(template, account);
+        if (gate) return gate;
+        if (template.channel === "sms" || template.channel === "email") {
+          const channel = template.channel;
+          const block = outreachBlock(account, channel);
+          if (block) {
+            set((current) =>
+              log(current, accountId, channel, `${template.name} blocked`, block, "Template", "blocked"),
+            );
+            return block;
+          }
+        }
+        const rendered = renderTemplate(template, account, typeof window === "undefined" ? "" : window.location.origin);
+        set((current) => {
+          const logged = log(
+            current,
+            accountId,
+            template.channel === "letter" ? "document" : template.channel,
+            `${template.name} sent`,
+            rendered.subject ? `${rendered.subject}\n\n${rendered.body}` : rendered.body,
+            template.channel === "sms" ? "SMS agent" : template.channel === "email" ? "Email agent" : "Mail vendor",
+            "sent",
+          );
+          if (template.channel === "letter") return logged;
+          return {
+            ...logged,
+            messages: [
+              {
+                id: id("om"),
+                accountId,
+                channel: template.channel,
+                status: "sent" as const,
+                body: rendered.body,
+                authenticated: true,
+                at: nowIso(),
+              },
+              ...logged.messages,
+            ],
+          };
+        });
+        return null;
+      },
+      sendPayLink: (accountId) => {
+        const state = get();
+        const account = state.accounts.find((item) => item.id === accountId);
+        if (!account) return "Missing account.";
+        const block = outreachBlock(account, "sms");
+        if (block) {
+          set((current) => log(current, accountId, "sms", "Pay link blocked", block, "SMS agent", "blocked"));
+          return block;
+        }
+        const url = payUrlFor(account, typeof window === "undefined" ? "" : window.location.origin);
+        const body = `${AGENCY_NAME}: this is a debt collector attempting to collect a debt. Pay or set a plan on the account ending ${account.last4}: ${url} (code ${account.portalCode}). Reply STOP to opt out.`;
+        set((current) => {
+          const logged = log(current, accountId, "sms", "Pay link sent (10DLC)", body, "SMS agent", "sent");
+          return {
+            ...logged,
+            messages: [
+              {
+                id: id("om"),
+                accountId,
+                channel: "sms" as const,
+                status: "sent" as const,
+                body,
+                authenticated: true,
+                at: nowIso(),
+              },
+              ...logged.messages,
+            ],
+          };
+        });
+        return null;
+      },
+      grantAccess: (agentId, accountIds, hours, reason) => {
+        const state = get();
+        const agent = state.agents.find((item) => item.id === agentId);
+        if (!agent) return "Collector not found.";
+        if (accountIds.length === 0) return "Select at least one account.";
+        if (accountIds.length > agent.maxAccounts) {
+          return `${agent.name} is capped at ${agent.maxAccounts} leased accounts.`;
+        }
+        const now = Date.now();
+        set((current) => ({
+          grants: [
+            {
+              id: id("gr"),
+              agentId,
+              accountIds,
+              startsAt: new Date(now).toISOString(),
+              expiresAt: new Date(now + hours * 36e5).toISOString(),
+              reason,
+              grantedBy: actorName(current),
+            },
+            ...current.grants,
+          ],
+        }));
+        return null;
+      },
+      revokeGrant: (grantId) =>
+        set((state) => ({
+          grants: state.grants.map((grant) =>
+            grant.id === grantId ? { ...grant, revokedAt: nowIso() } : grant,
+          ),
+        })),
+      extendGrant: (grantId, hours) =>
+        set((state) => ({
+          grants: state.grants.map((grant) =>
+            grant.id === grantId
+              ? {
+                  ...grant,
+                  revokedAt: undefined,
+                  expiresAt: new Date(
+                    Math.max(Date.now(), new Date(grant.expiresAt).getTime()) + hours * 36e5,
+                  ).toISOString(),
+                }
+              : grant,
+          ),
+        })),
+      acknowledgeReview: (reviewId) =>
+        set((state) => ({
+          reviews: state.reviews.map((review) =>
+            review.id === reviewId ? { ...review, acknowledged: true } : review,
+          ),
+        })),
+      reviewTranscriptNow: (accountId, agentId, transcript) =>
+        set((state) => {
+          const account = state.accounts.find((item) => item.id === accountId);
+          const agent = state.agents.find((item) => item.id === agentId);
+          if (!account || !agent) return state;
+          const review = reviewCall(accountId, agentId, agent.name, transcript, account, 120);
+          return log(
+            { ...state, reviews: [review, ...state.reviews] },
+            accountId,
+            "qa",
+            `TTS review · ${review.verdict} (${review.score}/100)`,
+            review.coaching,
+            "Review bot",
+            review.verdict,
+          );
+        }),
+      portalPay: (portalCode, amount, method, last4) => {
+        const state = get();
+        const account = state.accounts.find(
+          (item) => item.portalCode.toUpperCase() === portalCode.trim().toUpperCase(),
+        );
+        if (!account) return { ok: false, message: "We could not find an account for that code." };
+        if (amount <= 0) return { ok: false, message: "Enter an amount greater than zero." };
+        if (amount > account.balance) {
+          return { ok: false, message: `That is more than the balance of $${account.balance}.` };
+        }
+        get().takePayment(account.id, amount, method, last4, "portal");
+        return {
+          ok: true,
+          message: `Thank you. $${amount} was authorized. It appears on your statement as ${AGENCY_NAME.toUpperCase()}.`,
+        };
+      },
+      portalPlan: (portalCode, installment, cadence) => {
+        const state = get();
+        const account = state.accounts.find(
+          (item) => item.portalCode.toUpperCase() === portalCode.trim().toUpperCase(),
+        );
+        if (!account || installment <= 0) return false;
+        get().startPlan(account.id, installment, cadence);
+        return true;
+      },
     }),
-    { name: "cove-collections-v1" },
+    { name: "cove-collections-v2" },
   ),
 );

@@ -29,6 +29,14 @@ export function accountName(first: string, last: string): string {
   return `${first} ${last}`;
 }
 
+export function pct(value: number, digits = 1): string {
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
+export function cents(value: number): string {
+  return `${(value * 100).toFixed(2)}¢`;
+}
+
 export function maskPhone(phone: string): string {
   return phone.replace(/(\d{3})\d{3}(\d{4})/, "$1-***-$2");
 }
