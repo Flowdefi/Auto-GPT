@@ -1,0 +1,26 @@
+{$COVE_DOMAIN:localhost} {
+	encode zstd gzip
+
+	# The consumer portal is the only surface that should be publicly reachable.
+	# Everything else is the collections floor.
+	@portal path /pay /pay/*
+	handle @portal {
+		header {
+			Strict-Transport-Security "max-age=31536000; includeSubDomains"
+			X-Content-Type-Options "nosniff"
+			Referrer-Policy "same-origin"
+			X-Frame-Options "DENY"
+		}
+		reverse_proxy app:3000
+	}
+
+	# Lock the floor to your office and VPN ranges. Replace these with your own
+	# before this ever faces the internet.
+	handle {
+		@trusted remote_ip 127.0.0.1/32 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+		route {
+			reverse_proxy @trusted app:3000
+			respond "Not available from this network." 403
+		}
+	}
+}
