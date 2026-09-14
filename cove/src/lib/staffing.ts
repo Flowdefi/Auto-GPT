@@ -63,9 +63,25 @@ export interface AgentPerformance {
   hoursToday: number;
 }
 
-function hoursSince(iso: string | undefined, at = Date.now()): number {
+/**
+ * Longest shift we will bill to a seat. Collectors forget to clock out, and an
+ * open clock-in would otherwise accrue labor cost forever and bury a good
+ * collector's margin under hours nobody worked.
+ */
+const MAX_SHIFT_HOURS = 16;
+
+/**
+ * Hours worked *today*, not hours since the clock-in timestamp. Counts from the
+ * later of the clock-in and midnight, then caps at one shift.
+ */
+function hoursToday(iso: string | undefined, at = Date.now()): number {
   if (!iso) return 0;
-  return Math.max(0, (at - new Date(iso).getTime()) / 3.6e6);
+  const clockedIn = new Date(iso).getTime();
+  if (Number.isNaN(clockedIn)) return 0;
+  const midnight = new Date(at).setHours(0, 0, 0, 0);
+  const from = Math.max(clockedIn, midnight);
+  const elapsed = (at - from) / 3.6e6;
+  return Math.min(MAX_SHIFT_HOURS, Math.max(0, elapsed));
 }
 
 export function performanceFor(
@@ -95,8 +111,8 @@ export function performanceFor(
   const qaScore = myReviews.length
     ? Math.round(myReviews.reduce((sum, review) => sum + review.score, 0) / myReviews.length)
     : agent.qaScore;
-  const hoursToday = hoursSince(agent.clockedInAt, at);
-  const laborCost = hoursToday * agent.hourlyCost + collected * (agent.commissionPct / 100);
+  const hours = hoursToday(agent.clockedInAt, at);
+  const laborCost = hours * agent.hourlyCost + collected * (agent.commissionPct / 100);
 
   return {
     agent,
@@ -110,6 +126,6 @@ export function performanceFor(
     qaScore,
     criticalFindings,
     margin: collected - laborCost,
-    hoursToday,
+    hoursToday: hours,
   };
 }
