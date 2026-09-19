@@ -48,7 +48,7 @@ function open(): SqliteHandle | null {
 }
 
 export function sqliteReady(): boolean {
-  if (handle) return available;
+  if (handle && available) return true;
   open();
   return available;
 }
@@ -255,10 +255,12 @@ export function persistSqlite(state: DatabaseFile): void {
       })),
       ["id", "workspace_id", "node_id", "title", "text", "terms"],
     );
-    db.exec("DELETE FROM rag_fts");
-    const fts = db.prepare("INSERT INTO rag_fts (chunk_id, workspace_id, title, text) VALUES (?, ?, ?, ?)");
+    db.exec("DELETE FROM rag_terms");
+    const termInsert = db.prepare("INSERT OR IGNORE INTO rag_terms (term, chunk_id, workspace_id) VALUES (?, ?, ?)");
     for (const chunk of state.chunks) {
-      fts.run(chunk.id, chunk.workspaceId, chunk.title, chunk.text);
+      for (const term of chunk.terms.slice(0, 80)) {
+        termInsert.run(term, chunk.id, chunk.workspaceId);
+      }
     }
     db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("version", String(state.version));
     db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("synced_at", new Date().toISOString());
@@ -361,16 +363,21 @@ export function searchFts(workspaceId: WorkspaceId, prompt: string, limit = 8): 
     .filter((term) => term.length > 1)
     .slice(0, 12);
   if (terms.length === 0) return [];
-  const match = terms.map((term) => `"${term}"`).join(" OR ");
+  const placeholders = terms.map(() => "?").join(",");
   try {
     const rows = db
       .prepare(
-        "SELECT chunk_id AS chunkId, bm25(rag_fts) AS rank FROM rag_fts WHERE workspace_id = ? AND rag_fts MATCH ? ORDER BY rank LIMIT ?",
+        `SELECT chunk_id AS chunkId, COUNT(*) AS hits
+         FROM rag_terms
+         WHERE workspace_id = ? AND term IN (${placeholders})
+         GROUP BY chunk_id
+         ORDER BY hits DESC
+         LIMIT ?`,
       )
-      .all(workspaceId, match, limit);
+      .all(workspaceId, ...terms, limit);
     return rows.map((row) => ({
       chunkId: String(row.chunkId),
-      score: Number(row.rank ?? 0),
+      score: Number(row.hits ?? 0),
     }));
   } catch {
     return [];

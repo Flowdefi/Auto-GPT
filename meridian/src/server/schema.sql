@@ -138,10 +138,10 @@ CREATE TABLE IF NOT EXISTS rag_chunks (
 );
 CREATE INDEX IF NOT EXISTS idx_chunks_ws ON rag_chunks(workspace_id);
 
-CREATE VIRTUAL TABLE IF NOT EXISTS rag_fts USING fts5(
-  chunk_id UNINDEXED,
-  workspace_id UNINDEXED,
-  title,
-  text,
-  tokenize = 'porter'
+CREATE TABLE IF NOT EXISTS rag_terms (
+  term TEXT NOT NULL,
+  chunk_id TEXT NOT NULL,
+  workspace_id TEXT NOT NULL,
+  PRIMARY KEY (term, chunk_id)
 );
+CREATE INDEX IF NOT EXISTS idx_rag_terms_lookup ON rag_terms(workspace_id, term);

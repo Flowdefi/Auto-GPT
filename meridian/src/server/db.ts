@@ -32,6 +32,12 @@ function migrate(db: DatabaseFile): DatabaseFile {
       subscribed: true,
     });
   }
+  if (db.nodes.length < 74) {
+    const fresh = seedServerData(emptyDb());
+    db.nodes = fresh.nodes;
+    db.edges = fresh.edges;
+    db.chunks = fresh.chunks;
+  }
   return db;
 }
 
