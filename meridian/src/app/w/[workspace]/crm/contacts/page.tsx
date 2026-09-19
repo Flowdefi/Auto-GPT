@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Subnav } from "@/components/subnav";
 import { DataTable } from "@/components/tables";
-import { Badge, Button, Card, Field, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, Field, PageHeader } from "@/components/meridian/legacy";
 import { contactName, relativeDay } from "@/lib/format";
 import { useMeridian } from "@/lib/store";
 import { useActiveWorkspace } from "@/lib/use-workspace";

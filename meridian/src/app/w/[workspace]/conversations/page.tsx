@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Button, Card, Field, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, Field, PageHeader } from "@/components/meridian/legacy";
 import { contactName, when } from "@/lib/format";
 import { useMeridian } from "@/lib/store";
 import { useActiveWorkspace } from "@/lib/use-workspace";

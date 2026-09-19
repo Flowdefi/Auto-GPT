@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Subnav } from "@/components/subnav";
-import { Badge, Button, Card, Field, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, Field, PageHeader } from "@/components/meridian/legacy";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 interface ListRow {

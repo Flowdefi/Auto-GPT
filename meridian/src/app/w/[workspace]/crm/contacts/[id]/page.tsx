@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { Timeline } from "@/components/tables";
-import { Badge, Button, Card, Field, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, Field, PageHeader } from "@/components/meridian/legacy";
 import { contactName, money, when } from "@/lib/format";
 import { useMeridian } from "@/lib/store";
 import { useActiveWorkspace } from "@/lib/use-workspace";

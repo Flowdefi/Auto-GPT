@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Badge, Card, Field, PageHeader } from "@/components/ui";
+import { Badge, Card, Field, PageHeader } from "@/components/meridian/legacy";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 interface NodeRow {

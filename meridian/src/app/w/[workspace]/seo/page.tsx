@@ -1,7 +1,7 @@
 "use client";
 
 import { DataTable } from "@/components/tables";
-import { Badge, Card, PageHeader } from "@/components/ui";
+import { Badge, Card, PageHeader } from "@/components/meridian/legacy";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 export default function SeoPage() {

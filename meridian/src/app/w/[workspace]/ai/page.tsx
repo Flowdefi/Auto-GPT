@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Card, Field, PageHeader } from "@/components/ui";
+import { Button, Card, Field, PageHeader } from "@/components/meridian/legacy";
 import { AI_STARTERS } from "@/lib/ai";
 import { askMeridian } from "@/lib/ask-ai";
 import { useMeridian } from "@/lib/store";

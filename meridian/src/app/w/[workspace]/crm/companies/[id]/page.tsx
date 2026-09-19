@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Card, PageHeader } from "@/components/ui";
+import { Card, PageHeader } from "@/components/meridian/legacy";
 import { contactName, money } from "@/lib/format";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 

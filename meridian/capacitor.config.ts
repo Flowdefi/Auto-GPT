@@ -1,11 +1,37 @@
-const config = {
+import type { CapacitorConfig } from "@capacitor/cli";
+
+/**
+ * Meridian is a server-rendered app, so the native shell points at the deployed
+ * origin instead of a static export. Set MERIDIAN_NATIVE_URL before `npx cap sync`.
+ */
+const serverUrl = process.env.MERIDIAN_NATIVE_URL;
+
+const config: CapacitorConfig = {
   appId: "net.debtmarket.meridian",
   appName: "Meridian",
-  webDir: "out",
+  webDir: "public",
   ios: {
-    contentInset: "automatic",
+    contentInset: "never",
     preferredContentMode: "mobile",
     scrollEnabled: true,
+    limitsNavigationsToAppBoundDomains: true,
+    backgroundColor: "#0c1620",
+  },
+  server: serverUrl
+    ? { url: serverUrl, cleartext: false, androidScheme: "https" }
+    : { androidScheme: "https" },
+  plugins: {
+    Keyboard: {
+      resize: "native",
+      style: "dark",
+      resizeOnFullScreen: true,
+    },
+    StatusBar: {
+      style: "DARK",
+      backgroundColor: "#0c1620",
+      overlaysWebView: true,
+    },
+    Haptics: {},
   },
 };
 
