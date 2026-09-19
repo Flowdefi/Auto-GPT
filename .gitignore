@@ -161,3 +161,25 @@ openai/
 
 # news
 CURRENT_BULLETIN.md
+
+# Meridian platform
+meridian/node_modules/
+meridian/.next/
+meridian/out/
+meridian/.env.local
+meridian/.env
+meridian/ios/
+meridian/android/
+
+# Keep Meridian / Cove source (root ignore also has lib/ and package-lock.json)
+!meridian/src/lib/
+!meridian/src/lib/**
+!meridian/package-lock.json
+cove/node_modules/
+cove/.next/
+cove/out/
+cove/.env
+cove/.env.local
+!cove/src/lib/
+!cove/src/lib/**
+!cove/package-lock.json

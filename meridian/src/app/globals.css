@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --accent: #c9a24a;
+  --accent-soft: rgba(201, 162, 74, 0.14);
+  --accent-text: #8a6918;
+  --hero: linear-gradient(135deg, #0c1620 0%, #1b3348 55%, #c9a24a 160%);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+}
+
+html,
+body {
+  min-height: 100%;
+  background: #f4f6f8;
+  color: #13202d;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+  padding-top: var(--safe-t);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c5d0db transparent;
+}
+
+.ios-blur {
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+}
+
+::selection {
+  background: var(--accent-soft);
+}

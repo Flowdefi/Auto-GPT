@@ -1,0 +1,90 @@
+# Cove self-host stack. Everything here is open source.
+#
+#   docker compose -f deploy/docker-compose.yml up -d --build
+#
+# Profiles keep the heavy telephony pieces out of the way until you want them:
+#   --profile voice    Asterisk (SIP/RTP, host networking)
+#   --profile edge     Caddy with automatic TLS
+#   --profile data     Postgres, for when state moves off the browser
+#
+# Read deploy/README.md before running the voice profile. Asterisk needs host
+# networking and a CPU-pinned host — it does not tolerate bridge NAT.
+
+name: cove
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: cove/app:local
+    container_name: cove-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      # Public origin used when rendering TF Recovery pay links into SMS.
+      COVE_PUBLIC_ORIGIN: ${COVE_PUBLIC_ORIGIN:-http://localhost:8080}
+    ports:
+      - "${COVE_PORT:-8080}:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  caddy:
+    profiles: ["edge"]
+    image: caddy:2-alpine
+    container_name: cove-caddy
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      COVE_DOMAIN: ${COVE_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  postgres:
+    profiles: ["data"]
+    image: postgres:16-alpine
+    container_name: cove-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cove}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cove}
+      POSTGRES_DB: ${POSTGRES_DB:-cove}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cove}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  asterisk:
+    profiles: ["voice"]
+    image: andrius/asterisk:20
+    container_name: cove-asterisk
+    restart: unless-stopped
+    # SIP signalling and RTP media break under Docker's bridge NAT. Host
+    # networking is not an optimization here, it is a requirement.
+    network_mode: host
+    volumes:
+      - ./asterisk:/etc/asterisk:ro
+      - asterisk_recordings:/var/spool/asterisk/monitor
+
+volumes:
+  caddy_data:
+  caddy_config:
+  pgdata:
+  asterisk_recordings:

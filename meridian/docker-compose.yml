@@ -1,0 +1,18 @@
+services:
+  meridian:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      MERIDIAN_PUBLIC_URL: ${MERIDIAN_PUBLIC_URL:-http://localhost:3000}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      AGENTMAIL_API_KEY: ${AGENTMAIL_API_KEY:-}
+      AGENTMAIL_INBOX_TRITON: ${AGENTMAIL_INBOX_TRITON:-portfolios@agentmail.to}
+      AETHER_FROM_EMAIL: ${AETHER_FROM_EMAIL:-desk@aethermarkets.io}
+    volumes:
+      - meridian-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  meridian-data:
