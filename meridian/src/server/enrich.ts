@@ -1,7 +1,8 @@
 import { promises as dns } from "dns";
 import type { WorkspaceId } from "@/lib/types";
-import { mutate } from "./db";
 import { domainOf, isFreeMailDomain } from "./crm";
+import { loadDb, mutate } from "./db";
+import { assertPublicHostname, parsePublicHttpUrl } from "./http-guard";
 
 export interface EnrichmentResult {
   domain: string;
@@ -32,7 +33,8 @@ async function fetchText(url: string): Promise<{ ok: boolean; body: string; fina
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(url, {
+    const safe = parsePublicHttpUrl(url);
+    const response = await fetch(safe.toString(), {
       headers: { "User-Agent": UA, Accept: "text/html,application/xhtml+xml" },
       redirect: "follow",
       signal: controller.signal,
@@ -210,7 +212,25 @@ async function dnsFacts(domain: string): Promise<{
  * its structured data, and its DNS records. No third-party data broker.
  */
 export async function enrichDomain(domain: string): Promise<EnrichmentResult> {
-  const clean = domain.toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/^www\./, "");
+  let clean: string;
+  try {
+    clean = assertPublicHostname(domain);
+  } catch {
+    return {
+      domain,
+      resolved: false,
+      schemaTypes: [],
+      socials: {},
+      technologies: [],
+      mxHosts: [],
+      hasSpf: false,
+      hasDmarc: false,
+      phones: [],
+      addresses: [],
+      fetchedAt: new Date().toISOString(),
+      notes: ["Domain is not a public hostname."],
+    };
+  }
   const notes: string[] = [];
   const result: EnrichmentResult = {
     domain: clean,
@@ -278,7 +298,7 @@ export async function enrichCompanyRecord(
   workspaceId: WorkspaceId,
   companyId: string,
 ): Promise<{ ok: boolean; result?: EnrichmentResult; error?: string }> {
-  const db = (await import("./db")).loadDb();
+  const db = loadDb();
   const company = db.companies.find((row) => row.id === companyId && row.workspaceId === workspaceId);
   if (!company) return { ok: false, error: "Company not found" };
 

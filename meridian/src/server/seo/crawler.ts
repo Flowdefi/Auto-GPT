@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import type { WorkspaceId } from "@/lib/types";
 import { mutate, nextId } from "../db";
+import { assertWorkspaceSite, parsePublicHttpUrl } from "../http-guard";
 import type { SeoPage } from "../models";
 import { auditPage, auditSite } from "./audit";
 import { topTerms } from "./text";
@@ -31,7 +32,8 @@ async function fetchPage(url: string): Promise<FetchedPage> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(url, {
+    const safe = parsePublicHttpUrl(url);
+    const response = await fetch(safe.toString(), {
       headers: { "User-Agent": UA, Accept: "text/html,application/xhtml+xml" },
       redirect: "follow",
       signal: controller.signal,
@@ -236,7 +238,7 @@ function pageRank(graph: Map<string, string[]>, iterations = 20, damping = 0.85)
 export async function crawlSite(options: CrawlOptions): Promise<{ crawlId: string }> {
   const maxPages = Math.min(options.maxPages ?? 40, 120);
   const maxDepth = options.maxDepth ?? 3;
-  const start = new URL(options.startUrl.startsWith("http") ? options.startUrl : `https://${options.startUrl}`);
+  const start = assertWorkspaceSite(options.workspaceId, options.startUrl);
   const host = start.host;
   const origin = start.origin;
 
