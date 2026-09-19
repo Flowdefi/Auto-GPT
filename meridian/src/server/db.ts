@@ -3,9 +3,11 @@ import path from "path";
 import { id } from "@/lib/format";
 import { emptyDb, type DatabaseFile } from "./models";
 import { seedServerData } from "./seed-db";
+import { persistSqlite, seedCrmSnapshot } from "./sqlite";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "meridian.json");
+const OWNER_EMAIL = "ayflow@pm.me";
 
 let cache: DatabaseFile | null = null;
 
@@ -15,21 +17,43 @@ function ensureDir(): void {
   }
 }
 
+function migrate(db: DatabaseFile): DatabaseFile {
+  if (!db.events) db.events = [];
+  const hasOwner = db.members.some((member) => member.email === OWNER_EMAIL);
+  if (!hasOwner) {
+    db.members.push({
+      id: "mem_triton_owner_proof",
+      listId: "triton_list_test",
+      email: OWNER_EMAIL,
+      firstName: "Desk",
+      lastName: "Owner",
+      company: "Triton Financial Solutions",
+      seedLocked: false,
+      subscribed: true,
+    });
+  }
+  return db;
+}
+
 export function loadDb(): DatabaseFile {
   if (cache) return cache;
   ensureDir();
   if (!existsSync(DATA_FILE)) {
-    cache = seedServerData(emptyDb());
+    cache = migrate(seedServerData(emptyDb()));
     persist(cache);
+    seedCrmSnapshot();
     return cache;
   }
   const parsed = JSON.parse(readFileSync(DATA_FILE, "utf8")) as DatabaseFile;
   if (!parsed.lists?.length) {
-    cache = seedServerData(parsed.version ? parsed : emptyDb());
+    cache = migrate(seedServerData(parsed.version ? parsed : emptyDb()));
     persist(cache);
+    seedCrmSnapshot();
     return cache;
   }
-  cache = parsed;
+  cache = migrate(parsed);
+  persist(cache);
+  seedCrmSnapshot();
   return cache;
 }
 
@@ -39,6 +63,11 @@ export function persist(db: DatabaseFile): void {
   writeFileSync(tmp, JSON.stringify(db, null, 2));
   renameSync(tmp, DATA_FILE);
   cache = db;
+  try {
+    persistSqlite(db);
+  } catch (error) {
+    console.warn("SQLite persist skipped:", error instanceof Error ? error.message : error);
+  }
 }
 
 export function mutate<T>(fn: (db: DatabaseFile) => T): T {
@@ -49,7 +78,7 @@ export function mutate<T>(fn: (db: DatabaseFile) => T): T {
 }
 
 export function resetDb(): DatabaseFile {
-  cache = seedServerData(emptyDb());
+  cache = migrate(seedServerData(emptyDb()));
   persist(cache);
   return cache;
 }

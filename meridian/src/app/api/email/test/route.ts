@@ -3,6 +3,7 @@ import { isWorkspaceId } from "@/lib/workspace-id";
 import { sendTest } from "@/server/mailer";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as {

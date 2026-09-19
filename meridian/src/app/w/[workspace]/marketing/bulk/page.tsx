@@ -39,14 +39,20 @@ export default function BulkEmailPage() {
   const [lists, setLists] = useState<ListRow[]>([]);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
-  const [mail, setMail] = useState<{ ready: boolean; provider: string; from: string; hint: string } | null>(null);
+  const [mail, setMail] = useState<{
+    ready: boolean;
+    provider: string;
+    from: string;
+    envelope?: string;
+    hint: string;
+  } | null>(null);
   const [listId, setListId] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [subject, setSubject] = useState("");
   const [previewText, setPreviewText] = useState("");
   const [html, setHtml] = useState("");
   const [text, setText] = useState("");
-  const [testTo, setTestTo] = useState("");
+  const [testTo, setTestTo] = useState(workspaceId === "triton" ? "ayflow@pm.me" : "");
   const [memberEmail, setMemberEmail] = useState("");
   const [memberName, setMemberName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -191,6 +197,11 @@ export default function BulkEmailPage() {
           <span className="font-medium">From {mail?.from ?? config.email}</span>
         </div>
         <p className="mt-2 text-ink-600">{mail?.hint}</p>
+        {mail?.envelope ? (
+          <p className="mt-1 text-xs text-ink-500">
+            Envelope {mail.envelope} · Reply-To {mail.from}
+          </p>
+        ) : null}
       </Card>
       <div className="grid gap-4 xl:grid-cols-[320px_1fr_320px]">
         <div className="space-y-4">
@@ -259,13 +270,14 @@ export default function BulkEmailPage() {
           <Card className="space-y-2 p-4 text-sm">
             <div className="font-semibold">Best practices</div>
             <ul className="list-disc space-y-1 pl-4 text-ink-600">
-              <li>From {config.email}</li>
+              <li>From / Reply-To {config.email}</li>
               <li>Physical address + unsubscribe in every footer</li>
               <li>List-Unsubscribe one-click header</li>
               <li>HTML + plain text</li>
+              <li>Open / click tracking</li>
               <li>Seed/demo addresses never sent</li>
-              <li>Suppression on unsubscribe</li>
-              <li>Institutional-only copy</li>
+              <li>Suppression on unsubscribe, bounce, complaint</li>
+              <li>Institutional-only copy · 400ms pacing</li>
             </ul>
           </Card>
           <Card className="space-y-2 p-4">

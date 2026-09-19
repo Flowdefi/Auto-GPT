@@ -4,6 +4,7 @@ import { loadDb, mutate, nextId } from "@/server/db";
 import { fromAddress } from "@/server/mailer";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as {

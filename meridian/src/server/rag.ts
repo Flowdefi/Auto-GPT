@@ -1,6 +1,7 @@
 import type { WorkspaceId } from "@/lib/types";
 import { loadDb } from "./db";
 import type { GraphNode } from "./models";
+import { searchFts, sqliteReady } from "./sqlite";
 import { scoreOverlap, tokenize } from "./tokenize";
 
 export interface RagHit {
@@ -14,12 +15,26 @@ export interface RagHit {
 export function queryRag(workspaceId: WorkspaceId, prompt: string, limit = 6): RagHit[] {
   const db = loadDb();
   const terms = tokenize(prompt);
-  const ranked = db.chunks
+  const lexical = db.chunks
     .filter((chunk) => chunk.workspaceId === workspaceId)
     .map((chunk) => ({ chunk, score: scoreOverlap(terms, chunk.terms) }))
     .filter((row) => row.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
+
+  const ftsHits = sqliteReady() ? searchFts(workspaceId, prompt, limit) : [];
+  const byId = new Map(db.chunks.map((chunk) => [chunk.id, chunk]));
+  const merged = new Map<string, { chunk: (typeof db.chunks)[number]; score: number }>();
+  for (const row of lexical) {
+    merged.set(row.chunk.id, row);
+  }
+  for (const hit of ftsHits) {
+    const chunk = byId.get(hit.chunkId);
+    if (!chunk) continue;
+    const lexicalScore = merged.get(chunk.id)?.score ?? 0;
+    merged.set(chunk.id, { chunk, score: Math.max(lexicalScore, 1 / (1 + Math.abs(hit.score))) });
+  }
+  const ranked = [...merged.values()].sort((a, b) => b.score - a.score).slice(0, limit);
 
   return ranked.map(({ chunk, score }) => {
     const node = db.nodes.find((row) => row.id === chunk.nodeId);

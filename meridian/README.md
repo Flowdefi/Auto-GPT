@@ -46,24 +46,32 @@ Open **Marketing → Bulk send**. Mail is addressed from `portfolios@debtmarket.
 - Seed CRM addresses locked (no mail to demo bank/buyer inboxes)
 - Add a real recipient, then **Send test** or **Send to sendable list**
 
-Set `RESEND_API_KEY` and verify `debtmarket.net` (SPF, DKIM, DMARC) so Resend can deliver as `portfolios@debtmarket.net`. Without that key, the composer still works and returns a clear provider error instead of silently faking delivery.
+Delivery order:
+
+1. **Resend** (`RESEND_API_KEY`) — From `portfolios@debtmarket.net` after SPF / DKIM / DMARC on `debtmarket.net`
+2. **AgentMail** (`AGENTMAIL_API_KEY`) — delivers immediately from `portfolios@agentmail.to` with **Reply-To** `portfolios@debtmarket.net` (no spoofed From)
+
+A proof campaign already landed at `ayflow@pm.me` from the Triton AgentMail inbox. Seed CRM addresses stay locked. Opens, clicks, unsubscribes, bounces, and complaints write into the database. Sends are paced at 400ms.
+
+Without a provider key the composer still works and returns a clear error instead of silently faking delivery.
 
 ## Database + RAG graph
 
-First API call creates `data/meridian.json`:
+First API call creates `data/meridian.json` and `data/meridian.db` (SQLite):
 
-- Email lists, members, templates, campaigns, outbound messages, suppressions
-- Graph nodes/edges for companies, contacts, deals, inventory, tickets, pages, playbooks
-- RAG chunks with lexical retrieval + neighbor expansion
+- Relational CRM snapshot (companies, contacts, deals, inventory, tickets, CMS, SEO, …)
+- Email lists, members, templates, campaigns, outbound messages, suppressions, events
+- Knowledge graph nodes/edges
+- RAG chunks with **FTS5 + lexical** retrieval and neighbor expansion
 
-Schema: [`src/server/schema.sql`](src/server/schema.sql). Explore it in **Graph / RAG**. AI calls `/api/rag/query` before answering.
+Schema: [`src/server/schema.sql`](src/server/schema.sql). Explore it in **Graph / RAG**. Health: `GET /api/health`. Snapshot: `GET /api/crm/snapshot?workspace=triton`. AI calls `/api/rag/query` before answering.
 
 ## Run
 
 ```bash
 cd meridian
 npm install
-cp .env.example .env.local   # add RESEND_API_KEY to actually deliver
+cp .env.example .env.local   # add AGENTMAIL_API_KEY or RESEND_API_KEY to send from the UI
 npm run dev
 ```
 
@@ -71,6 +79,12 @@ Open [http://localhost:3000](http://localhost:3000) and choose a workspace.
 
 ```bash
 npm run build && npm run start
+```
+
+Docker (persists `data/`):
+
+```bash
+docker compose up --build
 ```
 
 Health: `GET /api/health`

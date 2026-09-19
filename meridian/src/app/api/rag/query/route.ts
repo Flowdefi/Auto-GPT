@@ -3,6 +3,7 @@ import { isWorkspaceId } from "@/lib/workspace-id";
 import { queryRag } from "@/server/rag";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as { workspaceId?: string; prompt?: string };

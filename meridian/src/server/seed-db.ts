@@ -239,6 +239,16 @@ function playbooks(workspaceId: WorkspaceId): Array<{ id: string; title: string;
         title: "Bid window email pattern",
         body: "Buyer alerts state face, asking cents, media quality, vintage, bid deadline, and NDA/data-room status. Sealed bids. Put-backs for fraud and deceased. Do not attach tapes.",
       },
+      {
+        id: "pb_deliverability",
+        title: "Outbound deliverability",
+        body: "SPF, DKIM, and DMARC on debtmarket.net. List-Unsubscribe one-click. HTML plus plain text. Suppression on unsubscribe, bounce, and complaint. Seed CRM addresses stay locked. Rate-limit bulk sends. Physical address Coconut Creek FL in every footer.",
+      },
+      {
+        id: "pb_asset_classes",
+        title: "DebtMarket asset classes",
+        body: "Credit card charge-off, auto deficiency, medical receivables, personal loans, telecom, private student loans, commercial paper, and fintech specialty. Typical close 14 to 45 days after a complete data room.",
+      },
     ];
   }
   return [
@@ -333,6 +343,7 @@ function emptyLike(_db: DatabaseFile): DatabaseFile {
     campaigns: [],
     messages: [],
     suppressions: [],
+    events: [],
     nodes: [],
     edges: [],
     chunks: [],

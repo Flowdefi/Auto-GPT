@@ -3,6 +3,7 @@ import { isWorkspaceId } from "@/lib/workspace-id";
 import { loadDb, mutate, nextId } from "@/server/db";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export function GET(request: Request) {
   const workspaceId = new URL(request.url).searchParams.get("workspace");

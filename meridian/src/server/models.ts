@@ -60,10 +60,21 @@ export interface OutboundMessage {
   to: string;
   subject: string;
   status: "queued" | "sent" | "delivered" | "failed" | "suppressed" | "skipped_seed";
+  provider?: string;
   providerId?: string;
   error?: string;
   unsubscribeToken: string;
   sentAt?: string;
+  opened?: number;
+  clicked?: number;
+}
+
+export interface MailEvent {
+  id: string;
+  messageId: string;
+  type: "open" | "click" | "bounce" | "complaint";
+  at: string;
+  url?: string;
 }
 
 export interface Suppression {
@@ -109,6 +120,7 @@ export interface DatabaseFile {
   campaigns: BulkCampaign[];
   messages: OutboundMessage[];
   suppressions: Suppression[];
+  events: MailEvent[];
   nodes: GraphNode[];
   edges: GraphEdge[];
   chunks: RagChunk[];
@@ -123,6 +135,7 @@ export function emptyDb(): DatabaseFile {
     campaigns: [],
     messages: [],
     suppressions: [],
+    events: [],
     nodes: [],
     edges: [],
     chunks: [],

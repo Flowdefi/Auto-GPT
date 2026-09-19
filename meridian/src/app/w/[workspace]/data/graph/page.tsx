@@ -22,6 +22,7 @@ export default function GraphPage() {
   const [nodes, setNodes] = useState<NodeRow[]>([]);
   const [edges, setEdges] = useState<EdgeRow[]>([]);
   const [chunks, setChunks] = useState(0);
+  const [crm, setCrm] = useState<{ engine?: { ready: boolean }; counts?: Record<string, number> } | null>(null);
   const [query, setQuery] = useState("FHB bid window media");
   const [hits, setHits] = useState<Array<{ title: string; kind: string; text: string; score: number; neighbors: string[] }>>(
     [],
@@ -35,6 +36,9 @@ export default function GraphPage() {
         setEdges(payload.edges ?? []);
         setChunks(payload.chunkCount ?? 0);
       });
+    void fetch(`/api/crm/snapshot?workspace=${workspaceId}`)
+      .then((response) => response.json())
+      .then((payload) => setCrm(payload));
   }, [workspaceId]);
 
   async function search() {
@@ -52,8 +56,17 @@ export default function GraphPage() {
       <PageHeader
         eyebrow="Data Hub"
         title="CRM graph + RAG"
-        subtitle={`${nodes.length} nodes · ${edges.length} edges · ${chunks} retrieval chunks. Query walks neighbors.`}
+        subtitle={`${nodes.length} nodes · ${edges.length} edges · ${chunks} retrieval chunks${crm?.engine?.ready ? " · SQLite FTS live" : ""}. Query walks neighbors.`}
       />
+      {crm?.counts ? (
+        <div className="mb-4 flex flex-wrap gap-2 text-xs text-ink-500">
+          {Object.entries(crm.counts).map(([kind, count]) => (
+            <span key={kind} className="rounded-full bg-ink-50 px-2 py-1">
+              {kind} {count}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div className="mb-4 flex gap-2">
         <Field value={query} onChange={(event) => setQuery(event.target.value)} />
         <button

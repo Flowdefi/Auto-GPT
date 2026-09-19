@@ -41,5 +41,6 @@ export function hubFromPath(pathname: string): HubId {
   if (pathname.includes("/reporting")) return "reporting";
   if (pathname.includes("/compliance")) return "compliance";
   if (pathname.includes("/ai")) return "ai";
+  if (pathname.includes("/data/")) return "automation";
   return "home";
 }
