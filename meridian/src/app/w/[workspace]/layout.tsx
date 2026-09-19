@@ -2,7 +2,7 @@
 
 import { AppShell } from "@/components/app-shell";
 import { HydrateGate } from "@/components/hydrate-gate";
-import { isWorkspaceId } from "@/lib/use-workspace";
+import { isWorkspaceId } from "@/lib/workspace-id";
 import { useParams } from "next/navigation";
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {

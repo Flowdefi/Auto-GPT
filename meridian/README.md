@@ -34,17 +34,48 @@ AI runs **on-device against workspace records** (no API key required). Prompts l
 - Home-screen install on iPhone (Share → Add to Home Screen).
 - `capacitor.config.ts` is ready for `npx cap add ios` when you want a native wrapper.
 
+## Bulk email (HubSpot-style)
+
+Open **Marketing → Bulk send**. Mail is addressed from `portfolios@debtmarket.net` with:
+
+- HTML + plain-text parts
+- Preview text
+- Physical address + institutional disclaimer
+- One-click `List-Unsubscribe` + public `/u/[token]` page
+- Suppression list
+- Seed CRM addresses locked (no mail to demo bank/buyer inboxes)
+- Add a real recipient, then **Send test** or **Send to sendable list**
+
+Set `RESEND_API_KEY` and verify `debtmarket.net` (SPF, DKIM, DMARC) so Resend can deliver as `portfolios@debtmarket.net`. Without that key, the composer still works and returns a clear provider error instead of silently faking delivery.
+
+## Database + RAG graph
+
+First API call creates `data/meridian.json`:
+
+- Email lists, members, templates, campaigns, outbound messages, suppressions
+- Graph nodes/edges for companies, contacts, deals, inventory, tickets, pages, playbooks
+- RAG chunks with lexical retrieval + neighbor expansion
+
+Schema: [`src/server/schema.sql`](src/server/schema.sql). Explore it in **Graph / RAG**. AI calls `/api/rag/query` before answering.
+
 ## Run
 
 ```bash
 cd meridian
 npm install
+cp .env.example .env.local   # add RESEND_API_KEY to actually deliver
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) and choose a workspace.
 
-Demo state persists in the browser (`localStorage`). Use **Reset demo** in the header to restore seed data.
+```bash
+npm run build && npm run start
+```
+
+Health: `GET /api/health`
+
+Demo CRM state persists in the browser. Server mail/graph data persists in `data/meridian.json`. Use **Reset demo** in the header to restore seed CRM data.
 
 ## Product notes
 

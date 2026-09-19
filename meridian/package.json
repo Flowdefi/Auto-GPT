@@ -4,9 +4,9 @@
   "private": true,
   "description": "Meridian — enterprise customer platform (HubSpot-class CRM, sales, marketing, CMS, SEO, and AI) for Triton Financial Solutions and Aether Digital Markets.",
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "next dev --port 3000 --hostname 0.0.0.0",
     "build": "next build",
-    "start": "next start --port 3000",
+    "start": "next start --port 3000 --hostname 0.0.0.0",
     "lint": "next lint"
   },
   "dependencies": {

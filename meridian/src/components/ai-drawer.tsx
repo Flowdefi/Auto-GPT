@@ -2,7 +2,8 @@
 
 import { Sparkles, X } from "lucide-react";
 import { useState } from "react";
-import { AI_STARTERS, meridianReply } from "@/lib/ai";
+import { AI_STARTERS } from "@/lib/ai";
+import { askMeridian } from "@/lib/ask-ai";
 import { useMeridian } from "@/lib/store";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 import { Button, Field } from "./ui";
@@ -21,11 +22,11 @@ export function AiDrawer({
 
   if (!open) return null;
 
-  function send(text: string) {
+  async function send(text: string) {
     const prompt = text.trim();
     if (!prompt) return;
     pushAi({ role: "user", body: prompt });
-    const reply = meridianReply(prompt, data, config);
+    const reply = await askMeridian(prompt, data, config);
     pushAi({ role: "assistant", body: reply.body });
     if (reply.subject) {
       logAiActivity(reply.subject, reply.body, reply.dealId, reply.contactId);

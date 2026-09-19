@@ -6,3 +6,5 @@ out
 ios
 android
 tsconfig.tsbuildinfo
+data/
+*.tmp

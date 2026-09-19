@@ -16,6 +16,7 @@ export default function ListsPage() {
         items={[
           { href: `/w/${workspaceId}/marketing/campaigns`, label: "Campaigns" },
           { href: `/w/${workspaceId}/marketing/emails`, label: "Emails" },
+          { href: `/w/${workspaceId}/marketing/bulk`, label: "Bulk send" },
           { href: `/w/${workspaceId}/marketing/lists`, label: "Lists & forms" },
         ]}
       />

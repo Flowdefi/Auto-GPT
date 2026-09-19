@@ -93,10 +93,18 @@ function scoreRecord(data: WorkspaceData, workspace: WorkspaceConfig, text: stri
   };
 }
 
+export interface RagContextHit {
+  title: string;
+  kind: string;
+  text: string;
+  neighbors: string[];
+}
+
 export function meridianReply(
   prompt: string,
   data: WorkspaceData,
   workspace: WorkspaceConfig,
+  rag: RagContextHit[] = [],
 ): AiReply {
   const text = prompt.trim();
   const lower = text.toLowerCase();
@@ -140,6 +148,16 @@ export function meridianReply(
     }
     return {
       body: "Aether is institutional only. KYC/AML on every counterparty. Travel Rule (IVMS-101) on transfers ≥ $3k. Prefer qualified custody (e.g. Pinnacle). Recorded lines on firm quotes. No retail onboarding from this desk.",
+    };
+  }
+
+  if (rag.length > 0 && !/(draft|score|forecast|inbox|task)/.test(lower)) {
+    const grounded = rag
+      .map((hit) => `• [${hit.kind}] ${hit.title}: ${hit.text}${hit.neighbors.length ? ` (related: ${hit.neighbors.join(", ")})` : ""}`)
+      .join("\n");
+    return {
+      subject: "RAG",
+      body: `Retrieved from the ${workspace.name} graph:\n${grounded}\n\n${workspace.name} snapshot — ${forecast(data)}`,
     };
   }
 

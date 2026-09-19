@@ -4,11 +4,10 @@ import { useParams } from "next/navigation";
 import { useEffect } from "react";
 import { useMeridian } from "./store";
 import type { WorkspaceId } from "./types";
+import { isWorkspaceId } from "./workspace-id";
 import { workspaceOf } from "./workspaces";
 
-export function isWorkspaceId(value: string | undefined): value is WorkspaceId {
-  return value === "triton" || value === "aether";
-}
+export { isWorkspaceId };
 
 export function useActiveWorkspace() {
   const params = useParams<{ workspace: string }>();
