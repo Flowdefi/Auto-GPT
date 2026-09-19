@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { askMeridian } from "@/lib/ask-ai";
+import { askCto } from "@/lib/ask-cto";
 import { haptic } from "@/lib/ios";
 import { promptsForPath } from "@/lib/prompt-context";
 import { useMeridian } from "@/lib/store";
@@ -46,10 +47,20 @@ function Conversation({
     setDraft("");
     pushAi({ role: "user", body: prompt });
     try {
-      const reply = await askMeridian(prompt, data, config);
-      pushAi({ role: "assistant", body: reply.body });
-      if (reply.subject) {
-        logAiActivity(reply.subject, reply.body, reply.dealId, reply.contactId);
+      const history = data.aiMessages.slice(-8).map((message) => ({
+        role: message.role as "user" | "assistant",
+        content: message.body,
+      }));
+      try {
+        const turn = await askCto(workspaceId, prompt, history);
+        pushAi({ role: "assistant", body: turn.reply });
+        logAiActivity("AI CTO", turn.reply.slice(0, 180));
+      } catch {
+        const reply = await askMeridian(prompt, data, config);
+        pushAi({ role: "assistant", body: reply.body });
+        if (reply.subject) {
+          logAiActivity(reply.subject, reply.body, reply.dealId, reply.contactId);
+        }
       }
     } finally {
       setBusy(false);
