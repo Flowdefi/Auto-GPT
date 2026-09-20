@@ -3,8 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  // Emits .next/standalone so the Docker image can run without node_modules.
-  output: "standalone",
+  // Docker uses standalone. OpenNext builds a Workers bundle instead.
+  output: process.env.OPENNEXT ? undefined : "standalone",
 };
 
 export default nextConfig;

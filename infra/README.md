@@ -46,6 +46,30 @@ hydrate from Postgres instead of local files / localStorage.
 
 Card PAN/CVC is never written. Portal payments store amount, method, and last4.
 
+## Cloudflare Workers (current live HTTPS)
+
+Temporary preview account **Scandalous Rosehip**. Claim it from the pull request
+within 60 minutes of deploy or the workers expire.
+
+| App | URL |
+| --- | --- |
+| Cove / TF Recovery | https://cove-tfr.scandalous-rosehip.workers.dev |
+| TF Recovery pay | https://cove-tfr.scandalous-rosehip.workers.dev/pay |
+| Meridian / Triton | https://meridian-triton.scandalous-rosehip.workers.dev |
+| Meridian home | https://meridian-triton.scandalous-rosehip.workers.dev/w/triton/home |
+
+Both workers bind **Hyperdrive** `927f2d9158164561b74b0273ef6ae7fe` to the same
+Prisma Postgres database.
+
+```bash
+# from cove/ or meridian/
+export CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="$DATABASE_URL"
+npx wrangler deploy --temporary   # first time / unclaimed account
+# after claiming: npx wrangler deploy
+```
+
+`workers.dev` may show a Cloudflare browser check to automated clients.
+
 ## Licensing
 
 Start collections work in GA + OH, then MO / KY. FDCPA, Reg F, and TCPA still

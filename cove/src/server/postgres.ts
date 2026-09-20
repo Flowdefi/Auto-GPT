@@ -1,3 +1,4 @@
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { Pool, type QueryResult, type QueryResultRow } from "pg";
 import type { AppData } from "@/lib/types";
 
@@ -6,9 +7,21 @@ const APP = "cove";
 let pool: Pool | null = null;
 let poolFailed = false;
 
+type HyperdriveBinding = { connectionString: string };
+
+function hyperdriveUrl(): string | undefined {
+  try {
+    const env = getCloudflareContext().env as { HYPERDRIVE?: HyperdriveBinding };
+    return env.HYPERDRIVE?.connectionString;
+  } catch {
+    return undefined;
+  }
+}
+
 export function databaseUrl(): string | undefined {
   const value = process.env.DATABASE_URL?.trim();
-  return value ? value : undefined;
+  if (value) return value;
+  return hyperdriveUrl();
 }
 
 function sslFor(url: string): boolean | { rejectUnauthorized: boolean } {
