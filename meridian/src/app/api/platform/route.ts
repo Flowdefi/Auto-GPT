@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
 import { llmStatus } from "@/server/ai/cto";
+import { requireSeat } from "@/server/api-guard";
 import { catalogForUi } from "@/server/ai/models";
 import { embedStatus } from "@/server/ai/embeddings";
 import { loadDb } from "@/server/db";
@@ -13,6 +14,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  const gate = await requireSeat(request);
+  if (!gate.ok) return gate.response;
   const workspace = new URL(request.url).searchParams.get("workspace") ?? undefined;
   if (!isWorkspaceId(workspace)) {
     return NextResponse.json({ error: "workspace required" }, { status: 400 });

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
 import { useActiveWorkspace } from "@/lib/use-workspace";
@@ -50,7 +51,7 @@ export default function IntegrationsPage() {
       <PageHeader
         eyebrow="Platform"
         title="Integrations"
-        subtitle="Office 365, website forms, mail authentication, and the model stack that powers the AI CTO."
+        subtitle="Office 365, website forms, mail authentication, and the model stack that powers the AI CTO. BYOK keys and mk_live_ API tokens live on Billing."
       />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
@@ -115,6 +116,12 @@ export default function IntegrationsPage() {
               Embeddings · {data?.embeddings.model} ({data?.embeddings.mode}, {data?.embeddings.dim}-d)
             </li>
             <li>SEO ranks · {data?.seo.configured ? data.seo.name : "local estimate (no SERP key)"}</li>
+            <li>
+              Provider keys · store encrypted BYOK values on{" "}
+              <Link className="underline" href="/billing">
+                Billing
+              </Link>
+            </li>
           </ul>
         </Card>
       </div>

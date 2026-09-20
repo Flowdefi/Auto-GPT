@@ -1,6 +1,7 @@
 import type { WorkspaceId } from "@/lib/types";
 import { loadDb, mutate, nextId } from "../db";
 import type { SeoBrief, SeoKeywordRow, SeoRankPoint } from "../models";
+import { resolveProviderSecret } from "../secrets";
 import { density, tokens, topTerms } from "./text";
 
 /**
@@ -15,8 +16,10 @@ export interface KeywordProvider {
 }
 
 export function keywordProvider(): KeywordProvider {
-  if (process.env.SERP_PROVIDER_URL && process.env.SERP_PROVIDER_KEY) {
-    return { name: process.env.SERP_PROVIDER_NAME ?? "custom", configured: true };
+  const url = resolveProviderSecret("SERP_PROVIDER_URL") ?? process.env.SERP_PROVIDER_URL;
+  const key = resolveProviderSecret("SERP_PROVIDER_KEY") ?? process.env.SERP_PROVIDER_KEY;
+  if (url && key) {
+    return { name: resolveProviderSecret("SERP_PROVIDER_NAME") ?? process.env.SERP_PROVIDER_NAME ?? "custom", configured: true };
   }
   return { name: "local-estimate", configured: false };
 }
@@ -184,9 +187,12 @@ export async function refreshRanks(workspaceId: WorkspaceId): Promise<{ checked:
 
   for (const keyword of tracked) {
     try {
-      const url = new URL(process.env.SERP_PROVIDER_URL!);
+      const providerUrl = resolveProviderSecret("SERP_PROVIDER_URL") ?? process.env.SERP_PROVIDER_URL;
+      const providerKey = resolveProviderSecret("SERP_PROVIDER_KEY") ?? process.env.SERP_PROVIDER_KEY;
+      if (!providerUrl || !providerKey) continue;
+      const url = new URL(providerUrl);
       url.searchParams.set("q", keyword.term);
-      url.searchParams.set("api_key", process.env.SERP_PROVIDER_KEY!);
+      url.searchParams.set("api_key", providerKey);
       const response = await fetch(url, { headers: { Accept: "application/json" } });
       if (!response.ok) continue;
       const payload = (await response.json()) as { organic_results?: Array<{ link?: string; position?: number }> };

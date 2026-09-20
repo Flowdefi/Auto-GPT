@@ -1,3 +1,5 @@
+import { resolveProviderSecret } from "../secrets";
+
 /**
  * Model catalog and router.
  *
@@ -99,8 +101,14 @@ export interface ResolvedModels {
 }
 
 export function resolveModels(): ResolvedModels {
-  const baseUrl = (process.env.OPENAI_BASE_URL ?? process.env.OLLAMA_BASE_URL ?? "").replace(/\/$/, "");
-  const apiKey = process.env.OPENAI_API_KEY;
+  const baseUrl = (
+    resolveProviderSecret("OPENAI_BASE_URL") ??
+    resolveProviderSecret("OLLAMA_BASE_URL") ??
+    process.env.OPENAI_BASE_URL ??
+    process.env.OLLAMA_BASE_URL ??
+    ""
+  ).replace(/\/$/, "");
+  const apiKey = resolveProviderSecret("OPENAI_API_KEY") ?? process.env.OPENAI_API_KEY;
   const reasoner = process.env.MERIDIAN_MODEL ?? process.env.OPENAI_MODEL ?? "qwen2.5:14b";
   const fast = process.env.MERIDIAN_FAST_MODEL ?? "llama3.2:3b";
   const embed = process.env.MERIDIAN_EMBED_MODEL ?? "nomic-embed-text";
