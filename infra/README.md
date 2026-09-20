@@ -46,10 +46,12 @@ hydrate from Postgres instead of local files / localStorage.
 
 Card PAN/CVC is never written. Portal payments store amount, method, and last4.
 
-## Cloudflare Workers (current live HTTPS)
+## Cloudflare Workers (durable HTTPS)
 
 Temporary preview account **Scandalous Rosehip**. Claim it from the pull request
-within 60 minutes of deploy or the workers expire.
+within 60 minutes of the last `--temporary` deploy or the workers expire. After
+claiming, run `npm run cf:deploy:prod` in `cove/` and `meridian/` (no
+`--temporary`).
 
 | App | URL |
 | --- | --- |
@@ -57,18 +59,34 @@ within 60 minutes of deploy or the workers expire.
 | TF Recovery pay | https://cove-tfr.scandalous-rosehip.workers.dev/pay |
 | Meridian / Triton | https://meridian-triton.scandalous-rosehip.workers.dev |
 | Meridian home | https://meridian-triton.scandalous-rosehip.workers.dev/w/triton/home |
+| Hyperdrive ping | https://meridian-cove-health.scandalous-rosehip.workers.dev |
 
-Both workers bind **Hyperdrive** `927f2d9158164561b74b0273ef6ae7fe` to the same
-Prisma Postgres database.
+Both app workers bind **Hyperdrive** `927f2d9158164561b74b0273ef6ae7fe` to the
+same Prisma Postgres database. The ping worker lives in `infra/cf-health`.
 
 ```bash
 # from cove/ or meridian/
 export CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="$DATABASE_URL"
 npx wrangler deploy --temporary   # first time / unclaimed account
-# after claiming: npx wrangler deploy
+# after claiming:
+npx wrangler deploy
 ```
 
-`workers.dev` may show a Cloudflare browser check to automated clients.
+`workers.dev` on an unclaimed preview account shows a Cloudflare browser check
+to datacenter clients. Open the links in a normal browser, or use a Cloudflare
+Tunnel in front of `npm run dev` / `npm run start` (no `workers.dev` challenge):
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:3000   # Meridian
+cloudflared tunnel --url http://127.0.0.1:3001   # Cove
+```
+
+GitHub Action `.github/workflows/cloudflare-workers.yml` deploys both OpenNext
+workers on `workflow_dispatch` once `CLOUDFLARE_API_TOKEN`,
+`CLOUDFLARE_ACCOUNT_ID`, and `DATABASE_URL` are set as repository secrets.
+
+Do **not** point `www.debtmarket.net` at this stack — that origin is still the
+GoDaddy WordPress site.
 
 ## Licensing
 

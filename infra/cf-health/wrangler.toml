@@ -1,0 +1,8 @@
+name = "meridian-cove-health"
+main = "index.js"
+compatibility_date = "2026-09-20"
+compatibility_flags = ["nodejs_compat"]
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "927f2d9158164561b74b0273ef6ae7fe"

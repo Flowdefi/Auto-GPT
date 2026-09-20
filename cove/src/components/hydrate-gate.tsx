@@ -1,16 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { useCove } from "@/lib/store";
 
-export function HydrateGate({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(() => useCove.persist.hasHydrated());
+function subscribe(onStoreChange: () => void) {
+  return useCove.persist.onFinishHydration(onStoreChange);
+}
 
-  useEffect(() => {
-    const unsub = useCove.persist.onFinishHydration(() => setReady(true));
-    if (useCove.persist.hasHydrated()) setReady(true);
-    return unsub;
-  }, []);
+function clientHydrated() {
+  return useCove.persist.hasHydrated();
+}
+
+function serverHydrated() {
+  return false;
+}
+
+export function HydrateGate({ children }: { children: React.ReactNode }) {
+  const ready = useSyncExternalStore(subscribe, clientHydrated, serverHydrated);
 
   if (!ready) {
     return <div className="flex min-h-dvh items-center justify-center text-sm text-cove-mute">Opening Cove…</div>;

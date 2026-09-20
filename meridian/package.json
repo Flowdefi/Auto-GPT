@@ -8,8 +8,9 @@
     "build": "next build",
     "start": "next start --port 3000 --hostname 0.0.0.0",
     "lint": "next lint",
-    "cf:build": "opennextjs-cloudflare build",
-    "cf:deploy": "opennextjs-cloudflare build && wrangler deploy --temporary"
+    "cf:build": "OPENNEXT=1 opennextjs-cloudflare build",
+    "cf:deploy": "OPENNEXT=1 opennextjs-cloudflare build && wrangler deploy --temporary",
+    "cf:deploy:prod": "OPENNEXT=1 opennextjs-cloudflare build && wrangler deploy"
   },
   "dependencies": {
     "@capacitor/app": "^7.1.2",
