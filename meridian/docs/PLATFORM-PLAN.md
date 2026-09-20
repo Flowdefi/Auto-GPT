@@ -38,6 +38,7 @@ Capture → enrich → score (fit + intent) → route (named account → segment
 6. **SEO suite.** Crawler, weighted technical audit, keyword research with difficulty and intent, content optimizer/brief, position tracking store, and competitor gap.
 7. **AI CTO.** An agent with a registered tool surface over the whole platform (root access), context-aware suggested prompts per page, content generation, and an audit log of every action it takes.
 8. **Email blast revamp.** Segments, A/B subject testing, spam scoring, deliverability (SPF/DKIM/DMARC) checks, throttling and warmup, frequency caps, link/UTM handling, and engagement suppression.
+9. **Internet gate.** Session auth, $275 lifetime seat (Polar + minted `mdl_` keys), per-user `mk_live_` API keys, BYOK secrets, public-route allowlist, and security headers.
 
 ## Non-negotiables carried forward
 

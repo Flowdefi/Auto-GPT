@@ -387,3 +387,28 @@ export function searchFts(workspaceId: WorkspaceId, prompt: string, limit = 8): 
 export function sqliteStats(): { path: string; ready: boolean } {
   return { path: SQLITE_FILE, ready: sqliteReady() };
 }
+
+/** Auth/billing tables. Never passed to persistSqlite's replaceTable wipe. */
+export function sqliteRun(sql: string, ...params: unknown[]): RunResult {
+  const db = open();
+  if (!db) throw new Error("SQLite is required for accounts, sessions, and licenses");
+  return db.prepare(sql).run(...params);
+}
+
+export function sqliteGet(sql: string, ...params: unknown[]): Record<string, unknown> | undefined {
+  const db = open();
+  if (!db) throw new Error("SQLite is required for accounts, sessions, and licenses");
+  return db.prepare(sql).get(...params);
+}
+
+export function sqliteAll(sql: string, ...params: unknown[]): Record<string, unknown>[] {
+  const db = open();
+  if (!db) throw new Error("SQLite is required for accounts, sessions, and licenses");
+  return db.prepare(sql).all(...params);
+}
+
+export function sqliteExec(sql: string): void {
+  const db = open();
+  if (!db) throw new Error("SQLite is required for accounts, sessions, and licenses");
+  db.exec(sql);
+}

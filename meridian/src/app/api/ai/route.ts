@@ -5,13 +5,16 @@ import { embedStatus } from "@/server/ai/embeddings";
 import { autoImprove } from "@/server/ai/improve";
 import { llmStatus, runCto } from "@/server/ai/cto";
 import { executeTool, toolCatalog } from "@/server/ai/tools";
+import { requireSeat } from "@/server/api-guard";
 import { loadDb } from "@/server/db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
+  const gate = await requireSeat(request);
+  if (!gate.ok) return gate.response;
   const workspace = new URL(request.url).searchParams.get("workspace") ?? undefined;
   if (!isWorkspaceId(workspace)) {
     return NextResponse.json({ error: "workspace required" }, { status: 400 });
@@ -27,6 +30,8 @@ export function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const gate = await requireSeat(request);
+  if (!gate.ok) return gate.response;
   const body = (await request.json()) as {
     workspaceId?: string;
     prompt?: string;

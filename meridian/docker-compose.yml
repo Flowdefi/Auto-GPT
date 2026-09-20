@@ -20,6 +20,11 @@ services:
       MERIDIAN_MODEL: ${MERIDIAN_MODEL:-qwen2.5:14b}
       MERIDIAN_FAST_MODEL: ${MERIDIAN_FAST_MODEL:-llama3.2:3b}
       MERIDIAN_EMBED_MODEL: ${MERIDIAN_EMBED_MODEL:-nomic-embed-text}
+      MERIDIAN_AUTH_SECRET: ${MERIDIAN_AUTH_SECRET:-}
+      POLAR_ACCESS_TOKEN: ${POLAR_ACCESS_TOKEN:-}
+      POLAR_PRODUCT_ID: ${POLAR_PRODUCT_ID:-}
+      POLAR_WEBHOOK_SECRET: ${POLAR_WEBHOOK_SECRET:-}
+      POLAR_SERVER: ${POLAR_SERVER:-production}
     volumes:
       - meridian-data:/app/data
     restart: unless-stopped
