@@ -1,7 +1,7 @@
 "use client";
 
 import { Subnav } from "@/components/subnav";
-import { Card, PageHeader } from "@/components/ui";
+import { Card, PageHeader } from "@/components/meridian/legacy";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 export default function EmailsPage() {

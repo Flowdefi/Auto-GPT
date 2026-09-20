@@ -44,6 +44,7 @@ export interface WorkspaceTheme {
   accent: string;
   accentSoft: string;
   accentText: string;
+  accentTextDark: string;
   mark: string;
   hero: string;
 }

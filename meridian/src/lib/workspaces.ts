@@ -14,8 +14,9 @@ export const WORKSPACES: Record<WorkspaceId, WorkspaceConfig> = {
     tagline: "Institutional marketplace for charged-off consumer and commercial debt portfolios.",
     theme: {
       accent: "#c9a24a",
-      accentSoft: "rgba(201, 162, 74, 0.14)",
-      accentText: "#8a6918",
+      accentSoft: "rgba(201, 162, 74, 0.16)",
+      accentText: "#7d5f14",
+      accentTextDark: "#e6cd8e",
       mark: "TF",
       hero: "linear-gradient(135deg, #0c1620 0%, #1b3348 55%, #c9a24a 160%)",
     },
@@ -57,8 +58,9 @@ export const WORKSPACES: Record<WorkspaceId, WorkspaceConfig> = {
     tagline: "OTC, listings, custody introductions, and market-making coverage for digital assets.",
     theme: {
       accent: "#5eead4",
-      accentSoft: "rgba(94, 234, 212, 0.14)",
-      accentText: "#0f766e",
+      accentSoft: "rgba(94, 234, 212, 0.16)",
+      accentText: "#0d6d66",
+      accentTextDark: "#8ff3e3",
       mark: "AE",
       hero: "linear-gradient(135deg, #070d13 0%, #12263a 50%, #5eead4 155%)",
     },

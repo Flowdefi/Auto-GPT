@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Button, Card, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
 import { contactName, relativeDay } from "@/lib/format";
 import { useMeridian } from "@/lib/store";
 import { useActiveWorkspace } from "@/lib/use-workspace";

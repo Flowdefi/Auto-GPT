@@ -2,7 +2,7 @@
 
 import { Subnav } from "@/components/subnav";
 import { DataTable } from "@/components/tables";
-import { Metric, PageHeader } from "@/components/ui";
+import { Metric, PageHeader } from "@/components/meridian/legacy";
 import { money } from "@/lib/format";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 

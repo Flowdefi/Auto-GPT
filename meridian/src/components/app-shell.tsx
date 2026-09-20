@@ -1,237 +1,306 @@
 "use client";
 
-import {
-  Bot,
-  Briefcase,
-  Building2,
-  ChevronLeft,
-  Home,
-  Inbox,
-  Menu,
-  Search,
-  Sparkles,
-} from "lucide-react";
+import { ChevronLeft, Command, Menu, RotateCcw, Search, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
-import { money } from "@/lib/format";
-import { hubFromPath, navFor } from "@/lib/nav";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { haptic, isIos } from "@/lib/ios";
+import { hubFromPath, navFor, type NavItem } from "@/lib/nav";
 import { useMeridian } from "@/lib/store";
 import { useActiveWorkspace } from "@/lib/use-workspace";
+import { cn } from "@/lib/utils";
 import { WORKSPACES } from "@/lib/workspaces";
 import { AiDrawer } from "./ai-drawer";
-import { cn } from "./ui";
+import { CommandPalette } from "./meridian/command-palette";
+import { NavIcon } from "./meridian/icon";
+import { ThemeToggle } from "./meridian/theme-provider";
+
+const GROUP_ORDER = ["Workspace", "Revenue", "Marketing", "Platform"] as const;
+
+function NavList({
+  items,
+  activeHref,
+  hub,
+  onNavigate,
+}: {
+  items: NavItem[];
+  activeHref: string;
+  hub: string;
+  onNavigate?: () => void;
+}) {
+  const grouped = useMemo(() => {
+    return GROUP_ORDER.map((group) => ({
+      group,
+      items: items.filter((item) => item.group === group),
+    })).filter((section) => section.items.length > 0);
+  }, [items]);
+
+  return (
+    <nav className="space-y-5 px-3 pb-6">
+      {grouped.map((section) => (
+        <div key={section.group}>
+          <div className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/45">
+            {section.group}
+          </div>
+          <div className="space-y-0.5">
+            {section.items.map((item) => {
+              const active = activeHref === item.href || (hub === item.hub && activeHref.startsWith(item.href));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => {
+                    haptic("light");
+                    onNavigate?.();
+                  }}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "group flex min-h-10 items-center gap-2.5 rounded-lg px-3 text-sm transition-colors",
+                    active
+                      ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                  )}
+                >
+                  <NavIcon
+                    name={item.icon}
+                    className={cn("size-4 shrink-0", active ? "text-[var(--brand)]" : "opacity-70")}
+                  />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </nav>
+  );
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { workspaceId, config, data, user } = useActiveWorkspace();
+  const { workspaceId, config, user } = useActiveWorkspace();
   const pathname = usePathname();
   const router = useRouter();
   const resetWorkspace = useMeridian((state) => state.resetWorkspace);
-  const [openNav, setOpenNav] = useState(false);
-  const [openAi, setOpenAi] = useState(false);
-  const [query, setQuery] = useState("");
+  const [navOpen, setNavOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [ios, setIos] = useState(false);
+
   const hub = hubFromPath(pathname);
   const nav = navFor(workspaceId);
+  const mobileTabs = nav.filter((item) => item.mobile).slice(0, 5);
 
-  const hits = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (q.length < 2) return [];
-    const contacts = data.contacts
-      .filter((contact) =>
-        `${contact.firstName} ${contact.lastName} ${contact.email} ${contact.title}`
-          .toLowerCase()
-          .includes(q),
-      )
-      .slice(0, 4)
-      .map((contact) => ({
-        href: `/w/${workspaceId}/crm/contacts/${contact.id}`,
-        title: `${contact.firstName} ${contact.lastName}`,
-        meta: contact.title,
-      }));
-    const companies = data.companies
-      .filter((company) => company.name.toLowerCase().includes(q))
-      .slice(0, 3)
-      .map((company) => ({
-        href: `/w/${workspaceId}/crm/companies/${company.id}`,
-        title: company.name,
-        meta: company.industry,
-      }));
-    const deals = data.deals
-      .filter((deal) => deal.name.toLowerCase().includes(q))
-      .slice(0, 3)
-      .map((deal) => ({
-        href: `/w/${workspaceId}/sales/deals/${deal.id}`,
-        title: deal.name,
-        meta: money(deal.amount),
-      }));
-    return [...contacts, ...companies, ...deals];
-  }, [data, query, workspaceId]);
+  useEffect(() => setIos(isIos()), []);
 
   return (
     <div
-      className="min-h-dvh bg-ink-50"
+      data-workspace={workspaceId}
+      className="min-h-dvh bg-background"
       style={
         {
-          "--accent": config.theme.accent,
-          "--accent-soft": config.theme.accentSoft,
-          "--accent-text": config.theme.accentText,
+          "--brand": config.theme.accent,
+          "--brand-soft": config.theme.accentSoft,
+          "--brand-text": config.theme.accentText,
           "--hero": config.theme.hero,
         } as React.CSSProperties
       }
     >
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 border-r border-ink-800/40 bg-ink-950 text-ink-100 transition-transform lg:translate-x-0",
-          openNav ? "translate-x-0" : "-translate-x-full",
-        )}
-      >
-        <div className="flex h-14 items-center gap-2 px-4">
+      <style>{`.dark [data-workspace="${workspaceId}"]{--brand-text:${config.theme.accentTextDark};}`}</style>
+
+      {/* Desktop sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
+        <div className="flex h-14 items-center gap-2.5 px-4">
           <div
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold text-ink-950"
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-xs font-bold text-[oklch(0.16_0.03_247)]"
             style={{ background: config.theme.accent }}
           >
             {config.theme.mark}
           </div>
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold">Meridian</div>
-            <div className="truncate text-[11px] text-ink-400">{config.legalName}</div>
+            <div className="truncate text-sm font-semibold text-sidebar-accent-foreground">Meridian</div>
+            <div className="truncate text-[11px] text-sidebar-foreground/55">{config.product}</div>
           </div>
         </div>
+
         <div className="px-3 pb-3">
-          <label className="sr-only" htmlFor="workspace-switch">
-            Workspace
-          </label>
-          <select
-            id="workspace-switch"
-            className="w-full rounded-lg border border-ink-800 bg-ink-900 px-2 py-2 text-xs"
-            value={workspaceId}
-            onChange={(event) => {
-              router.push(`/w/${event.target.value}/home`);
-              setOpenNav(false);
-            }}
-          >
-            {Object.values(WORKSPACES).map((workspace) => (
-              <option key={workspace.id} value={workspace.id}>
-                {workspace.legalName}
-              </option>
-            ))}
-          </select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex min-h-10 w-full items-center justify-between rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 text-left text-xs text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
+              >
+                <span className="truncate">{config.legalName}</span>
+                <ChevronLeft className="size-3.5 -rotate-90 opacity-60" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-60">
+              <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+              {Object.values(WORKSPACES).map((workspace) => (
+                <DropdownMenuItem
+                  key={workspace.id}
+                  onSelect={() => {
+                    haptic("medium");
+                    router.push(`/w/${workspace.id}/home`);
+                  }}
+                >
+                  <span
+                    className="size-2.5 rounded-full"
+                    style={{ background: workspace.theme.accent }}
+                    aria-hidden
+                  />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm">{workspace.legalName}</div>
+                    <div className="truncate text-xs text-muted-foreground">{workspace.industry}</div>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => router.push("/")}>All workspaces</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        <nav className="space-y-0.5 px-2">
-          {nav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setOpenNav(false)}
-              className={cn(
-                "flex items-center rounded-lg px-3 py-2 text-sm",
-                hub === item.hub
-                  ? "bg-white/10 text-white"
-                  : "text-ink-300 hover:bg-white/5 hover:text-white",
-              )}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="absolute bottom-0 left-0 right-0 border-t border-ink-800 p-3 text-[11px] text-ink-400">
-          Enterprise · Smart CRM · Breeze-class AI
+
+        <ScrollArea className="flex-1">
+          <NavList items={nav} activeHref={pathname} hub={hub} />
+        </ScrollArea>
+
+        <div className="border-t border-sidebar-border px-4 py-3 text-[11px] text-sidebar-foreground/50">
+          Smart CRM · SEO · Breeze-class AI
         </div>
       </aside>
 
-      {openNav ? (
-        <button
-          type="button"
-          className="fixed inset-0 z-30 bg-ink-950/40 lg:hidden"
-          onClick={() => setOpenNav(false)}
-          aria-label="Close navigation"
-        />
-      ) : null}
-
       <div className="lg:pl-64">
-        <header className="ios-blur sticky top-0 z-20 border-b border-ink-100/80 bg-white/80">
+        {/* Header */}
+        <header className="ios-blur sticky top-0 z-30 border-b bg-background/80 safe-top">
           <div className="flex h-14 items-center gap-2 px-3 sm:px-5">
-            <button
-              type="button"
-              className="rounded-lg p-2 lg:hidden"
-              onClick={() => setOpenNav(true)}
-              aria-label="Open navigation"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-            <Link href="/" className="hidden items-center gap-1 text-xs text-ink-500 sm:flex">
-              <ChevronLeft className="h-3.5 w-3.5" />
-              Workspaces
-            </Link>
-            <div className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={`Search ${config.product}…`}
-                className="h-10 w-full rounded-xl border border-ink-100 bg-ink-50 pl-9 pr-3 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-[var(--accent)]"
-              />
-              {hits.length > 0 ? (
-                <div className="absolute left-0 right-0 top-11 z-30 overflow-hidden rounded-xl border border-ink-100 bg-white shadow-pop">
-                  {hits.map((hit) => (
-                    <Link
-                      key={hit.href}
-                      href={hit.href}
-                      onClick={() => setQuery("")}
-                      className="block px-3 py-2 hover:bg-ink-50"
+            <Sheet open={navOpen} onOpenChange={setNavOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="tap-target lg:hidden" aria-label="Open navigation">
+                  <Menu className="size-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[17rem] border-sidebar-border bg-sidebar p-0 text-sidebar-foreground">
+                <SheetHeader className="px-4 pb-0">
+                  <SheetTitle className="flex items-center gap-2.5 text-sidebar-accent-foreground">
+                    <span
+                      className="grid size-8 place-items-center rounded-lg text-xs font-bold text-[oklch(0.16_0.03_247)]"
+                      style={{ background: config.theme.accent }}
                     >
-                      <div className="text-sm font-medium">{hit.title}</div>
-                      <div className="text-xs text-ink-500">{hit.meta}</div>
-                    </Link>
-                  ))}
-                </div>
+                      {config.theme.mark}
+                    </span>
+                    {config.name}
+                  </SheetTitle>
+                </SheetHeader>
+                <ScrollArea className="h-[calc(100dvh-5rem)]">
+                  <NavList items={nav} activeHref={pathname} hub={hub} onNavigate={() => setNavOpen(false)} />
+                </ScrollArea>
+              </SheetContent>
+            </Sheet>
+
+            <button
+              type="button"
+              onClick={() => {
+                haptic("light");
+                setPaletteOpen(true);
+              }}
+              className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-xl border bg-muted/60 px-3 text-left text-sm text-muted-foreground transition-colors hover:bg-muted"
+            >
+              <Search className="size-4 shrink-0" />
+              <span className="truncate">Search {config.product}…</span>
+              {!ios ? (
+                <kbd className="ml-auto hidden items-center gap-0.5 rounded border bg-background px-1.5 py-0.5 text-[10px] font-medium sm:flex">
+                  <Command className="size-3" />K
+                </kbd>
               ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={() => setOpenAi(true)}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[var(--accent-soft)] px-3 text-sm font-semibold text-[var(--accent-text)]"
+            </button>
+
+            <Button
+              variant="soft"
+              size="tap"
+              className="rounded-xl"
+              onClick={() => {
+                haptic("medium");
+                setAiOpen(true);
+              }}
             >
-              <Sparkles className="h-4 w-4" />
+              <Sparkles className="size-4" />
               <span className="hidden sm:inline">AI</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => resetWorkspace(workspaceId)}
-              className="hidden rounded-xl px-2 text-xs text-ink-400 hover:text-ink-700 md:inline"
-            >
-              Reset demo
-            </button>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-900 text-xs font-semibold text-white">
-              {user?.initials}
-            </div>
+            </Button>
+
+            <ThemeToggle />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="tap-target grid place-items-center" aria-label="Account">
+                  <Avatar className="size-9">
+                    <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
+                      {user?.initials}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="text-sm">{user?.name}</div>
+                  <div className="text-xs font-normal text-muted-foreground">{user?.role}</div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => router.push(`/w/${workspaceId}/settings/integrations`)}>
+                  <NavIcon name="Plug" className="size-4" />
+                  Integrations
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    resetWorkspace(workspaceId);
+                    toast.success("Demo CRM data restored");
+                  }}
+                >
+                  <RotateCcw className="size-4" />
+                  Reset demo data
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
-        <main className="px-3 pb-24 pt-5 sm:px-6 lg:pb-10">{children}</main>
+        <main className="momentum-scroll safe-x px-3 pb-[calc(var(--tabbar-h)+var(--safe-b)+1.5rem)] pt-5 sm:px-6 lg:pb-12">
+          {children}
+        </main>
       </div>
 
-      <nav className="ios-blur fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-white/90 pb-[var(--safe-b)] lg:hidden">
+      {/* iOS-style bottom tab bar */}
+      <nav
+        className="ios-blur fixed inset-x-0 bottom-0 z-30 border-t bg-background/90 pb-[var(--safe-b)] lg:hidden"
+        aria-label="Primary"
+      >
         <div className="grid grid-cols-5">
-          {[
-            { href: `/w/${workspaceId}/home`, label: "Home", icon: Home },
-            { href: `/w/${workspaceId}/crm/contacts`, label: "CRM", icon: Building2 },
-            { href: `/w/${workspaceId}/conversations`, label: "Inbox", icon: Inbox },
-            { href: `/w/${workspaceId}/sales/deals`, label: "Sales", icon: Briefcase },
-            { href: `/w/${workspaceId}/ai`, label: "AI", icon: Bot },
-          ].map((item) => {
-            const active = pathname.startsWith(item.href);
-            const Icon = item.icon;
+          {mobileTabs.map((item) => {
+            const active = pathname.startsWith(item.href) || hub === item.hub;
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => haptic("light")}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 py-2 text-[11px]",
-                  active ? "text-[var(--accent-text)]" : "text-ink-400",
+                  "no-select flex min-h-[var(--tabbar-h)] flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors",
+                  active ? "text-[var(--brand-text)]" : "text-muted-foreground",
                 )}
               >
-                <Icon className="h-5 w-5" />
+                <NavIcon name={item.icon} className="size-5" />
                 {item.label}
               </Link>
             );
@@ -239,7 +308,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      <AiDrawer open={openAi} onClose={() => setOpenAi(false)} />
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} onAskAi={() => setAiOpen(true)} />
+      <AiDrawer open={aiOpen} onClose={() => setAiOpen(false)} />
     </div>
   );
 }

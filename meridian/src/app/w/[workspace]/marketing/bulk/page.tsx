@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Subnav } from "@/components/subnav";
-import { Badge, Button, Card, Field, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, Field, PageHeader } from "@/components/meridian/legacy";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 interface ListRow {
@@ -55,20 +55,26 @@ export default function BulkEmailPage() {
   const [testTo, setTestTo] = useState(workspaceId === "triton" ? "ayflow@pm.me" : "");
   const [memberEmail, setMemberEmail] = useState("");
   const [memberName, setMemberName] = useState("");
+  const [variantB, setVariantB] = useState("");
+  const [spam, setSpam] = useState<{ score: number; verdict: string; hits: Array<{ rule: string; detail: string }> } | null>(null);
+  const [auth, setAuth] = useState<{ score: number; verdict: string; summary: string } | null>(null);
+  const [segments, setSegments] = useState<Array<{ id: string; name: string; size: number; description: string }>>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const selectedList = lists.find((list) => list.id === listId);
 
   async function refresh() {
-    const [catalog, status] = await Promise.all([
+    const [catalog, status, segmentPayload] = await Promise.all([
       fetch(`/api/email/lists?workspace=${workspaceId}`).then((response) => response.json()),
       fetch("/api/email/status").then((response) => response.json()),
+      fetch(`/api/segments?workspace=${workspaceId}`).then((response) => response.json()),
     ]);
     setLists(catalog.lists ?? []);
     setTemplates(catalog.templates ?? []);
     setCampaigns(catalog.campaigns ?? []);
     setMail(status);
+    setSegments(segmentPayload.segments ?? []);
     if (!listId && catalog.lists?.[0]) setListId(catalog.lists[0].id);
     if (!templateId && catalog.templates?.[0]) {
       applyTemplate(catalog.templates[0]);
@@ -80,6 +86,27 @@ export default function BulkEmailPage() {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      void fetch("/api/email/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject,
+          html,
+          text,
+          domain: workspaceId === "triton" ? "debtmarket.net" : "aethermarkets.io",
+        }),
+      })
+        .then((response) => response.json())
+        .then((payload) => {
+          setSpam(payload.spam ?? null);
+          setAuth(payload.auth ?? null);
+        });
+    }, 400);
+    return () => clearTimeout(handle);
+  }, [subject, html, text, workspaceId]);
 
   function applyTemplate(template: TemplateRow) {
     setSubject(template.subject);
@@ -157,7 +184,11 @@ export default function BulkEmailPage() {
         const sent = await fetch("/api/email/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ campaignId: created.id }),
+          body: JSON.stringify({
+            campaignId: created.id,
+            variants: variantB.trim() ? [variantB.trim()] : [],
+            frequencyCap: 3,
+          }),
         }).then(async (response) => {
           const payload = await response.json();
           if (!response.ok) throw new Error(payload.error);
@@ -219,6 +250,15 @@ export default function BulkEmailPage() {
               ))}
             </select>
             <p className="mt-2 text-xs text-ink-500">{selectedList?.description}</p>
+            {segments.length > 0 ? (
+              <div className="mt-3 space-y-1 text-xs text-ink-500">
+                {segments.map((segment) => (
+                  <div key={segment.id}>
+                    {segment.name} · {segment.size} contacts
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </Card>
           <Card className="space-y-2 p-4">
             <div className="text-sm font-semibold">Add sendable recipient</div>
@@ -248,7 +288,8 @@ export default function BulkEmailPage() {
           </Card>
         </div>
         <div className="space-y-3">
-          <Field value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Subject" />
+          <Field value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Subject A" />
+          <Field value={variantB} onChange={(event) => setVariantB(event.target.value)} placeholder="Subject B (optional A/B split)" />
           <Field value={previewText} onChange={(event) => setPreviewText(event.target.value)} placeholder="Preview text" />
           <textarea
             className="min-h-48 w-full rounded-xl border border-ink-200 p-3 text-sm"
@@ -278,7 +319,26 @@ export default function BulkEmailPage() {
               <li>Seed/demo addresses never sent</li>
               <li>Suppression on unsubscribe, bounce, complaint</li>
               <li>Institutional-only copy · 400ms pacing</li>
+              <li>A/B subjects hashed by recipient</li>
+              <li>72-hour frequency cap (3)</li>
             </ul>
+            {spam ? (
+              <div className="mt-3">
+                <Badge tone={spam.verdict === "clean" ? "good" : spam.verdict === "risky" ? "warn" : "bad"}>
+                  spam {spam.score} · {spam.verdict}
+                </Badge>
+                <ul className="mt-2 list-disc pl-4 text-xs text-ink-600">
+                  {spam.hits.map((hit) => (
+                    <li key={hit.rule}>{hit.detail}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {auth ? (
+              <p className="mt-2 text-xs text-ink-500">
+                Domain auth {auth.verdict} · {auth.score}/100. {auth.summary}
+              </p>
+            ) : null}
           </Card>
           <Card className="space-y-2 p-4">
             <div className="text-sm font-semibold">Send test</div>

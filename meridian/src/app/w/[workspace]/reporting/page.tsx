@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Metric, PageHeader } from "@/components/ui";
+import { Card, Metric, PageHeader } from "@/components/meridian/legacy";
 import { money } from "@/lib/format";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 

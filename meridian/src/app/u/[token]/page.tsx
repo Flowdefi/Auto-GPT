@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { Button, Card } from "@/components/ui";
+import { Button, Card } from "@/components/meridian/legacy";
 
 export default function UnsubscribePage() {
   const params = useParams<{ token: string }>();

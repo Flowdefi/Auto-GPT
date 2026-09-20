@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Card, PageHeader } from "@/components/ui";
+import { Badge, Card, PageHeader } from "@/components/meridian/legacy";
 import { centsOnDollar, compact, money } from "@/lib/format";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Subnav } from "@/components/subnav";
-import { Badge, Card, PageHeader } from "@/components/ui";
+import { Badge, Card, PageHeader } from "@/components/meridian/legacy";
 import { money } from "@/lib/format";
 import { useMeridian } from "@/lib/store";
 import { useActiveWorkspace } from "@/lib/use-workspace";

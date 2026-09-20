@@ -1,4 +1,5 @@
 import type { WorkspaceId } from "@/lib/types";
+import { cachedEmbed, cosine } from "./ai/embeddings";
 import { loadDb } from "./db";
 import type { GraphNode } from "./models";
 import { searchFts, sqliteReady } from "./sqlite";
@@ -34,7 +35,15 @@ export function queryRag(workspaceId: WorkspaceId, prompt: string, limit = 6): R
     const lexicalScore = merged.get(chunk.id)?.score ?? 0;
     merged.set(chunk.id, { chunk, score: Math.max(lexicalScore, 1 / (1 + Math.abs(hit.score))) });
   }
-  const ranked = [...merged.values()].sort((a, b) => b.score - a.score).slice(0, limit);
+  const queryVector = cachedEmbed(`q:${prompt}`, prompt);
+  const hybrid = [...merged.values()].map((row) => {
+    const vector = cachedEmbed(row.chunk.id, `${row.chunk.title} ${row.chunk.text}`);
+    const semantic = Math.max(0, cosine(queryVector, vector));
+    const lexicalNorm = row.score / (1 + row.score);
+    return { ...row, score: 0.55 * lexicalNorm + 0.45 * semantic };
+  });
+
+  const ranked = hybrid.sort((a, b) => b.score - a.score).slice(0, limit);
 
   return ranked.map(({ chunk, score }) => {
     const node = db.nodes.find((row) => row.id === chunk.nodeId);

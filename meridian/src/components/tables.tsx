@@ -1,6 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { cn } from "./ui";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 export function DataTable({
   headers,
@@ -10,46 +18,35 @@ export function DataTable({
   rows: Array<{ key: string; href?: string; cells: ReactNode[] }>;
 }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-ink-100 bg-white shadow-card">
-      <table className="min-w-full text-left text-sm">
-        <thead className="bg-ink-50 text-xs uppercase tracking-wide text-ink-400">
-          <tr>
+    <div className="momentum-scroll overflow-x-auto rounded-xl border bg-card shadow-card">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
             {headers.map((header) => (
-              <th key={header} className="px-4 py-3 font-medium">
+              <TableHead key={header} className="whitespace-nowrap text-xs uppercase tracking-wide">
                 {header}
-              </th>
+              </TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const cells = row.cells.map((cell, index) => (
-              <td key={index} className="px-4 py-3 align-middle text-ink-800">
-                {cell}
-              </td>
-            ));
-            return row.href ? (
-              <tr key={row.key} className="border-t border-ink-50 hover:bg-ink-50/70">
-                {cells.map((cell, index) =>
-                  index === 0 ? (
-                    <td key={index} className="px-4 py-3">
-                      <Link href={row.href ?? "#"} className="font-medium hover:underline">
-                        {row.cells[0]}
-                      </Link>
-                    </td>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={row.key}>
+              {row.cells.map((cell, index) => (
+                <TableCell key={index} className="align-middle">
+                  {index === 0 && row.href ? (
+                    <Link href={row.href} className="font-medium hover:underline">
+                      {cell}
+                    </Link>
                   ) : (
                     cell
-                  ),
-                )}
-              </tr>
-            ) : (
-              <tr key={row.key} className="border-t border-ink-50">
-                {cells}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  )}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -66,16 +63,16 @@ export function Timeline({
           <div className="flex flex-col items-center">
             <div
               className={cn(
-                "mt-1 h-2.5 w-2.5 rounded-full",
-                index === 0 ? "bg-[var(--accent)]" : "bg-ink-200",
+                "mt-1.5 size-2.5 rounded-full",
+                index === 0 ? "bg-[var(--brand)]" : "bg-border",
               )}
             />
-            <div className="w-px flex-1 bg-ink-100" />
+            <div className="w-px flex-1 bg-border" />
           </div>
           <div className="pb-4">
             <div className="text-sm font-medium">{item.title}</div>
-            <div className="whitespace-pre-wrap text-sm text-ink-600">{item.body}</div>
-            <div className="mt-1 text-xs text-ink-400">{item.meta}</div>
+            <div className="whitespace-pre-wrap text-sm text-muted-foreground">{item.body}</div>
+            <div className="mt-1 text-xs text-muted-foreground/70">{item.meta}</div>
           </div>
         </li>
       ))}

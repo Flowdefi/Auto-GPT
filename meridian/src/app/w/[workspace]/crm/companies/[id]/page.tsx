@@ -2,22 +2,54 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Card, PageHeader } from "@/components/ui";
+import { useState } from "react";
+import { Button, Card, PageHeader } from "@/components/meridian/legacy";
 import { contactName, money } from "@/lib/format";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 export default function CompanyRecordPage() {
   const params = useParams<{ id: string }>();
   const { workspaceId, data } = useActiveWorkspace();
+  const [enrichment, setEnrichment] = useState<Record<string, unknown> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const company = data.companies.find((item) => item.id === params.id);
   if (!company) return <PageHeader title="Company not found" />;
-  const contacts = data.contacts.filter((contact) => contact.companyId === company.id);
+  const companyId = company.id;
+  const contacts = data.contacts.filter((contact) => contact.companyId === companyId);
   const deals = data.deals.filter((deal) => deal.companyId === company.id);
   const books = data.inventory.filter((item) => item.sellerCompanyId === company.id);
 
+  async function enrich() {
+    setBusy(true);
+    setError(null);
+    const response = await fetch("/api/enrich", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId, companyId }),
+    });
+    const payload = await response.json();
+    setBusy(false);
+    if (!response.ok) {
+      setError(payload.error ?? "Enrichment failed");
+      return;
+    }
+    setEnrichment(payload.result ?? null);
+  }
+
   return (
     <div>
-      <PageHeader eyebrow={company.type} title={company.name} subtitle={company.notes} />
+      <PageHeader
+        eyebrow={company.type}
+        title={company.name}
+        subtitle={company.notes}
+        actions={
+          <Button tone="soft" disabled={busy} onClick={() => void enrich()}>
+            {busy ? "Enriching…" : "Enrich from public sources"}
+          </Button>
+        }
+      />
+      {error ? <Card className="mb-4 p-4 text-sm">{error}</Card> : null}
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="p-5 text-sm">
           <div className="font-semibold">Profile</div>
@@ -53,6 +85,12 @@ export default function CompanyRecordPage() {
               {item.name} · {item.kind} · {money(item.faceValue)}
             </Link>
           ))}
+        </Card>
+      ) : null}
+      {enrichment ? (
+        <Card className="mt-4 p-5 text-sm">
+          <div className="font-semibold">Public enrichment</div>
+          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs">{JSON.stringify(enrichment, null, 2)}</pre>
         </Card>
       ) : null}
     </div>

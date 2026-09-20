@@ -2,7 +2,7 @@
 
 import { Subnav } from "@/components/subnav";
 import { DataTable } from "@/components/tables";
-import { PageHeader } from "@/components/ui";
+import { PageHeader } from "@/components/meridian/legacy";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 export default function SequencesPage() {

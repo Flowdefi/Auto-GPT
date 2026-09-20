@@ -8,3 +8,5 @@ android
 tsconfig.tsbuildinfo
 /data/
 *.tmp
+/ios/
+/android/

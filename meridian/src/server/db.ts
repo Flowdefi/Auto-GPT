@@ -4,6 +4,9 @@ import { id } from "@/lib/format";
 import { emptyDb, type DatabaseFile } from "./models";
 import { seedServerData } from "./seed-db";
 import { persistSqlite, seedCrmSnapshot } from "./sqlite";
+import { seedCrmRecords } from "./crm";
+import { seedSegmentsInto } from "./segments";
+import { seedDemoLeads, seedWorkflows } from "./workflow";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "meridian.json");
@@ -17,8 +20,37 @@ function ensureDir(): void {
   }
 }
 
+const COLLECTIONS: Array<keyof DatabaseFile> = [
+  "events",
+  "companies",
+  "contacts",
+  "leads",
+  "submissions",
+  "inbox",
+  "mailboxes",
+  "workflows",
+  "runs",
+  "tasks",
+  "crawls",
+  "seoPages",
+  "seoIssues",
+  "keywords",
+  "ranks",
+  "briefs",
+  "segments",
+  "aiAudit",
+];
+
 function migrate(db: DatabaseFile): DatabaseFile {
-  if (!db.events) db.events = [];
+  for (const key of COLLECTIONS) {
+    if (!Array.isArray(db[key])) {
+      (db as unknown as Record<string, unknown[]>)[key] = [];
+    }
+  }
+  seedCrmRecords(db);
+  seedWorkflows(db);
+  seedDemoLeads(db);
+  seedSegmentsInto(db);
   const hasOwner = db.members.some((member) => member.email === OWNER_EMAIL);
   if (!hasOwner) {
     db.members.push({

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Badge, Card, Metric, PageHeader } from "@/components/ui";
+import { Badge, Card, Metric, PageHeader } from "@/components/meridian/legacy";
 import { meridianReply } from "@/lib/ai";
 import { centsOnDollar, compact, money } from "@/lib/format";
 import { useMeridian } from "@/lib/store";
