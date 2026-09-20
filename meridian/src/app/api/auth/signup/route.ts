@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE } from "@/lib/commerce";
-import { accountHasSeat, createAccount, issueSessionCookie, publicAccount, sessionCookieOptions } from "@/server/auth";
+import { accountById, accountHasSeat, createAccount, issueSessionCookie, publicAccount, sessionCookieOptions } from "@/server/auth";
 import { claimReservedLicense } from "@/server/billing";
 import { clientIp, rateLimited, tooMany } from "@/server/rate-limit";
 
@@ -23,9 +23,10 @@ export async function POST(request: Request) {
     });
     claimReservedLicense(account);
     const licensed = accountHasSeat(account.id);
-    const session = issueSessionCookie(account, request);
+    const fresh = accountById(account.id) ?? account;
+    const session = issueSessionCookie(fresh, request);
     const response = NextResponse.json({
-      account: publicAccount(account, licensed),
+      account: publicAccount(fresh, licensed),
       next: licensed ? "/w/triton/home" : "/billing",
     });
     response.cookies.set(SESSION_COOKIE, session.cookie, sessionCookieOptions());
