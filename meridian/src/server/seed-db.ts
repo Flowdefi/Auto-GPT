@@ -331,7 +331,62 @@ export function seedServerData(db: DatabaseFile): DatabaseFile {
   const next = emptyLike(db);
   indexWorkspace("triton", seedTriton(), next);
   indexWorkspace("aether", seedAether(), next);
+  ensureCrmRecords(next);
   return next;
+}
+
+/** Copy Triton/Aether CRM rows onto the JSON/Postgres book when they are missing. */
+export function ensureCrmRecords(db: DatabaseFile): void {
+  if (db.contacts.length > 0 && db.companies.length > 0) return;
+  const now = new Date().toISOString();
+  const sets: Array<[WorkspaceId, WorkspaceData]> = [
+    ["triton", seedTriton()],
+    ["aether", seedAether()],
+  ];
+  for (const [workspaceId, data] of sets) {
+    if (db.companies.length === 0) {
+      for (const company of data.companies) {
+        db.companies.push({
+          id: company.id,
+          workspaceId,
+          name: company.name,
+          domain: company.domain,
+          type: company.type,
+          industry: company.industry,
+          city: company.city,
+          state: company.state,
+          employees: company.employees,
+          ownerId: company.ownerId,
+          lifecycle: company.lifecycle,
+          score: company.score,
+          notes: company.notes,
+          createdAt: now,
+        });
+      }
+    }
+    if (db.contacts.length === 0) {
+      for (const contact of data.contacts) {
+        db.contacts.push({
+          id: contact.id,
+          workspaceId,
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          email: contact.email.toLowerCase(),
+          phone: contact.phone,
+          title: contact.title,
+          companyId: contact.companyId,
+          ownerId: contact.ownerId,
+          lifecycle: contact.lifecycle,
+          score: contact.score,
+          city: contact.city,
+          state: contact.state,
+          tags: contact.tags,
+          lastActivityAt: contact.lastActivityAt,
+          createdAt: now,
+        });
+      }
+    }
+  }
 }
 
 function emptyLike(_db: DatabaseFile): DatabaseFile {

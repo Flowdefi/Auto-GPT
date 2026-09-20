@@ -3,7 +3,7 @@ import path from "path";
 import { id } from "@/lib/format";
 import { emptyDb, type DatabaseFile } from "./models";
 import { getPool, readSnapshot, upsertCrmRows, writeAudit, writeSnapshot } from "./postgres";
-import { seedServerData } from "./seed-db";
+import { ensureCrmRecords, seedServerData } from "./seed-db";
 import { persistSqlite, seedCrmSnapshot } from "./sqlite";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -41,6 +41,7 @@ function migrate(db: DatabaseFile): DatabaseFile {
     db.edges = fresh.edges;
     db.chunks = fresh.chunks;
   }
+  ensureCrmRecords(db);
   return db;
 }
 
@@ -67,11 +68,15 @@ export function loadDb(): DatabaseFile {
 }
 
 function persistLocal(db: DatabaseFile): void {
-  ensureDir();
-  const tmp = `${DATA_FILE}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(db, null, 2));
-  renameSync(tmp, DATA_FILE);
   cache = db;
+  try {
+    ensureDir();
+    const tmp = `${DATA_FILE}.${process.pid}.tmp`;
+    writeFileSync(tmp, JSON.stringify(db, null, 2));
+    renameSync(tmp, DATA_FILE);
+  } catch (error) {
+    console.warn("Local JSON persist skipped:", error instanceof Error ? error.message : error);
+  }
   try {
     persistSqlite(db);
   } catch (error) {
@@ -105,8 +110,10 @@ export async function ready(): Promise<DatabaseFile> {
           const remote = await readSnapshot();
           if (remote?.payload?.lists?.length) {
             persistGeneration = remote.version || 1;
+            const hadCrm = (remote.payload.contacts?.length ?? 0) > 0;
             cache = migrate(remote.payload);
-            persistLocal(cache);
+            if (!hadCrm && cache.contacts.length > 0) persist(cache);
+            else persistLocal(cache);
             seedCrmSnapshot();
             return cache;
           }
