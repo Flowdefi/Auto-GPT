@@ -1,26 +1,41 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { useCove } from "@/lib/store";
+import { useEffect, useState } from "react";
+
+type Sample = { portalCode: string; last4: string };
 
 export default function PortalEntryPage() {
   const router = useRouter();
-  const accounts = useCove((state) => state.accounts);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [samples, setSamples] = useState<Sample[]>([]);
 
-  function open() {
+  useEffect(() => {
+    void fetch("/api/pay", { cache: "no-store" })
+      .then((response) => response.json() as Promise<{ samples?: Sample[] }>)
+      .then((body) => setSamples(body.samples ?? []))
+      .catch(() => setSamples([]));
+  }, []);
+
+  async function open() {
     const trimmed = code.trim().toUpperCase();
-    const match = accounts.find((account) => account.portalCode.toUpperCase() === trimmed);
-    if (!match) {
+    if (!trimmed) {
+      setError("Enter the reference code from your letter or text message.");
+      return;
+    }
+    const response = await fetch(`/api/pay?code=${encodeURIComponent(trimmed)}`, { cache: "no-store" });
+    if (!response.ok) {
       setError("We could not find an account for that code. Check the letter or text message you received.");
       return;
     }
-    router.push(`/pay/${match.portalCode}`);
+    const body = (await response.json()) as { account?: { portalCode: string } };
+    if (!body.account) {
+      setError("We could not find an account for that code. Check the letter or text message you received.");
+      return;
+    }
+    router.push(`/pay/${body.account.portalCode}`);
   }
-
-  const samples = accounts.filter((account) => account.balance > 0).slice(0, 3);
 
   return (
     <div>
@@ -43,7 +58,7 @@ export default function PortalEntryPage() {
               setError(null);
             }}
             onKeyDown={(event) => {
-              if (event.key === "Enter") open();
+              if (event.key === "Enter") void open();
             }}
             placeholder="TFR-XXXX-XXXX"
             autoCapitalize="characters"
@@ -51,7 +66,7 @@ export default function PortalEntryPage() {
           />
           <button
             type="button"
-            onClick={open}
+            onClick={() => void open()}
             className="min-h-12 rounded-xl bg-tfr-navy px-6 text-sm font-semibold text-white transition active:scale-[0.99]"
           >
             Continue
@@ -62,14 +77,14 @@ export default function PortalEntryPage() {
         <div className="mt-5 border-t border-tfr-line pt-4 text-xs text-tfr-ink/60">
           <div className="font-medium text-tfr-ink">Demo codes</div>
           <div className="mt-1 flex flex-wrap gap-2">
-            {samples.map((account) => (
+            {samples.map((sample) => (
               <button
-                key={account.id}
+                key={sample.portalCode}
                 type="button"
-                onClick={() => setCode(account.portalCode)}
+                onClick={() => setCode(sample.portalCode)}
                 className="rounded-lg bg-tfr-blueSoft px-2 py-1 font-mono text-[11px] text-tfr-blue"
               >
-                {account.portalCode}
+                {sample.portalCode}
               </button>
             ))}
           </div>

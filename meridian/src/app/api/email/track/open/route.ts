@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ready } from "@/server/db";
 import { recordMailEvent } from "@/server/mailer";
 
 export const dynamic = "force-dynamic";
@@ -9,9 +10,12 @@ const PIXEL = Buffer.from(
   "base64",
 );
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const messageId = new URL(request.url).searchParams.get("m");
-  if (messageId) recordMailEvent(messageId, "open");
+  if (messageId) {
+    await ready();
+    recordMailEvent(messageId, "open");
+  }
   return new NextResponse(PIXEL, {
     headers: {
       "Content-Type": "image/gif",

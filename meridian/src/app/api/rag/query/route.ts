@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
+import { ready } from "@/server/db";
 import { queryRag } from "@/server/rag";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ export async function POST(request: Request) {
   if (!isWorkspaceId(body.workspaceId) || !body.prompt?.trim()) {
     return NextResponse.json({ error: "workspaceId and prompt required" }, { status: 400 });
   }
+  await ready();
   const hits = queryRag(body.workspaceId, body.prompt);
   return NextResponse.json({ hits });
 }

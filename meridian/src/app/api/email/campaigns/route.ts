@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
-import { loadDb, mutate, nextId } from "@/server/db";
+import { loadDb, mutate, nextId, ready } from "@/server/db";
 import { fromAddress } from "@/server/mailer";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +25,7 @@ export async function POST(request: Request) {
   const subject = body.subject;
   const html = body.html;
   const from = fromAddress(workspaceId);
+  await ready();
   const campaign = mutate((db) => {
     const template = body.templateId
       ? db.templates.find((row) => row.id === body.templateId)
@@ -56,8 +57,9 @@ export async function POST(request: Request) {
   return NextResponse.json({ campaign });
 }
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const campaignId = new URL(request.url).searchParams.get("id");
+  await ready();
   const db = loadDb();
   if (!campaignId) {
     return NextResponse.json({ campaigns: db.campaigns });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
+import { ready } from "@/server/db";
 import { sendTest } from "@/server/mailer";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
   if (!isWorkspaceId(body.workspaceId) || !body.to || !body.subject || !body.html) {
     return NextResponse.json({ error: "workspaceId, to, subject, and html are required" }, { status: 400 });
   }
+  await ready();
   try {
     const result = await sendTest(
       body.workspaceId,

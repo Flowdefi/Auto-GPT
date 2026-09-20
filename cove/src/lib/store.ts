@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 import { firstPartySafeCopy, miniMiranda, outreachBlock } from "./compliance";
 import { id, nowIso } from "./format";
 import { seedCove } from "./seed";
@@ -94,6 +94,67 @@ function log(
 function actorName(state: AppData): string {
   return state.agents.find((agent) => agent.id === state.currentAgentId)?.name ?? "Cove";
 }
+
+function pickData(state: Store): AppData {
+  return {
+    agents: state.agents,
+    accounts: state.accounts,
+    portfolios: state.portfolios,
+    plans: state.plans,
+    payments: state.payments,
+    timeline: state.timeline,
+    scripts: state.scripts,
+    queue: state.queue,
+    messages: state.messages,
+    templates: state.templates,
+    grants: state.grants,
+    reviews: state.reviews,
+    liveCall: state.liveCall,
+    currentAgentId: state.currentAgentId,
+    autoBot: state.autoBot,
+  };
+}
+
+const remoteStorage: PersistStorage<AppData> = {
+  getItem: async (name) => {
+    try {
+      const response = await fetch("/api/state", { cache: "no-store" });
+      if (response.ok) {
+        const body = (await response.json()) as { payload?: AppData };
+        if (body.payload?.accounts?.length) {
+          return { state: body.payload };
+        }
+      }
+    } catch {
+      // Fall back to the last local copy when the floor API is unreachable.
+    }
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(name) ?? window.localStorage.getItem("cove-collections-v2");
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as StorageValue<AppData>;
+    } catch {
+      return null;
+    }
+  },
+  setItem: async (name, value) => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(name, JSON.stringify(value));
+    }
+    try {
+      await fetch("/api/state", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(value.state),
+      });
+    } catch {
+      // Local copy is still saved; the next successful hydrate will merge.
+    }
+  },
+  removeItem: (name) => {
+    if (typeof window !== "undefined") window.localStorage.removeItem(name);
+  },
+};
 
 function patchAccount(state: AppData, accountId: string, patch: Partial<Account>): AppData {
   return {
@@ -723,6 +784,10 @@ export const useCove = create<Store>()(
         return true;
       },
     }),
-    { name: "cove-collections-v2" },
+    {
+      name: "cove-collections-v3",
+      storage: remoteStorage,
+      partialize: pickData,
+    },
   ),
 );

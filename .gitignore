@@ -180,6 +180,7 @@ cove/.next/
 cove/out/
 cove/.env
 cove/.env.local
+infra/.env
 !cove/src/lib/
 !cove/src/lib/**
 !cove/package-lock.json

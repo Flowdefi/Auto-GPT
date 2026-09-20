@@ -4,21 +4,23 @@
   "private": true,
   "description": "Cove — US consumer collections floor for unlicensed-state inventory. Clock-in, dialer, authenticated voice/SMS/email agents, payments, skip trace, debtor CRM.",
   "scripts": {
-    "dev": "next dev --port 3001",
+    "dev": "next dev --port 3001 --hostname 0.0.0.0",
     "build": "next build",
-    "start": "next start --port 3001",
+    "start": "next start --port 3001 --hostname 0.0.0.0",
     "lint": "next lint"
   },
   "dependencies": {
     "clsx": "^2.1.1",
     "lucide-react": "^0.511.0",
     "next": "^15.3.2",
+    "pg": "^8.23.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zustand": "^5.0.5"
   },
   "devDependencies": {
     "@types/node": "^22.15.18",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",
     "autoprefixer": "^10.4.21",

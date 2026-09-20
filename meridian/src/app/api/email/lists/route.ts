@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
-import { loadDb, mutate, nextId } from "@/server/db";
+import { loadDb, mutate, nextId, ready } from "@/server/db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const workspaceId = new URL(request.url).searchParams.get("workspace");
   if (!isWorkspaceId(workspaceId ?? undefined)) {
     return NextResponse.json({ error: "workspace required" }, { status: 400 });
   }
+  await ready();
   const db = loadDb();
   const lists = db.lists
     .filter((list) => list.workspaceId === workspaceId)
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Invalid email" }, { status: 400 });
   }
+  await ready();
   const db = loadDb();
   const list = db.lists.find((row) => row.id === body.listId && row.workspaceId === body.workspaceId);
   if (!list) {

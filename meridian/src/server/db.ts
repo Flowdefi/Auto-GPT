@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import path from "path";
 import { id } from "@/lib/format";
 import { emptyDb, type DatabaseFile } from "./models";
+import { getPool, readSnapshot, upsertCrmRows, writeAudit, writeSnapshot } from "./postgres";
 import { seedServerData } from "./seed-db";
 import { persistSqlite, seedCrmSnapshot } from "./sqlite";
 
@@ -10,6 +11,8 @@ const DATA_FILE = path.join(DATA_DIR, "meridian.json");
 const OWNER_EMAIL = "ayflow@pm.me";
 
 let cache: DatabaseFile | null = null;
+let persistGeneration = 1;
+let boot: Promise<DatabaseFile> | null = null;
 
 function ensureDir(): void {
   if (!existsSync(DATA_DIR)) {
@@ -63,7 +66,7 @@ export function loadDb(): DatabaseFile {
   return cache;
 }
 
-export function persist(db: DatabaseFile): void {
+function persistLocal(db: DatabaseFile): void {
   ensureDir();
   const tmp = `${DATA_FILE}.${process.pid}.tmp`;
   writeFileSync(tmp, JSON.stringify(db, null, 2));
@@ -74,6 +77,52 @@ export function persist(db: DatabaseFile): void {
   } catch (error) {
     console.warn("SQLite persist skipped:", error instanceof Error ? error.message : error);
   }
+}
+
+function persistRemote(db: DatabaseFile): void {
+  if (!getPool()) return;
+  persistGeneration += 1;
+  const generation = persistGeneration;
+  void writeSnapshot(db, generation)
+    .then(() => upsertCrmRows(db))
+    .catch((error) => {
+      console.error("Postgres persist failed:", error instanceof Error ? error.message : error);
+    });
+}
+
+export function persist(db: DatabaseFile): void {
+  persistLocal(db);
+  persistRemote(db);
+}
+
+/** Load Postgres first when DATABASE_URL is set so hosts share one book. */
+export async function ready(): Promise<DatabaseFile> {
+  if (cache && boot) return cache;
+  if (!boot) {
+    boot = (async () => {
+      if (getPool()) {
+        try {
+          const remote = await readSnapshot();
+          if (remote?.payload?.lists?.length) {
+            persistGeneration = remote.version || 1;
+            cache = migrate(remote.payload);
+            persistLocal(cache);
+            seedCrmSnapshot();
+            return cache;
+          }
+          const seeded = loadDb();
+          await writeSnapshot(seeded, persistGeneration);
+          await upsertCrmRows(seeded);
+          await writeAudit("seed", { lists: seeded.lists.length, contacts: seeded.contacts.length });
+          return seeded;
+        } catch (error) {
+          console.error("Postgres boot failed, using local store:", error instanceof Error ? error.message : error);
+        }
+      }
+      return loadDb();
+    })();
+  }
+  return boot;
 }
 
 export function mutate<T>(fn: (db: DatabaseFile) => T): T {
