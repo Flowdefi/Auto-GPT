@@ -144,4 +144,10 @@ CREATE TABLE IF NOT EXISTS rag_terms (
   workspace_id TEXT NOT NULL,
   PRIMARY KEY (term, chunk_id)
 );
+
+CREATE TABLE IF NOT EXISTS rag_vectors (
+  chunk_id TEXT PRIMARY KEY,
+  dim INTEGER NOT NULL,
+  vector TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_rag_terms_lookup ON rag_terms(workspace_id, term);

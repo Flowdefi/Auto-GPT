@@ -1,10 +1,12 @@
 import type { WorkspaceId } from "@/lib/types";
+import { cachedEmbed, cachedOrUndefined, cosine, embedTexts, rememberEmbed } from "./ai/embeddings";
 import { loadDb } from "./db";
 import type { GraphNode } from "./models";
-import { searchFts, sqliteReady } from "./sqlite";
+import { loadVector, searchFts, sqliteReady, upsertVectors } from "./sqlite";
 import { scoreOverlap, tokenize } from "./tokenize";
 
 export interface RagHit {
+  chunkId?: string;
   title: string;
   kind: string;
   text: string;
@@ -34,11 +36,20 @@ export function queryRag(workspaceId: WorkspaceId, prompt: string, limit = 6): R
     const lexicalScore = merged.get(chunk.id)?.score ?? 0;
     merged.set(chunk.id, { chunk, score: Math.max(lexicalScore, 1 / (1 + Math.abs(hit.score))) });
   }
-  const ranked = [...merged.values()].sort((a, b) => b.score - a.score).slice(0, limit);
+  const queryVector = vectorFor(`q:${prompt}`, prompt);
+  const hybrid = [...merged.values()].map((row) => {
+    const vector = vectorFor(row.chunk.id, `${row.chunk.title} ${row.chunk.text}`);
+    const semantic = Math.max(0, cosine(queryVector, vector));
+    const lexicalNorm = row.score / (1 + row.score);
+    return { ...row, score: 0.55 * lexicalNorm + 0.45 * semantic };
+  });
+
+  const ranked = hybrid.sort((a, b) => b.score - a.score).slice(0, limit);
 
   return ranked.map(({ chunk, score }) => {
     const node = db.nodes.find((row) => row.id === chunk.nodeId);
     return {
+      chunkId: chunk.id,
       title: chunk.title,
       kind: node?.kind ?? "chunk",
       text: clip(chunk.text, 420),
@@ -46,6 +57,40 @@ export function queryRag(workspaceId: WorkspaceId, prompt: string, limit = 6): R
       neighbors: neighborLabels(workspaceId, node),
     };
   });
+}
+
+function vectorFor(key: string, text: string): Float32Array {
+  const cached = cachedOrUndefined(key);
+  if (cached) return cached;
+  const stored = key.startsWith("q:") ? null : loadVector(key);
+  if (stored) {
+    rememberEmbed(key, stored);
+    return stored;
+  }
+  return cachedEmbed(key, text);
+}
+
+/** Pull remote embeddings for the best lexical hits, then blend them with FTS. */
+export async function queryRagAsync(workspaceId: WorkspaceId, prompt: string, limit = 6): Promise<RagHit[]> {
+  const preview = queryRag(workspaceId, prompt, Math.max(limit, 8));
+  const db = loadDb();
+  const chunks = preview
+    .map((hit) => (hit.chunkId ? db.chunks.find((chunk) => chunk.id === hit.chunkId) : undefined))
+    .filter((chunk): chunk is NonNullable<typeof chunk> => Boolean(chunk));
+  if (chunks.length > 0) {
+    const embedded = await embedTexts(chunks.map((chunk) => `${chunk.title} ${chunk.text}`));
+    if (embedded.status.mode === "remote") {
+      const rows: Array<{ id: string; vector: Float32Array }> = [];
+      chunks.forEach((chunk, index) => {
+        const vector = embedded.vectors[index];
+        if (!vector) return;
+        rememberEmbed(chunk.id, vector);
+        rows.push({ id: chunk.id, vector });
+      });
+      upsertVectors(rows);
+    }
+  }
+  return queryRag(workspaceId, prompt, limit);
 }
 
 function neighborLabels(workspaceId: WorkspaceId, node?: GraphNode): string[] {

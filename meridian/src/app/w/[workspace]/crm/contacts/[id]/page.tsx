@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Timeline } from "@/components/tables";
 import { Badge, Button, Card, Field, PageHeader } from "@/components/meridian/legacy";
 import { contactName, money, when } from "@/lib/format";
@@ -13,9 +13,47 @@ export default function ContactRecordPage() {
   const { workspaceId, data } = useActiveWorkspace();
   const addActivity = useMeridian((state) => state.addActivity);
   const [note, setNote] = useState("");
-  const contact = data.contacts.find((item) => item.id === params.id);
+  const [serverContact, setServerContact] = useState<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    title: string;
+    companyId: string;
+    companyName: string;
+    lifecycle: string;
+    score: number;
+    city: string;
+    state: string;
+  } | null>(null);
+
+  useEffect(() => {
+    void fetch(`/api/crm/contacts?workspace=${workspaceId}&id=${params.id}`)
+      .then((response) => response.json())
+      .then((payload) => setServerContact(payload.contacts?.[0] ?? null));
+  }, [params.id, workspaceId]);
+
+  const demo = data.contacts.find((item) => item.id === params.id);
+  const contact = serverContact
+    ? {
+        ...demo,
+        id: serverContact.id,
+        firstName: serverContact.firstName,
+        lastName: serverContact.lastName,
+        email: serverContact.email,
+        phone: serverContact.phone,
+        title: serverContact.title,
+        companyId: serverContact.companyId,
+        lifecycle: serverContact.lifecycle,
+        score: serverContact.score,
+        city: serverContact.city,
+        state: serverContact.state,
+        tags: demo?.tags ?? [],
+      }
+    : demo;
   if (!contact) return <PageHeader title="Contact not found" />;
-  const company = data.companies.find((item) => item.id === contact.companyId);
+  const companyName = serverContact?.companyName || data.companies.find((item) => item.id === contact.companyId)?.name;
   const deals = data.deals.filter((deal) => deal.contactId === contact.id);
   const activities = data.activities.filter((activity) => activity.contactId === contact.id);
 
@@ -24,7 +62,7 @@ export default function ContactRecordPage() {
       <PageHeader
         eyebrow="Contact"
         title={contactName(contact.firstName, contact.lastName)}
-        subtitle={`${contact.title} · ${company?.name ?? "—"}`}
+        subtitle={`${contact.title} · ${companyName ?? "—"}`}
         actions={<Badge tone="accent">{contact.lifecycle}</Badge>}
       />
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
@@ -72,7 +110,7 @@ export default function ContactRecordPage() {
             </div>
             <div>Score {contact.score}</div>
             <div className="flex flex-wrap gap-1">
-              {contact.tags.map((tag) => (
+              {(contact.tags ?? []).map((tag) => (
                 <Badge key={tag}>{tag}</Badge>
               ))}
             </div>

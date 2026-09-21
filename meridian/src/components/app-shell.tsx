@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { haptic, isIos } from "@/lib/ios";
+import { haptic, isIos, isNative, isStandalone } from "@/lib/ios";
 import { hubFromPath, navFor, type NavItem } from "@/lib/nav";
 import { useMeridian } from "@/lib/store";
 import { useActiveWorkspace } from "@/lib/use-workspace";
@@ -29,6 +29,24 @@ import { NavIcon } from "./meridian/icon";
 import { ThemeToggle } from "./meridian/theme-provider";
 
 const GROUP_ORDER = ["Workspace", "Revenue", "Marketing", "Platform"] as const;
+
+function InstallHint() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    setShow(isIos() && !isStandalone() && !isNative());
+  }, []);
+  if (!show) return null;
+  return (
+    <div className="safe-x flex items-start justify-between gap-3 border-b bg-[var(--brand-soft)] px-3 py-3 text-sm sm:px-6">
+      <p>
+        On iPhone, open Share and choose <span className="font-semibold">Add to Home Screen</span>. The icon uses this same server as the web and local apps.
+      </p>
+      <button type="button" className="min-h-11 shrink-0 px-2 font-medium" onClick={() => setShow(false)}>
+        Dismiss
+      </button>
+    </div>
+  );
+}
 
 function NavList({
   items,
@@ -276,6 +294,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
+        <InstallHint />
         <main className="momentum-scroll safe-x px-3 pb-[calc(var(--tabbar-h)+var(--safe-b)+1.5rem)] pt-5 sm:px-6 lg:pb-12">
           {children}
         </main>
