@@ -48,20 +48,19 @@ Card PAN/CVC is never written. Portal payments store amount, method, and last4.
 
 ## Cloudflare Workers (durable HTTPS)
 
-Temporary preview account **Scandalous Rosehip**. Claim it from the pull request
-within 60 minutes of the last `--temporary` deploy or the workers expire. After
-claiming, run `npm run cf:deploy:prod` in `cove/` and `meridian/` (no
-`--temporary`).
+Temporary preview account **Pinnate Gate**. Claim it from the pull request
+within 60 minutes of the deploy or the workers expire. After claiming, run
+`npm run cf:deploy:prod` in `cove/` and `meridian/` (no `--temporary`).
 
 | App | URL |
 | --- | --- |
-| Cove / TF Recovery | https://cove-tfr.scandalous-rosehip.workers.dev |
-| TF Recovery pay | https://cove-tfr.scandalous-rosehip.workers.dev/pay |
-| Meridian / Triton | https://meridian-triton.scandalous-rosehip.workers.dev |
-| Meridian home | https://meridian-triton.scandalous-rosehip.workers.dev/w/triton/home |
-| Hyperdrive ping | https://meridian-cove-health.scandalous-rosehip.workers.dev |
+| Cove / TF Recovery | https://cove-tfr.pinnate-gate.workers.dev |
+| TF Recovery pay | https://cove-tfr.pinnate-gate.workers.dev/pay |
+| Meridian / Triton | https://meridian-triton.pinnate-gate.workers.dev |
+| Meridian home | https://meridian-triton.pinnate-gate.workers.dev/w/triton/home |
+| Hyperdrive ping | https://meridian-cove-health.pinnate-gate.workers.dev |
 
-Both app workers bind **Hyperdrive** `927f2d9158164561b74b0273ef6ae7fe` to the
+Both app workers bind **Hyperdrive** `12274905107e469cb63352790d5c123c` to the
 same Prisma Postgres database. The ping worker lives in `infra/cf-health`.
 
 ```bash

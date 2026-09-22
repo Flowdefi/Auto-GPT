@@ -5,4 +5,4 @@ compatibility_flags = ["nodejs_compat"]
 
 [[hyperdrive]]
 binding = "HYPERDRIVE"
-id = "927f2d9158164561b74b0273ef6ae7fe"
+id = "12274905107e469cb63352790d5c123c"

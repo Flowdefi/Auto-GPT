@@ -186,6 +186,7 @@ infra/.env
 .dev.vars
 meridian/.open-next/
 cove/.open-next/
+infra/cf-health/node_modules/
 meridian/.wrangler/
 cove/.wrangler/
 .playwright-mcp/
