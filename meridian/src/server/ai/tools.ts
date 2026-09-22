@@ -1,13 +1,16 @@
 import type { WorkspaceId } from "@/lib/types";
 import { workspaceOf } from "@/lib/workspaces";
+import { analyticsSnapshot } from "../analytics";
 import { companiesOf, contactsOf } from "../crm";
 import { loadDb, mutate, nextId } from "../db";
-import { enrichCompanyRecord } from "../enrich";
+import { enrichCompanyRecord, enrichContactRecord } from "../enrich";
+import { portfoliosOf, updatePortfolio } from "../portfolios";
+import { generateSocialPack } from "../social";
 import { providerStatus } from "../mailer";
 import { outlookStatus, syncAll } from "../outlook";
 import { queryRag } from "../rag";
 import { crawlSite } from "../seo/crawler";
-import { buildBrief, optimizePage, researchKeywords } from "../seo/keywords";
+import { buildBrief, optimizePage, researchKeywords, seoRankPlan } from "../seo/keywords";
 import { applySeoFixes, autoImprove, improveEmailDraft, suggestImprovements } from "./improve";
 import { createLead, runAutomations, setLeadStatus, sweepSla } from "../workflow";
 import type { LeadStatus } from "../models";
@@ -372,6 +375,96 @@ export const TOOLS: ToolDefinition[] = [
     kind: "write",
     parameters: {},
     run: (_args, { workspaceId }) => autoImprove(workspaceId),
+  },
+  {
+    name: "list_portfolios",
+    description: "List marketplace portfolios with seller, seller price, face value, debt type, and date last worked.",
+    kind: "read",
+    parameters: {},
+    run: (_args, { workspaceId }) =>
+      portfoliosOf(workspaceId).map((row) => ({
+        id: row.id,
+        name: row.name,
+        seller: row.sellerName,
+        sellerPrice: row.sellerPrice,
+        faceValue: row.faceValue,
+        debtType: row.debtType,
+        accountCount: row.accountCount,
+        geography: row.geography,
+        states: row.states,
+        dateListed: row.dateListed,
+        dateLastWorked: row.dateLastWorked,
+        status: row.status,
+        possibleBuyers: row.possibleBuyers,
+      })),
+  },
+  {
+    name: "update_portfolio",
+    description: "Update a portfolio field and append a history entry. Does not replace history.",
+    kind: "write",
+    parameters: {
+      id: { type: "string", description: "Portfolio id", required: true },
+      name: { type: "string", description: "Portfolio name" },
+      seller: { type: "string", description: "Seller company name or id" },
+      sellerPrice: { type: "string", description: "Seller asking price" },
+      faceValue: { type: "string", description: "Face value" },
+      notes: { type: "string", description: "Notes" },
+      debtType: { type: "string", description: "Type of debt" },
+      possibleBuyers: { type: "string", description: "Possible buyers" },
+      dateLastWorked: { type: "string", description: "YYYY-MM-DD" },
+    },
+    run: (args, { workspaceId }) => {
+      const price = args.sellerPrice ? Number(args.sellerPrice) : undefined;
+      const face = args.faceValue ? Number(args.faceValue) : undefined;
+      if (args.sellerPrice && !Number.isFinite(price)) throw new Error("sellerPrice must be a number");
+      if (args.faceValue && !Number.isFinite(face)) throw new Error("faceValue must be a number");
+      return updatePortfolio(
+        workspaceId,
+        args.id ?? "",
+        {
+          name: args.name,
+          seller: args.seller,
+          sellerPrice: price,
+          faceValue: face,
+          notes: args.notes,
+          debtType: args.debtType,
+          possibleBuyers: args.possibleBuyers,
+          dateLastWorked: args.dateLastWorked,
+        },
+        "ai-cto",
+      );
+    },
+  },
+  {
+    name: "draft_social",
+    description: "Draft a social pack for X, Facebook, Google Business, and LinkedIn. Stores drafts. Does not publish.",
+    kind: "write",
+    parameters: {},
+    run: (_args, { workspaceId }) => {
+      const posts = generateSocialPack(workspaceId);
+      return posts.map((post) => ({ id: post.id, channel: post.channel, status: post.status, body: post.body }));
+    },
+  },
+  {
+    name: "seo_rank_plan",
+    description: "Path to #1 for tracked keywords. Uses stored rank points only and never invents a position.",
+    kind: "read",
+    parameters: { keyword: { type: "string", description: "Optional keyword filter" } },
+    run: (args, { workspaceId }) => seoRankPlan(workspaceId, args.keyword),
+  },
+  {
+    name: "analytics_summary",
+    description: "Live counts: leads, SLA breaches, tasks, portfolio value, email delivery, forms, SEO health, first-party page views.",
+    kind: "read",
+    parameters: {},
+    run: (_args, { workspaceId }) => analyticsSnapshot(workspaceId),
+  },
+  {
+    name: "enrich_contact",
+    description: "Enrich a contact from Gravatar, Wikidata, and the corporate domain. No API key.",
+    kind: "write",
+    parameters: { contactId: { type: "string", description: "Contact id", required: true } },
+    run: (args, { workspaceId }) => enrichContactRecord(workspaceId, args.contactId ?? ""),
   },
   {
     name: "recent_inbox",

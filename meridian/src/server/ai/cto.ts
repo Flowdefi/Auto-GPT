@@ -128,7 +128,7 @@ async function chat(config: LlmConfig, messages: Array<{ role: string; content: 
 }
 
 /** Keyword planner used when no model endpoint is configured. */
-function planLocally(prompt: string): Array<{ name: string; args: Record<string, string> }> {
+function planLocally(prompt: string, page: CtoPage = {}): Array<{ name: string; args: Record<string, string> }> {
   const lower = prompt.toLowerCase();
   const plan: Array<{ name: string; args: Record<string, string> }> = [];
 
@@ -144,15 +144,20 @@ function planLocally(prompt: string): Array<{ name: string; args: Record<string,
   if (/crawl|audit|site health|technical seo|fix.*site/.test(lower)) {
     plan.push({ name: "seo_crawl", args: { maxPages: "20" } });
   }
-  if (/keyword|rank|search volume|difficulty/.test(lower)) {
+  if (/keyword|rank|search volume|difficulty/.test(lower) && !/#1|path to|unmeasured|rank plan/.test(lower)) {
     const seed = lower.match(/(?:for|about|on)\s+["']?([a-z0-9 \-]{4,48})["']?/)?.[1];
     plan.push({ name: "seo_keywords", args: seed ? { seed } : {} });
+  }
+  if (/#1|path to|unmeasured|rank plan|on-page/.test(lower)) {
+    const quoted = prompt.match(/["']([^"']{3,80})["']/)?.[1];
+    const keyword = quoted ?? lower.match(/(?:for|keyword)\s+([a-z0-9][a-z0-9 \-]{2,60})/)?.[1];
+    plan.push({ name: "seo_rank_plan", args: keyword ? { keyword: keyword.trim() } : {} });
   }
   if (/brief|outline|write.*(article|post|page)/.test(lower)) {
     const keyword = lower.match(/["']([^"']{4,60})["']/)?.[1] ?? "sell charged off debt";
     plan.push({ name: "seo_brief", args: { keyword } });
   }
-  if (/email|campaign|blast|newsletter|draft.*mail/.test(lower)) {
+  if (/email|campaign|blast|newsletter|draft.*mail/.test(lower) && !/delivery|analytics|reporting|page view/.test(lower)) {
     plan.push({ name: "list_email_lists", args: {} });
     const topic = prompt.replace(/^.*?(?:about|for|on)\s+/i, "").slice(0, 60) || "portfolio update";
     plan.push({ name: "draft_campaign", args: { topic, audience: /buyer/.test(lower) ? "buyers" : "sellers" } });
@@ -164,7 +169,29 @@ function planLocally(prompt: string): Array<{ name: string; args: Record<string,
     plan.push({ name: "recent_inbox", args: {} });
   }
   if (/enrich/.test(lower)) {
-    plan.push({ name: "search_crm", args: { query: prompt.split(/\s+/).slice(-2).join(" ") } });
+    if (page.recordId?.startsWith("ct_") || /contact|gravatar|wikidata/.test(lower)) {
+      if (page.recordId?.startsWith("ct_")) {
+        plan.push({ name: "enrich_contact", args: { contactId: page.recordId } });
+      } else {
+        plan.push({ name: "search_crm", args: { query: prompt.split(/\s+/).slice(-3).join(" ") } });
+      }
+    } else if (page.recordId?.startsWith("co_")) {
+      plan.push({ name: "enrich_company", args: { companyId: page.recordId } });
+    } else {
+      plan.push({ name: "search_crm", args: { query: prompt.split(/\s+/).slice(-2).join(" ") } });
+    }
+  }
+  if (/portfolio|seller price|face value|charge-?off|date last worked|spreadsheet|tape/.test(lower)) {
+    plan.push({ name: "list_portfolios", args: {} });
+  }
+  if (/social|linkedin|facebook|google business|tweet|channel pack|x post/.test(lower)) {
+    plan.push({ name: "draft_social", args: {} });
+  }
+  if (/analytics|reporting|pageview|page views|traffic|form submission|campaign delivery|email delivery|seo health|first-party/.test(lower)) {
+    plan.push({ name: "analytics_summary", args: {} });
+  }
+  if (/phone|linkedin url|notes are missing|coverage note/.test(lower)) {
+    plan.push({ name: "search_crm", args: { query: page.recordId ?? "contact" } });
   }
   if (/suggest|what should we|recommend/.test(lower)) {
     plan.push({ name: "suggest_improvements", args: {} });
@@ -294,6 +321,63 @@ function summarize(prompt: string, calls: CtoTurn["toolCalls"], grounded: string
       continue;
     }
 
+    if (call.name === "list_portfolios" && Array.isArray(result)) {
+      const rows = result as Array<Record<string, unknown>>;
+      const face = rows.reduce((sum, row) => sum + Number(row.faceValue ?? 0), 0);
+      const ask = rows.reduce((sum, row) => sum + Number(row.sellerPrice ?? 0), 0);
+      lines.push(`${rows.length} portfolios. Face ${face.toLocaleString("en-US")} · seller price ${ask.toLocaleString("en-US")}.`);
+      for (const row of rows.slice(0, 5)) {
+        lines.push(`• ${row.name} — ${row.debtType} · last worked ${row.dateLastWorked} · ${row.status}`);
+      }
+      continue;
+    }
+
+    if (call.name === "draft_social" && Array.isArray(result)) {
+      lines.push("Drafted a four-channel pack. Nothing was published.");
+      for (const post of result as Array<{ channel?: string; body?: string }>) {
+        lines.push(`• ${post.channel}: ${(post.body ?? "").slice(0, 140)}`);
+      }
+      continue;
+    }
+
+    if (call.name === "seo_rank_plan" && result && typeof result === "object") {
+      const planResult = result as { note?: string; items?: Array<{ term: string; label: string; suggestions: string[] }> };
+      if (planResult.note) lines.push(planResult.note);
+      for (const item of planResult.items?.slice(0, 5) ?? []) {
+        lines.push(`• ${item.term}: ${item.label}`);
+        for (const suggestion of item.suggestions.slice(0, 3)) lines.push(`  – ${suggestion}`);
+      }
+      continue;
+    }
+
+    if (call.name === "analytics_summary" && result && typeof result === "object") {
+      const stats = result as {
+        slaBreaches?: number;
+        openTasks?: number;
+        faceValue?: number;
+        sellerPrice?: number;
+        formSubmissions?: number;
+        seoHealth?: number | null;
+        firstPartyPageviews?: number;
+        email?: { delivered?: number; intended?: number };
+        ga?: { hint?: string };
+      };
+      lines.push(
+        `SLA breaches ${stats.slaBreaches ?? 0}. Open tasks ${stats.openTasks ?? 0}. Forms ${stats.formSubmissions ?? 0}. Email delivered ${stats.email?.delivered ?? 0} of ${stats.email?.intended ?? 0}.`,
+      );
+      lines.push(
+        `Portfolio face ${stats.faceValue ?? 0}, seller price ${stats.sellerPrice ?? 0}. SEO health ${stats.seoHealth ?? "no crawl"}. First-party page views ${stats.firstPartyPageviews ?? 0}.`,
+      );
+      if (stats.ga?.hint) lines.push(stats.ga.hint);
+      continue;
+    }
+
+    if (call.name === "enrich_contact" && result && typeof result === "object") {
+      const enriched = result as { ok?: boolean; error?: string; enrichment?: { notes?: string[] } };
+      lines.push(enriched.ok ? (enriched.enrichment?.notes ?? []).join(" ") || "Contact enriched." : (enriched.error ?? "Enrichment failed."));
+      continue;
+    }
+
     if ((call.name === "auto_improve" || call.name === "list_improvements" || call.name === "suggest_improvements") && result && typeof result === "object") {
       const run = result as { applied?: Array<{ title: string; detail: string }>; proposed?: Array<{ title: string; detail: string }> };
       if (run.applied?.length) {
@@ -341,7 +425,7 @@ export async function runCto(
   const activeModel = role === "fast" ? resolved.fast : resolved.reasoner;
 
   if (!config) {
-    for (const step of planLocally(prompt)) {
+    for (const step of planLocally(prompt, page)) {
       const outcome = await executeTool(step.name, step.args, context);
       calls.push({ name: step.name, args: step.args, ...outcome });
     }

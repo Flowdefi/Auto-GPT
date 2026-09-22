@@ -8,6 +8,7 @@ import {
   optimizePage,
   refreshRanks,
   researchKeywords,
+  seoRankPlan,
   trackKeyword,
 } from "@/server/seo/keywords";
 
@@ -73,6 +74,7 @@ export function GET(request: Request) {
     ranks: db.ranks.filter((row) => row.workspaceId === workspace).slice(0, 200),
     briefs: db.briefs.filter((row) => row.workspaceId === workspace).slice(0, 10),
     provider: keywordProvider(),
+    rankPlan: seoRankPlan(workspace),
   });
 }
 
@@ -127,6 +129,9 @@ export async function POST(request: Request) {
         if (!body.keyword) return NextResponse.json({ error: "keyword required" }, { status: 400 });
         return NextResponse.json({ brief: buildBrief(workspaceId, body.keyword, body.targetUrl) });
       }
+
+      case "rank-plan":
+        return NextResponse.json(seoRankPlan(workspaceId, body.keyword));
 
       case "optimize": {
         if (!body.url || !body.keyword) {

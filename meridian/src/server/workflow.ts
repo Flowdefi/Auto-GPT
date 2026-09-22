@@ -216,6 +216,10 @@ function fieldValue(db: DatabaseFile, subjectType: WorkflowRun["subjectType"], s
     const contact = db.contacts.find((row) => row.id === subjectId);
     return contact ? (contact as unknown as Record<string, unknown>)[field] : undefined;
   }
+  if (subjectType === "portfolio") {
+    const portfolio = db.portfolios.find((row) => row.id === subjectId);
+    return portfolio ? (portfolio as unknown as Record<string, unknown>)[field] : undefined;
+  }
   return undefined;
 }
 
@@ -366,6 +370,7 @@ function applyAction(
           status: "open",
           leadId: subjectType === "lead" ? subjectId : undefined,
           contactId: lead?.contactId,
+          portfolioId: subjectType === "portfolio" ? subjectId : undefined,
           source: "automation",
           createdAt: new Date().toISOString(),
         });
@@ -424,10 +429,11 @@ function applyAction(
           workspaceId,
           title: String(params.title ?? "Alert"),
           body: String(params.body ?? `Lead ${subjectId} needs attention`),
-          ownerId: lead?.ownerId ?? "",
+          ownerId: lead?.ownerId || String(params.ownerId ?? ""),
           dueAt: new Date().toISOString(),
           status: "open",
           leadId: subjectType === "lead" ? subjectId : undefined,
+          portfolioId: subjectType === "portfolio" ? subjectId : undefined,
           source: "alert",
           createdAt: new Date().toISOString(),
         });
@@ -437,11 +443,22 @@ function applyAction(
 
     case "enrich": {
       const db = loadDb();
-      const lead = db.leads.find((row) => row.id === subjectId);
-      if (!lead?.companyId) return "skipped: no company";
-      const companyId = lead.companyId;
+      const lead = subjectType === "lead" ? db.leads.find((row) => row.id === subjectId) : undefined;
+      const contactId = subjectType === "contact" ? subjectId : lead?.contactId;
+      const companyId =
+        lead?.companyId ??
+        (contactId ? db.contacts.find((row) => row.id === contactId)?.companyId : undefined);
+      if (!contactId && !companyId) return "skipped: no contact or company";
+      if (contactId) {
+        const id = contactId;
+        void import("./enrich")
+          .then((mod) => mod.enrichContactRecord(workspaceId, id))
+          .catch(() => undefined);
+        return "contact enrichment started from public sources";
+      }
+      const id = companyId ?? "";
       void import("./enrich")
-        .then((mod) => mod.enrichCompanyRecord(workspaceId, companyId))
+        .then((mod) => mod.enrichCompanyRecord(workspaceId, id))
         .catch(() => undefined);
       return "enrichment started from public sources";
     }
@@ -460,7 +477,6 @@ function applyAction(
 }
 
 export function seedWorkflows(db: DatabaseFile): void {
-  if (db.workflows.length > 0) return;
   const base: Array<Omit<AutomationWorkflow, "id" | "runCount">> = [
     {
       workspaceId: "triton",
@@ -545,11 +561,123 @@ export function seedWorkflows(db: DatabaseFile): void {
         { type: "create_task", params: { title: "Return an indicative quote", dueMinutes: 15 } },
       ],
     },
+    {
+      workspaceId: "triton",
+      name: "New portfolio listed → coverage task",
+      description: "A newly listed portfolio opens a buyer-coverage task. Institutional counterparties only.",
+      enabled: true,
+      trigger: { event: "portfolio.listed" },
+      actions: [
+        {
+          type: "create_task",
+          params: {
+            title: "Cover newly listed portfolio",
+            dueMinutes: 240,
+            ownerId: "u_jordan",
+            body: "Confirm seller price, media, and the buyer shortlist. No consumer contact.",
+          },
+        },
+      ],
+    },
+    {
+      workspaceId: "triton",
+      name: "Stale portfolio → desk alert",
+      description: "Portfolios whose date last worked is older than 14 days raise an alert.",
+      enabled: true,
+      trigger: { event: "portfolio.stale" },
+      actions: [
+        {
+          type: "send_internal_alert",
+          params: {
+            title: "Portfolio has gone stale",
+            ownerId: "u_maya",
+            body: "Date last worked is outside the 14-day coverage window.",
+          },
+        },
+      ],
+    },
+    {
+      workspaceId: "triton",
+      name: "Hot seller lead → enrich contact",
+      description: "A hot sell-side lead enriches the contact from public sources.",
+      enabled: true,
+      trigger: {
+        event: "lead.created",
+        filters: [
+          { field: "side", op: "eq", value: "seller" },
+          { field: "score", op: "gte", value: 70 },
+        ],
+      },
+      actions: [{ type: "enrich", params: { target: "contact" } }],
+    },
+    {
+      workspaceId: "aether",
+      name: "New listing → desk task",
+      description: "A newly listed block opens a coverage task.",
+      enabled: true,
+      trigger: { event: "portfolio.listed" },
+      actions: [
+        {
+          type: "create_task",
+          params: {
+            title: "Cover newly listed block",
+            dueMinutes: 120,
+            ownerId: "u_marcus",
+            body: "Confirm size, venue, and settlement path.",
+          },
+        },
+      ],
+    },
+    {
+      workspaceId: "aether",
+      name: "Stale inventory → desk alert",
+      description: "Inventory whose date last worked is older than 14 days raises an alert.",
+      enabled: true,
+      trigger: { event: "portfolio.stale" },
+      actions: [
+        {
+          type: "send_internal_alert",
+          params: {
+            title: "Listing has gone stale",
+            ownerId: "u_marcus",
+            body: "Date last worked is outside the 14-day coverage window.",
+          },
+        },
+      ],
+    },
   ];
 
   for (const workflow of base) {
+    const exists = db.workflows.some((row) => row.workspaceId === workflow.workspaceId && row.name === workflow.name);
+    if (exists) continue;
     db.workflows.push({ ...workflow, id: nextId("wf"), runCount: 0 });
   }
+}
+
+const STALE_MS = 14 * 24 * 60 * 60 * 1000;
+const STALE_REPEAT_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Raises portfolio.stale once a week when date last worked is older than 14 days. */
+export function sweepStalePortfolios(workspaceId: WorkspaceId): { alerted: number } {
+  const now = Date.now();
+  const db = loadDb();
+  const due = db.portfolios.filter((portfolio) => {
+    if (portfolio.workspaceId !== workspaceId || !portfolio.dateLastWorked) return false;
+    const worked = new Date(portfolio.dateLastWorked).getTime();
+    if (!Number.isFinite(worked) || now - worked < STALE_MS) return false;
+    const recent = db.runs.some(
+      (run) =>
+        run.workspaceId === workspaceId &&
+        run.subjectId === portfolio.id &&
+        run.event === "portfolio.stale" &&
+        now - new Date(run.at).getTime() < STALE_REPEAT_MS,
+    );
+    return !recent;
+  });
+  for (const portfolio of due) {
+    runAutomations(workspaceId, "portfolio.stale", "portfolio", portfolio.id);
+  }
+  return { alerted: due.length };
 }
 
 /** Demo pipeline so Leads is not an empty board on first boot. */

@@ -6,6 +6,7 @@ import { seedServerData } from "./seed-db";
 import { indexLiveRecords } from "./live-index";
 import { persistSqlite, seedCrmSnapshot } from "./sqlite";
 import { seedCrmRecords } from "./crm";
+import { seedPortfolios } from "./portfolios";
 import { seedSegmentsInto } from "./segments";
 import { seedDemoLeads, seedWorkflows } from "./workflow";
 
@@ -40,6 +41,9 @@ const COLLECTIONS: Array<keyof DatabaseFile> = [
   "briefs",
   "segments",
   "aiAudit",
+  "portfolios",
+  "socialPosts",
+  "analyticsEvents",
 ];
 
 function migrate(db: DatabaseFile): DatabaseFile {
@@ -52,6 +56,7 @@ function migrate(db: DatabaseFile): DatabaseFile {
   seedWorkflows(db);
   seedDemoLeads(db);
   seedSegmentsInto(db);
+  seedPortfolios(db);
   const hasOwner = db.members.some((member) => member.email === OWNER_EMAIL);
   if (!hasOwner) {
     db.members.push({

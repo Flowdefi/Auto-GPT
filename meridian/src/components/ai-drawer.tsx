@@ -35,7 +35,7 @@ function Conversation({
 
   const suggestions = promptsForPath(pathname, workspaceId);
   const recordId = pathname.split("/").filter(Boolean).at(-1);
-  const pageRecord = recordId && !["home", "contacts", "companies", "leads", "bulk", "seo", "ai", "automation", "integrations", "campaigns", "lists", "emails", "deals", "forecast", "sequences"].includes(recordId)
+  const pageRecord = recordId && !["home", "contacts", "companies", "leads", "bulk", "seo", "ai", "automation", "integrations", "campaigns", "lists", "emails", "deals", "forecast", "sequences", "social", "portfolios", "reporting", "marketplace", "graph", "tickets", "pages", "compliance", "settings"].includes(recordId)
     ? recordId
     : undefined;
   const [modelLabel, setModelLabel] = useState("built-in planner");

@@ -93,6 +93,16 @@ export function indexLiveRecords(db: DatabaseFile): void {
     add(issue.workspaceId, "seo-issue", issue.id, issue.title, `${issue.severity} ${issue.url} ${issue.detail} ${issue.recommendation}`);
   }
 
+  for (const portfolio of db.portfolios) {
+    add(
+      portfolio.workspaceId,
+      "portfolio",
+      portfolio.id,
+      portfolio.name,
+      `${portfolio.sellerName} ${portfolio.debtType} face ${portfolio.faceValue} seller price ${portfolio.sellerPrice} ${portfolio.geography} ${portfolio.states.join(" ")} last worked ${portfolio.dateLastWorked} ${portfolio.notes} buyers ${portfolio.possibleBuyers}`,
+    );
+  }
+
   for (const workflow of db.workflows) {
     add(
       workflow.workspaceId,

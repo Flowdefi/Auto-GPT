@@ -151,3 +151,33 @@ CREATE TABLE IF NOT EXISTS rag_vectors (
   vector TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_rag_terms_lookup ON rag_terms(workspace_id, term);
+
+CREATE TABLE IF NOT EXISTS portfolios (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_portfolios_ws ON portfolios(workspace_id);
+
+CREATE TABLE IF NOT EXISTS social_posts (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  channel TEXT NOT NULL,
+  status TEXT NOT NULL,
+  pack_id TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_social_ws ON social_posts(workspace_id);
+
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT,
+  name TEXT NOT NULL,
+  path TEXT NOT NULL,
+  source TEXT NOT NULL,
+  at TEXT NOT NULL,
+  forwarded INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_analytics_ws ON analytics_events(workspace_id, name);

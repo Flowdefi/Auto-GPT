@@ -269,6 +269,45 @@ export function persistSqlite(state: DatabaseFile): void {
       const vector = embedLocal(`${chunk.title} ${chunk.text}`);
       vectorInsert.run(chunk.id, vector.length, JSON.stringify(Array.from(vector)));
     }
+    replaceTable(
+      db,
+      "portfolios",
+      state.portfolios.map((row) => ({
+        id: row.id,
+        workspace_id: row.workspaceId,
+        name: row.name,
+        json: JSON.stringify(row),
+      })),
+      ["id", "workspace_id", "name", "json"],
+    );
+    replaceTable(
+      db,
+      "social_posts",
+      state.socialPosts.map((row) => ({
+        id: row.id,
+        workspace_id: row.workspaceId,
+        channel: row.channel,
+        status: row.status,
+        pack_id: row.packId,
+        body: row.body,
+        created_at: row.createdAt,
+      })),
+      ["id", "workspace_id", "channel", "status", "pack_id", "body", "created_at"],
+    );
+    replaceTable(
+      db,
+      "analytics_events",
+      state.analyticsEvents.map((row) => ({
+        id: row.id,
+        workspace_id: row.workspaceId ?? null,
+        name: row.name,
+        path: row.path,
+        source: row.source,
+        at: row.at,
+        forwarded: row.forwarded ? 1 : 0,
+      })),
+      ["id", "workspace_id", "name", "path", "source", "at", "forwarded"],
+    );
     syncOperationalCrm(db, state);
     db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("version", String(state.version));
     db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("synced_at", new Date().toISOString());
@@ -365,6 +404,16 @@ function syncOperationalCrm(db: SqliteHandle, state: DatabaseFile): void {
   }
   for (const lead of state.leads) {
     upsert.run(lead.workspaceId, "leads", lead.id, `${lead.status} ${lead.band}`, JSON.stringify(lead), lead.updatedAt);
+  }
+  for (const portfolio of state.portfolios) {
+    upsert.run(
+      portfolio.workspaceId,
+      "portfolios",
+      portfolio.id,
+      portfolio.name,
+      JSON.stringify(portfolio),
+      portfolio.updatedAt,
+    );
   }
 }
 

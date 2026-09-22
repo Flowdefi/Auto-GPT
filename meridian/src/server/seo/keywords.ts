@@ -382,3 +382,148 @@ export function optimizePage(workspaceId: WorkspaceId, url: string, keyword: str
   const score = Math.round((checks.filter((check) => check.ok).length / checks.length) * 100);
   return { url, keyword, score, checks };
 }
+
+export interface RankPlanItem {
+  keywordId: string;
+  term: string;
+  position: number | null;
+  label: string;
+  measured: boolean;
+  targetUrl?: string;
+  suggestions: string[];
+}
+
+function uniqueLines(lines: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const line of lines) {
+    const clean = line.trim();
+    if (!clean || seen.has(clean)) continue;
+    seen.add(clean);
+    out.push(clean);
+  }
+  return out;
+}
+
+function rankSuggestions(workspaceId: WorkspaceId, term: string, targetUrl: string | undefined, crawled: boolean): string[] {
+  const lines: string[] = [];
+  if (!crawled) {
+    return [
+      "Crawl the site first. These targets are a checklist, not a measurement of the live pages.",
+      `Put "${term}" in the title tag and the H1.`,
+      "Write a meta description of 140–160 characters that includes the keyword.",
+      "Aim for at least 900 words on the ranking URL.",
+      "Add at least 3 internal links from related pages on the same host.",
+    ];
+  }
+
+  const db = loadDb();
+  const crawl = db.crawls.find((row) => row.workspaceId === workspaceId && row.status === "complete");
+  const pages = crawl ? db.seoPages.filter((page) => page.crawlId === crawl.id) : [];
+  const page =
+    (targetUrl ? pages.find((row) => row.url === targetUrl) : undefined) ??
+    pages.slice().sort((a, b) => b.pageRank - a.pageRank)[0];
+
+  if (!page) {
+    lines.push("The crawl has no pages yet. Run it again, then re-open this plan.");
+    lines.push(`When a URL exists, put "${term}" in the title and the H1.`);
+    return lines;
+  }
+
+  const report = optimizePage(workspaceId, page.url, term);
+  const wordTarget = Math.max(900, (page.wordCount || 0) + 400);
+  lines.push(
+    page.title.toLowerCase().includes(term.toLowerCase())
+      ? `Title already contains "${term}" (${page.titleLength} characters; keep it between 30 and 65).`
+      : `Change the title so it contains "${term}". Current title: ${page.title || "missing"}.`,
+  );
+  const h1 = page.h1[0] ?? "";
+  lines.push(
+    page.h1.some((heading) => heading.toLowerCase().includes(term.toLowerCase()))
+      ? `H1 already contains "${term}".`
+      : `Set the H1 to a heading that contains "${term}". Current H1: ${h1 || "missing"}.`,
+  );
+  lines.push(
+    page.metaLength >= 140 && page.metaLength <= 160
+      ? `Meta length is ${page.metaLength}, inside 140–160. Keep the keyword in it.`
+      : `Rewrite the meta description to 140–160 characters and include "${term}". Current length: ${page.metaLength}.`,
+  );
+  lines.push(
+    page.wordCount >= wordTarget
+      ? `Word count is ${page.wordCount}, at the ${wordTarget} target.`
+      : `Raise the page from ${page.wordCount} words toward ${wordTarget}.`,
+  );
+  const links = pages
+    .filter((row) => row.url !== page.url && row.status === 200)
+    .sort((a, b) => b.pageRank - a.pageRank)
+    .slice(0, 3)
+    .map((row) => row.url);
+  lines.push(
+    page.internalLinks >= 3
+      ? `Internal links: ${page.internalLinks}. Keep links to ${links.join(", ") || "related commercial pages"}.`
+      : `Add internal links (now ${page.internalLinks}) to ${links.join(", ") || "the strongest crawled URLs"}.`,
+  );
+  if (report) {
+    for (const check of report.checks) {
+      if (!check.ok) lines.push(`${check.label}: ${check.detail}`);
+    }
+  }
+  const issues = db.seoIssues.filter((issue) => issue.workspaceId === workspaceId && issue.url === page.url).slice(0, 4);
+  if (issues.length === 0) {
+    lines.push("No crawl issues stored for this URL. Cover the keyword in the first 100 words and in one H2.");
+  } else {
+    for (const issue of issues) lines.push(`Content gap — ${issue.title}: ${issue.recommendation}`);
+  }
+  return uniqueLines(lines);
+}
+
+/** On-page plan for tracked keywords. Positions come only from stored rank points. */
+export function seoRankPlan(workspaceId: WorkspaceId, keyword?: string): {
+  crawled: boolean;
+  note: string;
+  items: RankPlanItem[];
+} {
+  const db = loadDb();
+  const crawled = db.crawls.some((row) => row.workspaceId === workspaceId && row.status === "complete");
+  const needle = keyword?.trim().toLowerCase() ?? "";
+  let rows = db.keywords.filter((row) => row.workspaceId === workspaceId && row.tracked);
+  if (needle) {
+    const matched = rows.filter((row) => row.term.toLowerCase().includes(needle));
+    rows = matched.length > 0 ? matched : db.keywords.filter((row) => row.workspaceId === workspaceId && row.term.toLowerCase().includes(needle));
+  }
+
+  const items: RankPlanItem[] = rows.slice(0, 12).map((row) => {
+    const point = db.ranks.find((rank) => rank.workspaceId === workspaceId && rank.keywordId === row.id);
+    const position = typeof point?.position === "number" ? point.position : null;
+    return {
+      keywordId: row.id,
+      term: row.term,
+      position,
+      label: position === null ? "unmeasured" : `#${position}`,
+      measured: position !== null,
+      targetUrl: row.targetUrl,
+      suggestions: rankSuggestions(workspaceId, row.term, row.targetUrl, crawled),
+    };
+  });
+
+  if (items.length === 0 && needle) {
+    items.push({
+      keywordId: "",
+      term: keyword?.trim() ?? needle,
+      position: null,
+      label: "unmeasured",
+      measured: false,
+      suggestions: rankSuggestions(workspaceId, keyword?.trim() ?? needle, undefined, crawled),
+    });
+  }
+
+  const note = !crawled
+    ? "No completed crawl. Crawl the site before treating the checklist as live. Keyword positions stay unmeasured until a rank point is stored."
+    : items.length === 0
+      ? "No tracked keywords yet. Track a keyword from the research table. Positions are unmeasured until a rank point exists."
+      : items.some((item) => item.measured)
+        ? "Positions shown below are stored rank points. Keywords without a rank point are unmeasured."
+        : "No rank points stored for these keywords. Every position is unmeasured — refresh ranks only after a SERP provider is configured.";
+
+  return { crawled, note, items };
+}

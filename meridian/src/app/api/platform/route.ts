@@ -7,6 +7,7 @@ import { loadDb } from "@/server/db";
 import { checkDomainAuth } from "@/server/deliverability";
 import { providerStatus, publicBaseUrl } from "@/server/mailer";
 import { outlookStatus } from "@/server/outlook";
+import { gaStatus } from "@/server/ga";
 import { keywordProvider } from "@/server/seo/keywords";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export async function GET(request: Request) {
     embeddings: embedStatus(),
     catalog: catalogForUi(),
     seo: keywordProvider(),
+    ga: gaStatus(),
     auth,
     publicUrl: publicBaseUrl(),
     forms: {

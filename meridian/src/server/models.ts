@@ -159,6 +159,8 @@ export interface CrmContact {
   city: string;
   state: string;
   tags: string[];
+  linkedinUrl?: string;
+  notes?: string;
   lastActivityAt: string;
   enrichedAt?: string;
   enrichment?: Record<string, unknown>;
@@ -250,7 +252,9 @@ export interface AutomationWorkflow {
       | "email.received"
       | "form.submitted"
       | "deal.stage_changed"
-      | "sla.breached";
+      | "sla.breached"
+      | "portfolio.listed"
+      | "portfolio.stale";
     filters?: Array<{ field: string; op: "eq" | "neq" | "gte" | "lte" | "contains"; value: string | number }>;
   };
   actions: Array<{
@@ -275,7 +279,7 @@ export interface WorkflowRun {
   id: string;
   workflowId: string;
   workspaceId: WorkspaceId;
-  subjectType: "lead" | "contact" | "deal" | "message";
+  subjectType: "lead" | "contact" | "deal" | "message" | "portfolio";
   subjectId: string;
   event: string;
   results: Array<{ action: string; ok: boolean; detail: string }>;
@@ -293,6 +297,7 @@ export interface CrmTask {
   leadId?: string;
   contactId?: string;
   dealId?: string;
+  portfolioId?: string;
   source: string;
   createdAt: string;
 }
@@ -411,6 +416,66 @@ export interface Segment {
   createdAt: string;
 }
 
+export interface PortfolioHistoryEntry {
+  id: string;
+  at: string;
+  field: string;
+  from: string;
+  to: string;
+  actor: string;
+}
+
+export type PortfolioGeography = "national" | "state";
+
+export interface Portfolio {
+  id: string;
+  workspaceId: WorkspaceId;
+  name: string;
+  sellerCompanyId?: string;
+  sellerName: string;
+  sellerPrice: number;
+  faceValue: number;
+  creditor: string;
+  accountCount: number;
+  chargeoffYear: string;
+  notes: string;
+  segments: string[];
+  dateListed: string;
+  dateLastWorked: string;
+  debtType: string;
+  geography: PortfolioGeography;
+  states: string[];
+  possibleBuyers: string;
+  status: "intake" | "listed" | "in_market" | "awarded" | "closed";
+  history: PortfolioHistoryEntry[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SocialChannel = "x" | "facebook" | "google_business" | "linkedin";
+
+export interface SocialPost {
+  id: string;
+  workspaceId: WorkspaceId;
+  packId: string;
+  channel: SocialChannel;
+  body: string;
+  status: "draft" | "scheduled" | "posted";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AnalyticsEvent {
+  id: string;
+  workspaceId?: WorkspaceId;
+  name: string;
+  path: string;
+  at: string;
+  source: "first-party";
+  forwarded: boolean;
+  forwardError?: string;
+}
+
 export interface AiAuditEntry {
   id: string;
   workspaceId: WorkspaceId;
@@ -451,6 +516,9 @@ export interface DatabaseFile {
   briefs: SeoBrief[];
   segments: Segment[];
   aiAudit: AiAuditEntry[];
+  portfolios: Portfolio[];
+  socialPosts: SocialPost[];
+  analyticsEvents: AnalyticsEvent[];
 }
 
 export function emptyDb(): DatabaseFile {
@@ -483,5 +551,8 @@ export function emptyDb(): DatabaseFile {
     briefs: [],
     segments: [],
     aiAudit: [],
+    portfolios: [],
+    socialPosts: [],
+    analyticsEvents: [],
   };
 }

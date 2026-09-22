@@ -10,6 +10,13 @@ interface PlatformSnapshot {
   ai: { configured: boolean; model?: string; fast?: string; embed?: string; hint: string };
   embeddings: { mode: string; model: string; dim: number };
   seo: { name: string; configured: boolean };
+  ga?: {
+    measurementId: string | null;
+    publicSnippet: boolean;
+    measurementProtocol: boolean;
+    propertyId: string | null;
+    hint: string;
+  };
   auth: { domain: string; score: number; verdict: string; summary: string };
   publicUrl?: string;
   forms: { submit: string; embed: string; snippet: string };
@@ -99,6 +106,24 @@ export default function IntegrationsPage() {
             </div>
             <p className="text-muted-foreground">{data?.auth.summary}</p>
           </div>
+        </Card>
+
+        <Card className="p-5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-semibold">Google Analytics 4</div>
+            <Badge tone={data?.ga?.measurementProtocol ? "good" : "warn"}>
+              {data?.ga?.measurementProtocol ? "forwarding" : "not configured"}
+            </Badge>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {data?.ga?.hint ?? "Set GA_MEASUREMENT_ID and GA_API_SECRET to forward page views. First-party counts still show on Reporting."}
+          </p>
+          <ul className="mt-3 space-y-1 text-sm">
+            <li>Measurement ID · {data?.ga?.measurementId ?? "missing"}</li>
+            <li>Browser snippet · {data?.ga?.publicSnippet ? "NEXT_PUBLIC_GA_MEASUREMENT_ID is set" : "set NEXT_PUBLIC_GA_MEASUREMENT_ID"}</li>
+            <li>Measurement Protocol · {data?.ga?.measurementProtocol ? "GA_API_SECRET is set" : "needs GA_MEASUREMENT_ID and GA_API_SECRET"}</li>
+            <li>Property · {data?.ga?.propertyId ?? "GA4_PROPERTY_ID optional"}</li>
+          </ul>
         </Card>
 
         <Card className="p-5">

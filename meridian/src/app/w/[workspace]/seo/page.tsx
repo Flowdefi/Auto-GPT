@@ -5,13 +5,20 @@ import { DataTable } from "@/components/tables";
 import { Badge, Button, Card, Field, PageHeader } from "@/components/meridian/legacy";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
+interface RankPlan {
+  crawled: boolean;
+  note: string;
+  items: Array<{ keywordId: string; term: string; position: number | null; label: string; measured: boolean; suggestions: string[] }>;
+}
+
 interface SeoState {
   latest?: { health: number; pagesCrawled: number; host: string; status: string };
   issues: Array<{ code: string; title: string; severity: string; count: number; recommendation: string; urls: string[] }>;
-  keywords: Array<{ id: string; term: string; volume: number; difficulty: number; intent: string; tracked: boolean }>;
+  keywords: Array<{ id: string; term: string; volume: number; difficulty: number; intent: string; tracked: boolean; targetUrl?: string }>;
   briefs: Array<{ id: string; keyword: string; title: string; wordTarget: number }>;
   provider: { name: string; configured: boolean };
   pages: Array<{ url: string; title: string; wordCount: number; pageRank: number }>;
+  rankPlan?: RankPlan;
 }
 
 export default function SeoPage() {
@@ -51,7 +58,11 @@ export default function SeoPage() {
         ? `Crawled ${payload.crawl?.pagesCrawled ?? 0} pages · health ${payload.crawl?.health ?? "—"} · ${payload.issues} issues`
         : action === "brief"
           ? `Brief ready: ${payload.brief?.title}`
-          : "Done.",
+          : action === "ranks"
+            ? payload.note ?? "Rank refresh finished."
+            : action === "track"
+              ? "Tracking updated. Position stays unmeasured until a rank point is stored."
+              : "Done.",
     );
     await refresh();
   }
@@ -69,6 +80,9 @@ export default function SeoPage() {
             </Button>
             <Button tone="soft" disabled={busy !== null} onClick={() => void run("research", { seed })}>
               {busy === "research" ? "Researching…" : "Research keywords"}
+            </Button>
+            <Button tone="soft" disabled={busy !== null} onClick={() => void run("ranks")}>
+              {busy === "ranks" ? "Checking…" : "Refresh ranks"}
             </Button>
           </div>
         }
@@ -104,6 +118,27 @@ export default function SeoPage() {
         </div>
       </div>
       {notice ? <Card className="mb-4 p-4 text-sm">{notice}</Card> : null}
+      <Card className="mb-6 space-y-4 p-5">
+        <div className="font-semibold">Path to #1</div>
+        <p className="text-sm text-muted-foreground">{state?.rankPlan?.note ?? "Load keywords to see on-page suggestions. Positions are unmeasured until a rank point exists."}</p>
+        {(state?.rankPlan?.items.length ?? 0) === 0 ? (
+          <p className="text-sm text-muted-foreground">Track a keyword below. If you have not crawled, crawl first so suggestions can use real titles, metas, and links.</p>
+        ) : (
+          state?.rankPlan?.items.map((item) => (
+            <div key={item.term + item.keywordId} className="rounded-xl border p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="font-medium">{item.term}</div>
+                <Badge tone={item.measured ? "good" : "neutral"}>{item.label}</Badge>
+              </div>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                {item.suggestions.slice(0, 6).map((suggestion) => (
+                  <li key={suggestion}>{suggestion}</li>
+                ))}
+              </ul>
+            </div>
+          ))
+        )}
+      </Card>
       <div className="mb-6 space-y-3">
         {(state?.issues ?? []).slice(0, 12).map((issue) => (
           <Card key={issue.code} className="p-4">
@@ -119,17 +154,23 @@ export default function SeoPage() {
         ))}
       </div>
       <DataTable
-        headers={["Keyword", "Volume", "Difficulty", "Intent", "Tracked"]}
-        rows={(state?.keywords ?? []).map((keyword) => ({
-          key: keyword.id,
-          cells: [
-            keyword.term,
-            keyword.volume.toLocaleString(),
-            String(keyword.difficulty),
-            keyword.intent,
-            keyword.tracked ? "yes" : "no",
-          ],
-        }))}
+        headers={["Keyword", "Volume", "Difficulty", "Intent", "Position", "Track"]}
+        rows={(state?.keywords ?? []).map((keyword) => {
+          const plan = state?.rankPlan?.items.find((item) => item.keywordId === keyword.id);
+          return {
+            key: keyword.id,
+            cells: [
+              keyword.term,
+              keyword.volume.toLocaleString(),
+              String(keyword.difficulty),
+              keyword.intent,
+              keyword.tracked ? plan?.label ?? "unmeasured" : "—",
+              <Button key={keyword.id} tone="soft" disabled={busy !== null} onClick={() => void run("track", { keywordId: keyword.id, tracked: !keyword.tracked })}>
+                {keyword.tracked ? "Stop tracking" : "Track"}
+              </Button>,
+            ],
+          };
+        })}
       />
       {(state?.briefs ?? []).length > 0 ? (
         <div className="mt-6 space-y-2">
