@@ -2,8 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { Source_Sans_3 } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AnalyticsBeacon } from "@/components/analytics-beacon";
 import { ThemeProvider } from "@/components/meridian/theme-provider";
 import "./globals.css";
+
+const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() ?? "";
+const publicGaId = /^G-[A-Z0-9]+$/i.test(gaMeasurementId) ? gaMeasurementId : undefined;
 
 const sans = Source_Sans_3({
   subsets: ["latin"],
@@ -57,8 +61,9 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={sans.variable} suppressHydrationWarning>
+    <html lang="en" className={sans.variable} data-scroll-behavior="smooth" suppressHydrationWarning>
       <body className="font-sans antialiased">
+        <AnalyticsBeacon measurementId={publicGaId} />
         <ThemeProvider>
           <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
           <Toaster position="top-center" richColors closeButton />

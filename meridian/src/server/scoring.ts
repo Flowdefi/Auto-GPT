@@ -188,6 +188,10 @@ export function inferSide(
   const buyer = BUYER_SIGNALS.filter((signal) => blob.includes(signal)).length;
   if (company.type === "seller" || company.type === "issuer") return "seller";
   if (company.type === "buyer" || company.type === "fund") return "buyer";
+  const selling = /\bsell(?:ing|s|er)?\b/.test(blob);
+  const buying = /\bbuy(?:ing|s|er)?\b/.test(blob);
+  if (selling && !buying) return "seller";
+  if (buying && !selling) return "buyer";
   if (seller > buyer) return "seller";
   if (buyer > seller) return "buyer";
   return "unknown";

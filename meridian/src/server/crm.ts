@@ -107,6 +107,9 @@ export interface UpsertContactInput {
   state?: string;
   ownerId?: string;
   tags?: string[];
+  lifecycle?: string;
+  linkedinUrl?: string;
+  notes?: string;
 }
 
 export interface UpsertResult {
@@ -194,11 +197,13 @@ export function upsertContact(input: UpsertContactInput): UpsertResult {
         title: input.title ?? "",
         companyId: company.id,
         ownerId: input.ownerId ?? "",
-        lifecycle: "lead",
+        lifecycle: input.lifecycle ?? "lead",
         score: 40,
         city: input.city ?? "",
         state: input.state ?? "",
         tags: input.tags ?? [],
+        linkedinUrl: input.linkedinUrl ?? "",
+        notes: input.notes ?? "",
         lastActivityAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
       };
@@ -213,11 +218,86 @@ export function upsertContact(input: UpsertContactInput): UpsertResult {
       if (input.tags?.length) {
         contact.tags = [...new Set([...contact.tags, ...input.tags])];
       }
+      if (input.lifecycle) contact.lifecycle = input.lifecycle;
+      if (input.linkedinUrl !== undefined) contact.linkedinUrl = input.linkedinUrl;
+      if (input.notes !== undefined) contact.notes = input.notes;
       contact.lastActivityAt = new Date().toISOString();
       if (!contact.companyId) contact.companyId = company.id;
     }
 
     return { contact, company, createdContact, createdCompany };
+  });
+}
+
+const LIFECYCLES = new Set(["subscriber", "lead", "mql", "sql", "opportunity", "customer", "evangelist"]);
+
+export function updateContact(
+  workspaceId: WorkspaceId,
+  id: string,
+  patch: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    title?: string;
+    company?: string;
+    city?: string;
+    state?: string;
+    lifecycle?: string;
+    tags?: string[];
+    linkedinUrl?: string;
+    notes?: string;
+  },
+): CrmContact {
+  return mutate((db) => {
+    const contact = db.contacts.find((row) => row.id === id && row.workspaceId === workspaceId);
+    if (!contact) throw new Error("Contact not found");
+    if (patch.firstName !== undefined) contact.firstName = patch.firstName.trim();
+    if (patch.lastName !== undefined) contact.lastName = patch.lastName.trim();
+    if (patch.phone !== undefined) contact.phone = patch.phone.trim();
+    if (patch.title !== undefined) contact.title = patch.title.trim();
+    if (patch.city !== undefined) contact.city = patch.city.trim();
+    if (patch.state !== undefined) contact.state = patch.state.trim();
+    if (patch.lifecycle !== undefined) {
+      if (!LIFECYCLES.has(patch.lifecycle)) throw new Error("Unknown lifecycle");
+      contact.lifecycle = patch.lifecycle;
+    }
+    if (patch.tags !== undefined) contact.tags = patch.tags;
+    if (patch.linkedinUrl !== undefined) contact.linkedinUrl = patch.linkedinUrl;
+    if (patch.notes !== undefined) contact.notes = patch.notes;
+    if (patch.company !== undefined) {
+      const name = patch.company.trim();
+      const match = db.companies.find(
+        (company) => company.workspaceId === workspaceId && company.name.toLowerCase() === name.toLowerCase(),
+      );
+      if (match) {
+        contact.companyId = match.id;
+      } else if (name) {
+        const current = db.companies.find((company) => company.id === contact.companyId);
+        if (current) current.name = name;
+        else {
+          const created: CrmCompany = {
+            id: nextId("co"),
+            workspaceId,
+            name,
+            domain: "",
+            type: "prospect",
+            industry: "",
+            city: contact.city,
+            state: contact.state,
+            employees: "",
+            ownerId: contact.ownerId,
+            lifecycle: "lead",
+            score: 40,
+            notes: "",
+            createdAt: new Date().toISOString(),
+          };
+          db.companies.push(created);
+          contact.companyId = created.id;
+        }
+      }
+    }
+    contact.lastActivityAt = new Date().toISOString();
+    return contact;
   });
 }
 

@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { seedAether } from "@/lib/seed/aether";
 import { seedTriton } from "@/lib/seed/triton";
 import type { WorkspaceData, WorkspaceId } from "@/lib/types";
+import { embedLocal } from "./ai/embeddings";
 import type { DatabaseFile } from "./models";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -262,6 +263,52 @@ export function persistSqlite(state: DatabaseFile): void {
         termInsert.run(term, chunk.id, chunk.workspaceId);
       }
     }
+    db.exec("DELETE FROM rag_vectors");
+    const vectorInsert = db.prepare("INSERT INTO rag_vectors (chunk_id, dim, vector) VALUES (?, ?, ?)");
+    for (const chunk of state.chunks) {
+      const vector = embedLocal(`${chunk.title} ${chunk.text}`);
+      vectorInsert.run(chunk.id, vector.length, JSON.stringify(Array.from(vector)));
+    }
+    replaceTable(
+      db,
+      "portfolios",
+      state.portfolios.map((row) => ({
+        id: row.id,
+        workspace_id: row.workspaceId,
+        name: row.name,
+        json: JSON.stringify(row),
+      })),
+      ["id", "workspace_id", "name", "json"],
+    );
+    replaceTable(
+      db,
+      "social_posts",
+      state.socialPosts.map((row) => ({
+        id: row.id,
+        workspace_id: row.workspaceId,
+        channel: row.channel,
+        status: row.status,
+        pack_id: row.packId,
+        body: row.body,
+        created_at: row.createdAt,
+      })),
+      ["id", "workspace_id", "channel", "status", "pack_id", "body", "created_at"],
+    );
+    replaceTable(
+      db,
+      "analytics_events",
+      state.analyticsEvents.map((row) => ({
+        id: row.id,
+        workspace_id: row.workspaceId ?? null,
+        name: row.name,
+        path: row.path,
+        source: row.source,
+        at: row.at,
+        forwarded: row.forwarded ? 1 : 0,
+      })),
+      ["id", "workspace_id", "name", "path", "source", "at", "forwarded"],
+    );
+    syncOperationalCrm(db, state);
     db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("version", String(state.version));
     db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("synced_at", new Date().toISOString());
     db.exec("COMMIT");
@@ -335,6 +382,61 @@ export function seedCrmSnapshot(): void {
   } catch (error) {
     db.exec("ROLLBACK");
     throw error;
+  }
+}
+
+function syncOperationalCrm(db: SqliteHandle, state: DatabaseFile): void {
+  const now = new Date().toISOString();
+  const upsert = db.prepare(
+    `INSERT INTO crm_records (workspace_id, kind, id, label, json, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(workspace_id, kind, id) DO UPDATE SET
+       label = excluded.label,
+       json = excluded.json,
+       updated_at = excluded.updated_at`,
+  );
+  for (const company of state.companies) {
+    upsert.run(company.workspaceId, "companies", company.id, company.name, JSON.stringify(company), company.enrichedAt ?? now);
+  }
+  for (const contact of state.contacts) {
+    const label = `${contact.firstName} ${contact.lastName}`.trim() || contact.email;
+    upsert.run(contact.workspaceId, "contacts", contact.id, label, JSON.stringify(contact), contact.lastActivityAt || now);
+  }
+  for (const lead of state.leads) {
+    upsert.run(lead.workspaceId, "leads", lead.id, `${lead.status} ${lead.band}`, JSON.stringify(lead), lead.updatedAt);
+  }
+  for (const portfolio of state.portfolios) {
+    upsert.run(
+      portfolio.workspaceId,
+      "portfolios",
+      portfolio.id,
+      portfolio.name,
+      JSON.stringify(portfolio),
+      portfolio.updatedAt,
+    );
+  }
+}
+
+export function loadVector(chunkId: string): Float32Array | null {
+  const db = open();
+  if (!db) return null;
+  try {
+    const row = db.prepare("SELECT vector FROM rag_vectors WHERE chunk_id = ?").get(chunkId);
+    if (!row?.vector || typeof row.vector !== "string") return null;
+    const values = JSON.parse(row.vector) as number[];
+    if (!Array.isArray(values) || values.length === 0) return null;
+    return Float32Array.from(values);
+  } catch {
+    return null;
+  }
+}
+
+export function upsertVectors(rows: Array<{ id: string; vector: Float32Array }>): void {
+  const db = open();
+  if (!db || rows.length === 0) return;
+  const stmt = db.prepare("INSERT OR REPLACE INTO rag_vectors (chunk_id, dim, vector) VALUES (?, ?, ?)");
+  for (const row of rows) {
+    stmt.run(row.id, row.vector.length, JSON.stringify(Array.from(row.vector)));
   }
 }
 

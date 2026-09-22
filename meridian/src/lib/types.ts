@@ -291,6 +291,9 @@ export interface AiMessage {
   role: "user" | "assistant";
   body: string;
   at: string;
+  model?: string;
+  tools?: string[];
+  grounded?: string[];
 }
 
 export interface Quote {
