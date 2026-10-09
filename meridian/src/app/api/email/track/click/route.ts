@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
+import { ready } from "@/server/db";
 import { parsePublicHttpUrl } from "@/server/http-guard";
 import { recordMailEvent } from "@/server/mailer";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
+  await ready();
   const url = new URL(request.url);
   const messageId = url.searchParams.get("m");
   const target = url.searchParams.get("u");

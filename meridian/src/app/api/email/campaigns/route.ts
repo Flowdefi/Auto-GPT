@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
-import { loadDb, mutate, nextId } from "@/server/db";
+import { loadDb, mutate, nextId, ready } from "@/server/db";
 import { abResults, fromAddress } from "@/server/mailer";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  await ready();
   const body = (await request.json()) as {
     workspaceId?: string;
     name?: string;
@@ -56,7 +57,8 @@ export async function POST(request: Request) {
   return NextResponse.json({ campaign });
 }
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
+  await ready();
   const campaignId = new URL(request.url).searchParams.get("id");
   const db = loadDb();
   if (!campaignId) {

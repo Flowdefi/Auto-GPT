@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { ready } from "@/server/db";
 import { sendCampaign } from "@/server/mailer";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  await ready();
   const body = (await request.json()) as {
     campaignId?: string;
     variants?: string[];

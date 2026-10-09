@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
-import { loadDb, mutate, nextId } from "@/server/db";
+import { loadDb, mutate, nextId, ready } from "@/server/db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
+  await ready();
   const workspaceId = new URL(request.url).searchParams.get("workspace");
   if (!isWorkspaceId(workspaceId ?? undefined)) {
     return NextResponse.json({ error: "workspace required" }, { status: 400 });
@@ -28,6 +29,7 @@ export function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  await ready();
   const body = (await request.json()) as {
     workspaceId?: string;
     listId?: string;

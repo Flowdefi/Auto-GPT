@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mutate } from "@/server/db";
+import { mutate, ready } from "@/server/db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,6 +13,7 @@ export function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  await ready();
   const queryToken = new URL(request.url).searchParams.get("token");
   let bodyToken: string | undefined;
   const contentType = request.headers.get("content-type") ?? "";

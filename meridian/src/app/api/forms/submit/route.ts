@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
-import { loadDb, mutate, nextId } from "@/server/db";
+import { loadDb, mutate, nextId, ready } from "@/server/db";
 import { createLead } from "@/server/workflow";
 import { runAutomations } from "@/server/workflow";
 
@@ -51,6 +51,7 @@ function rateLimited(ip: string): boolean {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export async function POST(request: Request) {
+  await ready();
   const origin = request.headers.get("origin");
   const headers = corsHeaders(origin);
   const ip =
@@ -172,7 +173,8 @@ export async function POST(request: Request) {
   }
 }
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
+  await ready();
   const workspace = new URL(request.url).searchParams.get("workspace") ?? undefined;
   if (!isWorkspaceId(workspace)) {
     return NextResponse.json({ error: "workspace required" }, { status: 400 });

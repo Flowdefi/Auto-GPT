@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
-import { loadDb } from "@/server/db";
+import { loadDb, ready } from "@/server/db";
 import { enrichCompanyRecord } from "@/server/enrich";
 import { assignableUsers, createLead, setLeadStatus, sweepSla } from "@/server/workflow";
 import type { LeadStatus } from "@/server/models";
@@ -20,7 +20,8 @@ const STATUSES: LeadStatus[] = [
   "converted",
 ];
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
+  await ready();
   const url = new URL(request.url);
   const workspace = url.searchParams.get("workspace") ?? undefined;
   if (!isWorkspaceId(workspace)) {
@@ -64,6 +65,7 @@ export function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  await ready();
   const body = (await request.json()) as {
     workspaceId?: string;
     email?: string;
@@ -107,6 +109,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  await ready();
   const body = (await request.json()) as {
     workspaceId?: string;
     leadId?: string;

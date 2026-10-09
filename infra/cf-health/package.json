@@ -1,0 +1,14 @@
+{
+  "name": "meridian-cove-health",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy --temporary"
+  },
+  "dependencies": {
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "wrangler": "^4.135.0"
+  }
+}

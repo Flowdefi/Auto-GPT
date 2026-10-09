@@ -1,0 +1,93 @@
+# Live infrastructure
+
+Meridian (Triton / Aether CRM) and Cove (TF Recovery collections) share one
+**Prisma Postgres** database in `us-east-1`. Snapshots are the source of truth;
+CRM rows, accounts, portfolios, and payments are projections.
+
+## What is already provisioned
+
+- Prisma project `meridian-cove` (region `us-east-1`)
+- Tables in `infra/schema.sql` (`snapshots`, `audit_events`, `meridian_crm`,
+  `cove_accounts`, `cove_payments`, `cove_portfolios`)
+- Both apps boot from `DATABASE_URL` via `ready()` before serving traffic
+
+Set `DATABASE_URL` in `meridian/.env.local` and `cove/.env.local`. Do not commit it.
+
+## Run locally against the live database
+
+```bash
+# terminal 1
+cd meridian && npm run dev
+
+# terminal 2
+cd cove && npm run dev
+```
+
+- Meridian health: `http://localhost:3000/api/health` — `postgres.ok` must be true
+- Cove health: `http://localhost:3001/api/health`
+- TF Recovery portal: `http://localhost:3001/pay`
+
+## Docker + Caddy (public HTTPS)
+
+```bash
+cp infra/.env.example infra/.env
+# edit DATABASE_URL and domains
+docker compose -f infra/docker-compose.yml --profile edge up -d --build
+```
+
+Point DNS A/AAAA records for `MERIDIAN_DOMAIN` and `COVE_DOMAIN` at the host.
+Caddy obtains Let's Encrypt certificates automatically.
+
+## Seeding
+
+The first process that starts with `DATABASE_URL` and an empty `snapshots` row
+writes the demo book (Triton CRM + unlicensed-state inventory). Later boots
+hydrate from Postgres instead of local files / localStorage.
+
+Card PAN/CVC is never written. Portal payments store amount, method, and last4.
+
+## Cloudflare Workers (durable HTTPS)
+
+Temporary preview account **Pinnate Gate**. Claim it from the pull request
+within 60 minutes of the deploy or the workers expire. After claiming, run
+`npm run cf:deploy:prod` in `cove/` and `meridian/` (no `--temporary`).
+
+| App | URL |
+| --- | --- |
+| Cove / TF Recovery | https://cove-tfr.pinnate-gate.workers.dev |
+| TF Recovery pay | https://cove-tfr.pinnate-gate.workers.dev/pay |
+| Meridian / Triton | https://meridian-triton.pinnate-gate.workers.dev |
+| Meridian home | https://meridian-triton.pinnate-gate.workers.dev/w/triton/home |
+| Hyperdrive ping | https://meridian-cove-health.pinnate-gate.workers.dev |
+
+Both app workers bind **Hyperdrive** `12274905107e469cb63352790d5c123c` to the
+same Prisma Postgres database. The ping worker lives in `infra/cf-health`.
+
+```bash
+# from cove/ or meridian/
+export CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="$DATABASE_URL"
+npx wrangler deploy --temporary   # first time / unclaimed account
+# after claiming:
+npx wrangler deploy
+```
+
+`workers.dev` on an unclaimed preview account shows a Cloudflare browser check
+to datacenter clients. Open the links in a normal browser, or use a Cloudflare
+Tunnel in front of `npm run dev` / `npm run start` (no `workers.dev` challenge):
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:3000   # Meridian
+cloudflared tunnel --url http://127.0.0.1:3001   # Cove
+```
+
+GitHub Action `.github/workflows/cloudflare-workers.yml` deploys both OpenNext
+workers on `workflow_dispatch` once `CLOUDFLARE_API_TOKEN`,
+`CLOUDFLARE_ACCOUNT_ID`, and `DATABASE_URL` are set as repository secrets.
+
+Do **not** point `www.debtmarket.net` at this stack — that origin is still the
+GoDaddy WordPress site.
+
+## Licensing
+
+Start collections work in GA + OH, then MO / KY. FDCPA, Reg F, and TCPA still
+apply. See `docs/START-HERE.md`.

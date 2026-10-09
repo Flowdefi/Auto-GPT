@@ -316,6 +316,30 @@ export interface BotAction {
   blockedReason?: string;
 }
 
+/** Public TF Recovery portal projection — no phones, skip, notes, or documents. */
+export type PortalView = {
+  portalCode: string;
+  firstName: string;
+  last4: string;
+  originalCreditor: string;
+  product: string;
+  balance: number;
+  payments: Array<{
+    id: string;
+    amount: number;
+    method: "card" | "ach";
+    last4: string;
+    at: string;
+    status: Payment["status"];
+  }>;
+  plan: {
+    installment: number;
+    cadence: PaymentPlan["cadence"];
+    remaining: number;
+    nextDue: string;
+  } | null;
+};
+
 export interface AppData {
   agents: Agent[];
   accounts: Account[];

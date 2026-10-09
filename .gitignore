@@ -180,6 +180,16 @@ cove/.next/
 cove/out/
 cove/.env
 cove/.env.local
+infra/.env
+.open-next/
+.wrangler/
+.dev.vars
+meridian/.open-next/
+cove/.open-next/
+infra/cf-health/node_modules/
+meridian/.wrangler/
+cove/.wrangler/
+.playwright-mcp/
 !cove/src/lib/
 !cove/src/lib/**
 !cove/package-lock.json

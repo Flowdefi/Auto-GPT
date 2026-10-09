@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
-import { loadDb } from "@/server/db";
+import { loadDb, ready } from "@/server/db";
 import { outlookStatus, reassociate, syncAll } from "@/server/outlook";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
+  await ready();
   const workspace = new URL(request.url).searchParams.get("workspace") ?? undefined;
   if (!isWorkspaceId(workspace)) {
     return NextResponse.json({ error: "workspace required" }, { status: 400 });
@@ -41,6 +42,7 @@ export function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  await ready();
   const body = (await request.json()) as { workspaceId?: string; action?: string };
   if (!isWorkspaceId(body.workspaceId)) {
     return NextResponse.json({ error: "workspaceId required" }, { status: 400 });

@@ -1,0 +1,93 @@
+# Live Meridian + Cove against a real Postgres (Prisma Postgres by default).
+#
+#   cp infra/.env.example infra/.env   # set DATABASE_URL + domains
+#   docker compose -f infra/docker-compose.yml up -d --build
+#
+# Caddy issues Let's Encrypt certs when MERIDIAN_DOMAIN / COVE_DOMAIN are public.
+
+name: meridian-cove
+
+services:
+  meridian:
+    build:
+      context: ../meridian
+      dockerfile: Dockerfile
+    image: meridian/app:live
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: ${DATABASE_URL}
+      MERIDIAN_PUBLIC_URL: ${MERIDIAN_PUBLIC_URL:-http://localhost:3000}
+      NEXT_PUBLIC_APP_URL: ${MERIDIAN_PUBLIC_URL:-http://localhost:3000}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      AGENTMAIL_API_KEY: ${AGENTMAIL_API_KEY:-}
+    expose:
+      - "3000"
+    ports:
+      - "${MERIDIAN_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 8s
+      retries: 5
+      start_period: 40s
+
+  cove:
+    build:
+      context: ../cove
+      dockerfile: Dockerfile
+    image: cove/app:live
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: ${DATABASE_URL}
+      COVE_PUBLIC_ORIGIN: ${COVE_PUBLIC_ORIGIN:-http://localhost:3001}
+    expose:
+      - "3000"
+    ports:
+      - "${COVE_PORT:-3001}:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 8s
+      retries: 5
+      start_period: 40s
+
+  caddy:
+    profiles: ["edge"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - meridian
+      - cove
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      MERIDIAN_DOMAIN: ${MERIDIAN_DOMAIN:-meridian.localhost}
+      COVE_DOMAIN: ${COVE_DOMAIN:-cove.localhost}
+      CADDY_EMAIL: ${CADDY_EMAIL:-ops@debtmarket.net}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

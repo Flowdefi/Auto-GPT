@@ -26,6 +26,7 @@ services:
       HOSTNAME: 0.0.0.0
       # Public origin used when rendering TF Recovery pay links into SMS.
       COVE_PUBLIC_ORIGIN: ${COVE_PUBLIC_ORIGIN:-http://localhost:8080}
+      DATABASE_URL: ${DATABASE_URL:-}
     ports:
       - "${COVE_PORT:-8080}:3000"
     healthcheck:

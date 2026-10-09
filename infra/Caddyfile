@@ -1,0 +1,13 @@
+{
+	email {$CADDY_EMAIL:ops@debtmarket.net}
+}
+
+{$MERIDIAN_DOMAIN:meridian.localhost} {
+	encode zstd gzip
+	reverse_proxy meridian:3000
+}
+
+{$COVE_DOMAIN:cove.localhost} {
+	encode zstd gzip
+	reverse_proxy cove:3000
+}

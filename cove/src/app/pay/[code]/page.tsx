@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { money, when } from "@/lib/format";
-import { useCove } from "@/lib/store";
+import type { PortalView } from "@/lib/types";
 
 type Tab = "once" | "plan";
 
@@ -21,14 +21,8 @@ function digitsOnly(value: string, max: number): string {
 export default function PortalAccountPage() {
   const params = useParams<{ code: string }>();
   const code = decodeURIComponent(params.code ?? "");
-  const accounts = useCove((state) => state.accounts);
-  const plans = useCove((state) => state.plans);
-  const payments = useCove((state) => state.payments);
-  const portalPay = useCove((state) => state.portalPay);
-  const portalPlan = useCove((state) => state.portalPlan);
-
-  const account = accounts.find((item) => item.portalCode.toUpperCase() === code.toUpperCase());
-
+  const [account, setAccount] = useState<PortalView | null>(null);
+  const [missing, setMissing] = useState(false);
   const [tab, setTab] = useState<Tab>("once");
   const [amount, setAmount] = useState("");
   const [installment, setInstallment] = useState("75");
@@ -39,8 +33,31 @@ export default function PortalAccountPage() {
   const [zip, setZip] = useState("");
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [planned, setPlanned] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  if (!account) {
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`/api/pay?code=${encodeURIComponent(code)}`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) {
+          if (!cancelled) setMissing(true);
+          return;
+        }
+        const body = (await response.json()) as { account?: PortalView };
+        if (!cancelled) {
+          if (body.account) setAccount(body.account);
+          else setMissing(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setMissing(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+
+  if (missing) {
     return (
       <div className="rounded-2xl border border-tfr-line bg-white p-6">
         <h1 className="text-xl font-semibold">We could not find that account</h1>
@@ -54,10 +71,61 @@ export default function PortalAccountPage() {
     );
   }
 
-  const activePlan = plans.find((plan) => plan.accountId === account.id && plan.status === "active");
-  const myPayments = payments.filter((payment) => payment.accountId === account.id);
+  if (!account) {
+    return <div className="text-sm text-tfr-ink/60">Looking up your account…</div>;
+  }
+
   const settlement = Math.round(account.balance * 0.6);
   const cardValid = digitsOnly(card, 16).length >= 15 && expiry.length >= 4 && cvc.length >= 3 && zip.length >= 5;
+  const activePlan = account.plan;
+  const myPayments = account.payments;
+
+  async function submit() {
+    if (!account) return;
+    const last4 = digitsOnly(card, 16).slice(-4) || "0000";
+    setBusy(true);
+    try {
+      if (tab === "once") {
+        const response = await fetch("/api/pay", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "pay",
+            portalCode: account.portalCode,
+            amount: Number(amount),
+            method: "card",
+            last4,
+          }),
+        });
+        const body = (await response.json()) as { ok: boolean; message: string; account?: PortalView };
+        setPlanned(false);
+        setResult({ ok: body.ok, message: body.message });
+        if (body.account) setAccount(body.account);
+        setAmount("");
+      } else {
+        const response = await fetch("/api/pay", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "plan",
+            portalCode: account.portalCode,
+            installment: Number(installment),
+            cadence,
+          }),
+        });
+        const body = (await response.json()) as { ok: boolean; message: string; account?: PortalView };
+        setResult(body.ok ? null : { ok: false, message: body.message });
+        setPlanned(body.ok);
+        if (body.account) setAccount(body.account);
+      }
+    } catch {
+      setResult({ ok: false, message: "The payment service is unavailable. Try again in a moment." });
+    } finally {
+      setCard("");
+      setCvc("");
+      setBusy(false);
+    }
+  }
 
   if (account.balance === 0) {
     return (
@@ -65,9 +133,7 @@ export default function PortalAccountPage() {
         <div className="inline-block rounded-full bg-tfr-greenSoft px-3 py-1 text-xs font-semibold text-tfr-green">
           Paid in full
         </div>
-        <h1 className="mt-3 text-2xl font-semibold">
-          {account.firstName}, this account is closed.
-        </h1>
+        <h1 className="mt-3 text-2xl font-semibold">{account.firstName}, this account is closed.</h1>
         <p className="mt-2 text-sm text-tfr-ink/70">
           Nothing further is owed on the {account.originalCreditor} account ending {account.last4}. A zero-balance
           letter has been sent to you.
@@ -282,20 +348,8 @@ export default function PortalAccountPage() {
 
           <button
             type="button"
-            disabled={!cardValid || (tab === "once" ? !(Number(amount) > 0) : !(Number(installment) > 0))}
-            onClick={() => {
-              const last4 = digitsOnly(card, 16).slice(-4) || "0000";
-              if (tab === "once") {
-                setPlanned(false);
-                setResult(portalPay(account.portalCode, Number(amount), "card", last4));
-                setAmount("");
-              } else {
-                setResult(null);
-                setPlanned(portalPlan(account.portalCode, Number(installment), cadence));
-              }
-              setCard("");
-              setCvc("");
-            }}
+            disabled={busy || !cardValid || (tab === "once" ? !(Number(amount) > 0) : !(Number(installment) > 0))}
+            onClick={() => void submit()}
             className="mt-4 min-h-[52px] w-full rounded-xl bg-tfr-navy py-3.5 text-sm font-semibold text-white transition active:scale-[0.99] disabled:opacity-40"
           >
             {tab === "once"
@@ -305,7 +359,7 @@ export default function PortalAccountPage() {
           <p className="mt-3 text-xs leading-relaxed text-tfr-ink/60">
             By continuing you authorize TF Recovery to charge the payment method above. This charge appears on your
             statement as <strong>TF RECOVERY</strong>. This is an attempt to collect a debt and any information
-            obtained will be used for that purpose.
+            obtained will be used for that purpose. Card numbers are never stored.
           </p>
         </div>
       </div>

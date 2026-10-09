@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
-import { loadDb } from "@/server/db";
+import { loadDb, ready } from "@/server/db";
 import { crawlSite } from "@/server/seo/crawler";
 import {
   buildBrief,
@@ -15,7 +15,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
+  await ready();
   const url = new URL(request.url);
   const workspace = url.searchParams.get("workspace") ?? undefined;
   if (!isWorkspaceId(workspace)) {
@@ -77,6 +78,7 @@ export function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  await ready();
   const body = (await request.json()) as {
     workspaceId?: string;
     action?: string;
