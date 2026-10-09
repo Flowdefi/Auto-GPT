@@ -11,11 +11,9 @@ const PIXEL = Buffer.from(
 );
 
 export async function GET(request: Request) {
+  await ready();
   const messageId = new URL(request.url).searchParams.get("m");
-  if (messageId) {
-    await ready();
-    recordMailEvent(messageId, "open");
-  }
+  if (messageId) recordMailEvent(messageId, "open");
   return new NextResponse(PIXEL, {
     headers: {
       "Content-Type": "image/gif",

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import { llmStatus } from "@/server/ai/cto";
+import { embedStatus } from "@/server/ai/embeddings";
 import { loadDb, ready } from "@/server/db";
 import { providerStatus } from "@/server/mailer";
+import { outlookStatus } from "@/server/outlook";
 import { databaseUrl, ping } from "@/server/postgres";
 import { sqliteStats } from "@/server/sqlite";
 
@@ -14,6 +17,9 @@ export async function GET() {
     ok: postgres.ok || Boolean(loadDb()),
     app: "meridian",
     mail: providerStatus(),
+    outlook: outlookStatus(),
+    ai: llmStatus(),
+    embeddings: embedStatus(),
     sqlite: sqliteStats(),
     postgres,
     database: {
@@ -24,8 +30,12 @@ export async function GET() {
       chunks: db.chunks.length,
       campaigns: db.campaigns.length,
       events: db.events.length,
-      contacts: db.contacts.length,
       companies: db.companies.length,
+      contacts: db.contacts.length,
+      leads: db.leads.length,
+      inbox: db.inbox.length,
+      workflows: db.workflows.length,
+      crawls: db.crawls.length,
     },
   });
 }

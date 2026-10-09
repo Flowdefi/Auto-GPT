@@ -13,6 +13,7 @@ export function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  await ready();
   const queryToken = new URL(request.url).searchParams.get("token");
   let bodyToken: string | undefined;
   const contentType = request.headers.get("content-type") ?? "";
@@ -29,7 +30,6 @@ export async function POST(request: Request) {
   if (!token) {
     return NextResponse.json({ error: "token required" }, { status: 400 });
   }
-  await ready();
   const result = mutate((db) => {
     const message = db.messages.find((row) => row.unsubscribeToken === token);
     if (!message) return { ok: false as const };

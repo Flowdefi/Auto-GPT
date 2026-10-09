@@ -72,34 +72,57 @@ export function fromAddress(workspaceId: WorkspaceId): { name: string; email: st
   return { name: "Aether Digital Markets", email: process.env.AETHER_FROM_EMAIL ?? "desk@aethermarkets.io" };
 }
 
-export async function sendCampaign(campaignId: string): Promise<BulkCampaign> {
+export interface SendOptions {
+  /** Extra subject lines to split-test against the campaign subject. */
+  variants?: string[];
+  /** Max marketing messages per address in the last 72 hours. */
+  frequencyCap?: number;
+  /** Milliseconds between sends. Higher values warm a new domain more safely. */
+  paceMs?: number;
+}
+
+export async function sendCampaign(campaignId: string, options: SendOptions = {}): Promise<BulkCampaign> {
   const db = loadDb();
   const campaign = db.campaigns.find((row) => row.id === campaignId);
   if (!campaign) throw new Error("Campaign not found");
   if (campaign.status === "sent") return campaign;
 
   const members = eligibleMembers(campaign.listId, campaign.workspaceId);
-  const sendable = members.filter((member) => !member.seedLocked).slice(0, MAX_CAMPAIGN);
+  const cap = options.frequencyCap ?? 3;
+  const capped = members.filter(
+    (member) => !member.seedLocked && recentSendCount(campaign.workspaceId, member.email) >= cap,
+  );
+  const cappedEmails = new Set(capped.map((member) => member.email));
+  const sendable = members
+    .filter((member) => !member.seedLocked && !cappedEmails.has(member.email))
+    .slice(0, MAX_CAMPAIGN);
+  const sendableEmails = new Set(sendable.map((member) => member.email));
   const locked = members.filter((member) => member.seedLocked);
+  const subjects = [campaign.subject, ...(options.variants ?? [])].filter((value) => Boolean(value?.trim()));
+  const pace = options.paceMs ?? SEND_GAP_MS;
 
   mutate((state) => {
     const current = state.campaigns.find((row) => row.id === campaignId);
     if (!current) return;
     current.status = "sending";
     current.intended = sendable.length;
-    current.skipped = locked.length;
+    current.skipped = locked.length + capped.length;
     for (const member of members) {
       const already = state.messages.some(
         (message) => message.campaignId === campaignId && message.to === member.email,
       );
       if (already) continue;
+      const variant = subjects[assignVariant(member.email, subjects)] ?? campaign.subject;
+      const overCap = cappedEmails.has(member.email);
+      const overLimit = !member.seedLocked && !overCap && !sendableEmails.has(member.email);
       state.messages.push({
         id: nextId("om"),
         campaignId,
         workspaceId: campaign.workspaceId,
         to: member.email,
-        subject: merge(campaign.subject, contextFor(member, campaign, "pending")),
-        status: member.seedLocked ? "skipped_seed" : "queued",
+        subject: variant,
+        status: member.seedLocked ? "skipped_seed" : overCap || overLimit ? "suppressed" : "queued",
+        error: overCap ? `Frequency cap (${cap} / 72h)` : overLimit ? "Campaign size cap" : undefined,
         unsubscribeToken: tokenFor(member.email, campaignId),
       });
     }
@@ -113,7 +136,7 @@ export async function sendCampaign(campaignId: string): Promise<BulkCampaign> {
     const member = sendable.find((row) => row.email === message.to);
     if (!member) continue;
     await deliverOne(campaign, member, message);
-    await sleep(SEND_GAP_MS);
+    await sleep(pace);
   }
 
   return mutate((state) => {
@@ -148,7 +171,7 @@ async function deliverOne(
   const ctx = contextFor(member, campaign, message.unsubscribeToken);
   const html = withTracking(merge(campaign.html, ctx), message.id);
   const text = merge(campaign.text, ctx);
-  const subject = merge(campaign.subject, ctx);
+  const subject = merge(message.subject || campaign.subject, ctx);
 
   try {
     const result = await transportSend({
@@ -351,6 +374,63 @@ async function transportSend(input: TransportInput): Promise<{ id: string; provi
   throw new Error(
     "No delivery provider. Set RESEND_API_KEY (custom From portfolios@debtmarket.net after SPF/DKIM/DMARC) or AGENTMAIL_API_KEY (delivers now via portfolios@agentmail.to with Reply-To portfolios@debtmarket.net).",
   );
+}
+
+export interface AbVariant {
+  label: string;
+  subject: string;
+  sent: number;
+  opened: number;
+  clicked: number;
+  openRate: number;
+}
+
+/**
+ * Splits a campaign's subject line across recipients. Assignment is by a stable
+ * hash of the address so a given contact always lands in the same arm.
+ */
+export function assignVariant(email: string, variants: string[]): number {
+  if (variants.length <= 1) return 0;
+  const digest = createHash("sha256").update(email).digest();
+  return (digest[0] ?? 0) % variants.length;
+}
+
+export function abResults(campaignId: string): AbVariant[] {
+  const db = loadDb();
+  const messages = db.messages.filter((message) => message.campaignId === campaignId);
+  const bySubject = new Map<string, { sent: number; opened: number; clicked: number }>();
+
+  for (const message of messages) {
+    const entry = bySubject.get(message.subject) ?? { sent: 0, opened: 0, clicked: 0 };
+    entry.sent += 1;
+    if ((message.opened ?? 0) > 0) entry.opened += 1;
+    if ((message.clicked ?? 0) > 0) entry.clicked += 1;
+    bySubject.set(message.subject, entry);
+  }
+
+  return [...bySubject.entries()].map(([subject, stats], index) => ({
+    label: String.fromCharCode(65 + index),
+    subject,
+    sent: stats.sent,
+    opened: stats.opened,
+    clicked: stats.clicked,
+    openRate: stats.sent > 0 ? Number(((stats.opened / stats.sent) * 100).toFixed(1)) : 0,
+  }));
+}
+
+/**
+ * Frequency cap: how many marketing messages this address already received in
+ * the window. HubSpot Enterprise calls this an email frequency cap.
+ */
+export function recentSendCount(workspaceId: WorkspaceId, email: string, windowHours = 72): number {
+  const cutoff = Date.now() - windowHours * 3_600_000;
+  return loadDb().messages.filter(
+    (message) =>
+      message.workspaceId === workspaceId &&
+      message.to === email.toLowerCase() &&
+      message.sentAt &&
+      new Date(message.sentAt).getTime() > cutoff,
+  ).length;
 }
 
 export function recordMailEvent(messageId: string, type: "open" | "click" | "bounce" | "complaint", url?: string): boolean {

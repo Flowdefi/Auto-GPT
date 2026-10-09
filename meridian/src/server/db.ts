@@ -2,9 +2,12 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import path from "path";
 import { id } from "@/lib/format";
 import { emptyDb, type DatabaseFile } from "./models";
+import { seedCrmRecords } from "./crm";
 import { getPool, readSnapshot, upsertCrmRows, writeAudit, writeSnapshot } from "./postgres";
-import { ensureCrmRecords, seedServerData } from "./seed-db";
+import { seedServerData } from "./seed-db";
+import { seedSegmentsInto } from "./segments";
 import { persistSqlite, seedCrmSnapshot } from "./sqlite";
+import { seedDemoLeads, seedWorkflows } from "./workflow";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "meridian.json");
@@ -20,8 +23,37 @@ function ensureDir(): void {
   }
 }
 
+const COLLECTIONS: Array<keyof DatabaseFile> = [
+  "events",
+  "companies",
+  "contacts",
+  "leads",
+  "submissions",
+  "inbox",
+  "mailboxes",
+  "workflows",
+  "runs",
+  "tasks",
+  "crawls",
+  "seoPages",
+  "seoIssues",
+  "keywords",
+  "ranks",
+  "briefs",
+  "segments",
+  "aiAudit",
+];
+
 function migrate(db: DatabaseFile): DatabaseFile {
-  if (!db.events) db.events = [];
+  for (const key of COLLECTIONS) {
+    if (!Array.isArray(db[key])) {
+      (db as unknown as Record<string, unknown[]>)[key] = [];
+    }
+  }
+  seedCrmRecords(db);
+  seedWorkflows(db);
+  seedDemoLeads(db);
+  seedSegmentsInto(db);
   const hasOwner = db.members.some((member) => member.email === OWNER_EMAIL);
   if (!hasOwner) {
     db.members.push({
@@ -41,7 +73,6 @@ function migrate(db: DatabaseFile): DatabaseFile {
     db.edges = fresh.edges;
     db.chunks = fresh.chunks;
   }
-  ensureCrmRecords(db);
   return db;
 }
 
@@ -110,10 +141,8 @@ export async function ready(): Promise<DatabaseFile> {
           const remote = await readSnapshot();
           if (remote?.payload?.lists?.length) {
             persistGeneration = remote.version || 1;
-            const hadCrm = (remote.payload.contacts?.length ?? 0) > 0;
             cache = migrate(remote.payload);
-            if (!hadCrm && cache.contacts.length > 0) persist(cache);
-            else persistLocal(cache);
+            persistLocal(cache);
             seedCrmSnapshot();
             return cache;
           }

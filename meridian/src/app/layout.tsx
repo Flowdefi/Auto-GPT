@@ -57,7 +57,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={sans.variable} suppressHydrationWarning>
+    <html lang="en" className={sans.variable} data-scroll-behavior="smooth" suppressHydrationWarning>
       <body className="font-sans antialiased">
         <ThemeProvider>
           <TooltipProvider delayDuration={200}>{children}</TooltipProvider>

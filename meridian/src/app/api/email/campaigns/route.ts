@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
 import { loadDb, mutate, nextId, ready } from "@/server/db";
-import { fromAddress } from "@/server/mailer";
+import { abResults, fromAddress } from "@/server/mailer";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  await ready();
   const body = (await request.json()) as {
     workspaceId?: string;
     name?: string;
@@ -25,7 +26,6 @@ export async function POST(request: Request) {
   const subject = body.subject;
   const html = body.html;
   const from = fromAddress(workspaceId);
-  await ready();
   const campaign = mutate((db) => {
     const template = body.templateId
       ? db.templates.find((row) => row.id === body.templateId)
@@ -58,8 +58,8 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const campaignId = new URL(request.url).searchParams.get("id");
   await ready();
+  const campaignId = new URL(request.url).searchParams.get("id");
   const db = loadDb();
   if (!campaignId) {
     return NextResponse.json({ campaigns: db.campaigns });
@@ -67,5 +67,5 @@ export async function GET(request: Request) {
   const campaign = db.campaigns.find((row) => row.id === campaignId);
   if (!campaign) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const messages = db.messages.filter((message) => message.campaignId === campaignId);
-  return NextResponse.json({ campaign, messages });
+  return NextResponse.json({ campaign, messages, ab: abResults(campaignId) });
 }
