@@ -2,6 +2,7 @@ import type { WorkspaceId } from "@/lib/types";
 import { domainOf, findCompanyByDomain, findContactByEmail, isFreeMailDomain } from "./crm";
 import { loadDb, mutate, nextId } from "./db";
 import type { InboxMessage } from "./models";
+import { resolveProviderSecret } from "./secrets";
 import { runAutomations } from "./workflow";
 
 const GRAPH = "https://graph.microsoft.com/v1.0";
@@ -16,10 +17,10 @@ export interface OutlookConfig {
 }
 
 export function outlookConfig(): OutlookConfig | null {
-  const tenantId = process.env.MS_TENANT_ID;
-  const clientId = process.env.MS_CLIENT_ID;
-  const clientSecret = process.env.MS_CLIENT_SECRET;
-  const mailboxes = (process.env.MS_MAILBOXES ?? "portfolios@debtmarket.net")
+  const tenantId = resolveProviderSecret("MS_TENANT_ID") ?? process.env.MS_TENANT_ID;
+  const clientId = resolveProviderSecret("MS_CLIENT_ID") ?? process.env.MS_CLIENT_ID;
+  const clientSecret = resolveProviderSecret("MS_CLIENT_SECRET") ?? process.env.MS_CLIENT_SECRET;
+  const mailboxes = (resolveProviderSecret("MS_MAILBOXES") ?? process.env.MS_MAILBOXES ?? "portfolios@debtmarket.net")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);

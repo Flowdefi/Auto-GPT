@@ -145,3 +145,75 @@ CREATE TABLE IF NOT EXISTS rag_terms (
   PRIMARY KEY (term, chunk_id)
 );
 CREATE INDEX IF NOT EXISTS idx_rag_terms_lookup ON rag_terms(workspace_id, term);
+
+-- Auth, billing, and BYOK live outside persistSqlite's wipe list.
+CREATE TABLE IF NOT EXISTS accounts (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  password_salt TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'owner',
+  status TEXT NOT NULL DEFAULT 'pending',
+  failed_logins INTEGER NOT NULL DEFAULT 0,
+  locked_until TEXT,
+  created_at TEXT NOT NULL,
+  last_login_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  ip TEXT,
+  user_agent TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_account ON sessions(account_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+
+CREATE TABLE IF NOT EXISTS licenses (
+  id TEXT PRIMARY KEY,
+  key_hash TEXT NOT NULL UNIQUE,
+  key_prefix TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  email TEXT,
+  account_id TEXT,
+  redeemed_at TEXT,
+  created_at TEXT NOT NULL,
+  polar_order_id TEXT,
+  notes TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_licenses_account ON licenses(account_id);
+CREATE INDEX IF NOT EXISTS idx_licenses_email ON licenses(email);
+
+CREATE TABLE IF NOT EXISTS api_keys (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  key_hash TEXT NOT NULL UNIQUE,
+  key_prefix TEXT NOT NULL,
+  last_used_at TEXT,
+  created_at TEXT NOT NULL,
+  revoked_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_api_keys_account ON api_keys(account_id);
+
+CREATE TABLE IF NOT EXISTS workspace_secrets (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  workspace_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  ciphertext TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE (account_id, workspace_id, name)
+);
+CREATE INDEX IF NOT EXISTS idx_secrets_account ON workspace_secrets(account_id, workspace_id);
+
+CREATE TABLE IF NOT EXISTS billing_events (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  at TEXT NOT NULL
+);

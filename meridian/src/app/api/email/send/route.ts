@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { requireSeat } from "@/server/api-guard";
 import { sendCampaign } from "@/server/mailer";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const gate = await requireSeat(request);
+  if (!gate.ok) return gate.response;
   const body = (await request.json()) as {
     campaignId?: string;
     variants?: string[];

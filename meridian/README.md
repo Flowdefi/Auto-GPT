@@ -76,7 +76,7 @@ First API call creates `data/meridian.json` and `data/meridian.db` (SQLite):
 - Knowledge graph nodes/edges
 - RAG chunks with **FTS5 + lexical** retrieval and neighbor expansion
 
-Schema: [`src/server/schema.sql`](src/server/schema.sql). Explore it in **Graph / RAG**. Health: `GET /api/health`. Snapshot: `GET /api/crm/snapshot?workspace=triton`. AI calls `/api/rag/query` before answering.
+Schema: [`src/server/schema.sql`](src/server/schema.sql). Explore it in **Graph / RAG**. Public health is a stub at `GET /api/health`. Snapshot and RAG require a seated session or `mk_live_` key.
 
 ## Run
 
@@ -87,7 +87,15 @@ cp .env.example .env.local   # add AGENTMAIL_API_KEY or RESEND_API_KEY to send f
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and choose a workspace.
+Open [http://localhost:3000](http://localhost:3000). Create an account, then buy the **$275 lifetime seat** (Polar) or redeem a minted key:
+
+```bash
+npm run license:mint -- you@example.com
+```
+
+Workspaces stay locked until a seat is attached. Extra operators each pay once. After purchase, mint `mk_live_` API keys on `/billing` and optionally store BYOK provider keys (Ollama, vLLM, Resend, AgentMail) encrypted per seat.
+
+Production requires `MERIDIAN_AUTH_SECRET` (32+ characters). Polar webhook: `POST /api/billing/webhook`.
 
 ```bash
 npm run build && npm run start
@@ -99,7 +107,7 @@ Docker (persists `data/`):
 docker compose up --build
 ```
 
-Health: `GET /api/health`
+Public health stub: `GET /api/health`
 
 Demo CRM state persists in the browser. Server mail/graph data persists in `data/meridian.json`. Use **Reset demo** in the header to restore seed CRM data.
 

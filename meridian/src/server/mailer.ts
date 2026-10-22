@@ -3,6 +3,7 @@ import type { WorkspaceId } from "@/lib/types";
 import { workspaceOf } from "@/lib/workspaces";
 import { loadDb, mutate, nextId } from "./db";
 import type { BulkCampaign, EmailListMember, OutboundMessage } from "./models";
+import { resolveProviderSecret } from "./secrets";
 
 const FROM_TRITON = "portfolios@debtmarket.net";
 const AGENTMAIL_TRITON = process.env.AGENTMAIL_INBOX_TRITON ?? "portfolios@agentmail.to";
@@ -300,7 +301,7 @@ function agentmailInbox(fromEmail: string): string {
 }
 
 async function sendViaAgentmail(input: TransportInput): Promise<{ id: string; provider: string }> {
-  const key = process.env.AGENTMAIL_API_KEY;
+  const key = resolveProviderSecret("AGENTMAIL_API_KEY") ?? process.env.AGENTMAIL_API_KEY;
   if (!key) throw new Error("AGENTMAIL_API_KEY missing");
   const inbox = agentmailInbox(input.fromEmail);
   const response = await fetch(`https://api.agentmail.to/v0/inboxes/${encodeURIComponent(inbox)}/messages`, {
@@ -327,7 +328,7 @@ async function sendViaAgentmail(input: TransportInput): Promise<{ id: string; pr
 }
 
 async function transportSend(input: TransportInput): Promise<{ id: string; provider: string }> {
-  const resendKey = process.env.RESEND_API_KEY;
+  const resendKey = resolveProviderSecret("RESEND_API_KEY") ?? process.env.RESEND_API_KEY;
   if (resendKey) {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -363,7 +364,7 @@ async function transportSend(input: TransportInput): Promise<{ id: string; provi
     return { id: payload.id ?? nextId("rs"), provider: "resend" };
   }
 
-  if (process.env.AGENTMAIL_API_KEY) {
+  if (resolveProviderSecret("AGENTMAIL_API_KEY") ?? process.env.AGENTMAIL_API_KEY) {
     return sendViaAgentmail(input);
   }
 
@@ -469,7 +470,7 @@ export function providerStatus(): {
   envelope?: string;
   hint: string;
 } {
-  if (process.env.RESEND_API_KEY) {
+  if (resolveProviderSecret("RESEND_API_KEY") ?? process.env.RESEND_API_KEY) {
     return {
       ready: true,
       provider: "resend",
@@ -478,7 +479,7 @@ export function providerStatus(): {
       hint: "Resend will send as portfolios@debtmarket.net once the domain is verified.",
     };
   }
-  if (process.env.AGENTMAIL_API_KEY) {
+  if (resolveProviderSecret("AGENTMAIL_API_KEY") ?? process.env.AGENTMAIL_API_KEY) {
     return {
       ready: true,
       provider: "agentmail",

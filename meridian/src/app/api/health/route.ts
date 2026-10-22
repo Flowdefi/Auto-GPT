@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { llmStatus } from "@/server/ai/cto";
 import { embedStatus } from "@/server/ai/embeddings";
+import { seatFromRequest } from "@/server/auth";
 import { loadDb } from "@/server/db";
 import { providerStatus } from "@/server/mailer";
 import { outlookStatus } from "@/server/outlook";
@@ -9,7 +10,11 @@ import { sqliteStats } from "@/server/sqlite";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export function GET() {
+export function GET(request: Request) {
+  const seat = seatFromRequest(request);
+  if (!seat?.licensed) {
+    return NextResponse.json({ ok: true, app: "meridian" });
+  }
   const db = loadDb();
   return NextResponse.json({
     ok: true,
@@ -19,6 +24,7 @@ export function GET() {
     ai: llmStatus(),
     embeddings: embedStatus(),
     sqlite: sqliteStats(),
+    account: { id: seat.account.id, email: seat.account.email },
     database: {
       lists: db.lists.length,
       members: db.members.length,

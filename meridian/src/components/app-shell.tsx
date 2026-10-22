@@ -262,6 +262,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <NavIcon name="Plug" className="size-4" />
                   Integrations
                 </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push("/billing")}>
+                  <NavIcon name="KeyRound" className="size-4" />
+                  Billing &amp; keys
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => {
                     resetWorkspace(workspaceId);
@@ -270,6 +274,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 >
                   <RotateCcw className="size-4" />
                   Reset demo data
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    void fetch("/api/auth/logout", { method: "POST" }).then(() => {
+                      router.push("/login");
+                      router.refresh();
+                    });
+                  }}
+                >
+                  Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
