@@ -22,8 +22,9 @@ export function navFor(workspaceId: WorkspaceId): NavItem[] {
     { href: `${base}/sales/deals`, label: "Deals", hub: "sales", icon: "Briefcase", group: "Revenue", mobile: true },
     { href: `${base}/sales/forecast`, label: "Forecast", hub: "sales", icon: "TrendingUp", group: "Revenue" },
     { href: `${base}/sales/sequences`, label: "Sequences", hub: "sales", icon: "ListChecks", group: "Revenue" },
-    { href: `${base}/marketplace`, label: inventory, hub: "marketplace", icon: "Layers", group: "Revenue" },
+    { href: `${base}/portfolios`, label: inventory, hub: "marketplace", icon: "Layers", group: "Revenue" },
 
+    { href: `${base}/marketing/social`, label: "Social", hub: "marketing", icon: "Share2", group: "Marketing" },
     { href: `${base}/marketing/bulk`, label: "Email blast", hub: "marketing", icon: "Send", group: "Marketing" },
     { href: `${base}/marketing/campaigns`, label: "Campaigns", hub: "marketing", icon: "Megaphone", group: "Marketing" },
     { href: `${base}/seo`, label: "SEO", hub: "seo", icon: "Search", group: "Marketing" },
@@ -44,7 +45,7 @@ export function hubFromPath(pathname: string): HubId {
   if (pathname.includes("/crm")) return "crm";
   if (pathname.includes("/leads")) return "sales";
   if (pathname.includes("/sales")) return "sales";
-  if (pathname.includes("/marketplace")) return "marketplace";
+  if (pathname.includes("/marketplace") || pathname.includes("/portfolios")) return "marketplace";
   if (pathname.includes("/marketing")) return "marketing";
   if (pathname.includes("/service")) return "service";
   if (pathname.includes("/content")) return "content";

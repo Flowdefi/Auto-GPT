@@ -25,7 +25,7 @@ Two workspaces ship fully wired:
 | Compliance | Industry playbooks + open tickets |
 | AI | Assistant + prospecting / data / customer agents, grounded in CRM data |
 
-AI runs **on-device against workspace records** (no API key required). Prompts like “score FHB”, “draft email to Lena”, “forecast”, “compliance”, and “inbox” use live deals and tapes.
+AI is an in-app **CTO** with registered tools over CRM, leads, Outlook, SEO, and mail. It grounds answers in hybrid RAG (lexical + inverted index + hashed/remote embeddings). Without a model endpoint it uses a deterministic planner that still executes real tools. Point `OPENAI_BASE_URL` / `OLLAMA_BASE_URL` plus `MERIDIAN_MODEL` at Ollama, llama.cpp, vLLM, or any OpenAI-compatible API to enable free-form reasoning. Default local stack: Qwen2.5 14B (reasoner), Llama 3.2 3B (router), nomic-embed-text (embeddings).
 
 ## iOS and web
 
@@ -51,7 +51,19 @@ Delivery order:
 1. **Resend** (`RESEND_API_KEY`) — From `portfolios@debtmarket.net` after SPF / DKIM / DMARC on `debtmarket.net`
 2. **AgentMail** (`AGENTMAIL_API_KEY`) — delivers immediately from `portfolios@agentmail.to` with **Reply-To** `portfolios@debtmarket.net` (no spoofed From)
 
-A proof campaign already landed at `ayflow@pm.me` from the Triton AgentMail inbox. Seed CRM addresses stay locked. Opens, clicks, unsubscribes, bounces, and complaints write into the database. Sends are paced at 400ms.
+A proof campaign already landed at `ayflow@pm.me` from the Triton AgentMail inbox. Seed CRM addresses stay locked. Opens, clicks, unsubscribes, bounces, and complaints write into the database. Sends are paced at 400ms, A/B subjects are hashed by recipient, and a 72-hour frequency cap (3) is enforced. The composer live-scores spam heuristics and checks SPF / DKIM / DMARC on the sending domain.
+
+## Revenue ops
+
+- **Leads** — fit + intent scoring, named-account then round-robin routing, SLA clocks, accept/reject, buyer and seller motions
+- **Automations** — event workflows (`lead.created`, `email.received`, `sla.breached`, `form.submitted`)
+- **Website forms** — `GET /api/forms/embed.js` on www.debtmarket.net posts to `POST /api/forms/submit` and creates a scored lead
+- **Office 365** — app-only Graph delta sync, auto-association by email then company domain
+- **Enrichment** — public site metadata, schema.org, DNS/MX, socials, tech fingerprints, inferred email pattern
+
+## SEO suite
+
+Crawl, weighted technical audit, keyword research, content briefs, and on-page optimizer. Position tracking stays empty until `SERP_PROVIDER_URL` + `SERP_PROVIDER_KEY` are set — the app will not invent ranks.
 
 Without a provider key the composer still works and returns a clear error instead of silently faking delivery.
 
@@ -66,22 +78,24 @@ First API call creates `data/meridian.json` and `data/meridian.db` (SQLite):
 
 Schema: [`src/server/schema.sql`](src/server/schema.sql). Explore it in **Graph / RAG**. Health: `GET /api/health`. Snapshot: `GET /api/crm/snapshot?workspace=triton`. AI calls `/api/rag/query` before answering.
 
-## Run
+## Run — one server, three clients
+
+Leads, contacts, mail, Outlook, SEO, and the AI CTO live in `data/meridian.json` and `data/meridian.db`. The browser, the public site, and iPhone all talk to that same server.
+
+### Local
 
 ```bash
 cd meridian
 npm install
-cp .env.example .env.local   # add AGENTMAIL_API_KEY or RESEND_API_KEY to send from the UI
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) and choose a workspace.
-
-```bash
+cp .env.example .env.local   # mail, Outlook, model, and SERP keys
 npm run build && npm run start
 ```
 
-Docker (persists `data/`):
+`next start` listens on `0.0.0.0:3000`. On the same Wi-Fi, an iPhone opens `http://<this-machine-ip>:3000`. `npm run dev` is the coding server and uses the same data directory.
+
+### Web
+
+Set `MERIDIAN_PUBLIC_URL` and `NEXT_PUBLIC_APP_URL` to the public origin before starting or before `docker compose up --build`. Form embeds, unsubscribe links, and open/click pixels use that origin. Docker keeps `data/` in the `meridian-data` volume.
 
 ```bash
 docker compose up --build
@@ -89,7 +103,20 @@ docker compose up --build
 
 Health: `GET /api/health`
 
-Demo CRM state persists in the browser. Server mail/graph data persists in `data/meridian.json`. Use **Reset demo** in the header to restore seed CRM data.
+### iPhone
+
+Add to Home Screen from Safari (Share → Add to Home Screen). The app shows that hint on iPhone until it is installed. The home-screen icon is a standalone window onto this server, with safe areas and the bottom tab bar.
+
+A native shell is a remote WebView, not a static export. On a Mac:
+
+```bash
+# MERIDIAN_NATIVE_URL=https://your-host  or  http://<lan-ip>:3000
+npx cap add ios
+npm run cap:sync
+npm run ios:open
+```
+
+HTTP LAN URLs turn Capacitor cleartext on. This repo does not compile or sign an IPA; open the Xcode project on a Mac for TestFlight.
 
 ## Product notes
 

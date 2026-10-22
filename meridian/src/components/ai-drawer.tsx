@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { askMeridian } from "@/lib/ask-ai";
+import { askCto } from "@/lib/ask-cto";
 import { haptic } from "@/lib/ios";
 import { promptsForPath } from "@/lib/prompt-context";
 import { useMeridian } from "@/lib/store";
@@ -33,6 +34,18 @@ function Conversation({
   const endRef = useRef<HTMLDivElement>(null);
 
   const suggestions = promptsForPath(pathname, workspaceId);
+  const recordId = pathname.split("/").filter(Boolean).at(-1);
+  const pageRecord = recordId && !["home", "contacts", "companies", "leads", "bulk", "seo", "ai", "automation", "integrations", "campaigns", "lists", "emails", "deals", "forecast", "sequences", "social", "portfolios", "reporting", "marketplace", "graph", "tickets", "pages", "compliance", "settings"].includes(recordId)
+    ? recordId
+    : undefined;
+  const [modelLabel, setModelLabel] = useState("built-in planner");
+
+  useEffect(() => {
+    void fetch(`/api/ai?workspace=${workspaceId}`)
+      .then((response) => response.json())
+      .then((payload) => setModelLabel(payload.model?.configured ? payload.model.model : "built-in planner"))
+      .catch(() => undefined);
+  }, [workspaceId]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -46,10 +59,26 @@ function Conversation({
     setDraft("");
     pushAi({ role: "user", body: prompt });
     try {
-      const reply = await askMeridian(prompt, data, config);
-      pushAi({ role: "assistant", body: reply.body });
-      if (reply.subject) {
-        logAiActivity(reply.subject, reply.body, reply.dealId, reply.contactId);
+      const history = data.aiMessages.slice(-8).map((message) => ({
+        role: message.role as "user" | "assistant",
+        content: message.body,
+      }));
+      try {
+        const turn = await askCto(workspaceId, prompt, history, { pathname, recordId: pageRecord });
+        pushAi({
+          role: "assistant",
+          body: turn.reply,
+          model: turn.model,
+          tools: turn.toolCalls.map((call) => call.name),
+          grounded: turn.grounded,
+        });
+        logAiActivity("AI CTO", turn.reply.slice(0, 180));
+      } catch {
+        const reply = await askMeridian(prompt, data, config);
+        pushAi({ role: "assistant", body: reply.body });
+        if (reply.subject) {
+          logAiActivity(reply.subject, reply.body, reply.dealId, reply.contactId);
+        }
       }
     } finally {
       setBusy(false);
@@ -58,7 +87,8 @@ function Conversation({
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
-      <div className="flex flex-wrap gap-2 border-b px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
+        <Badge variant="outline">{modelLabel}</Badge>
         {suggestions.map((starter) => (
           <button
             key={starter}
@@ -90,6 +120,17 @@ function Conversation({
               )}
             >
               {message.body}
+              {message.role === "assistant" && (message.model || message.tools?.length || message.grounded?.length) ? (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {message.model ? <Badge variant="secondary">{message.model}</Badge> : null}
+                  {message.tools?.map((tool) => (
+                    <Badge key={tool} variant="outline">{tool}</Badge>
+                  ))}
+                  {message.grounded?.slice(0, 3).map((hit) => (
+                    <Badge key={hit} variant="secondary">{hit}</Badge>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ))}
           {busy ? (

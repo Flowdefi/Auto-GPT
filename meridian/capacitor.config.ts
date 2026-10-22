@@ -18,7 +18,7 @@ const config: CapacitorConfig = {
     backgroundColor: "#0c1620",
   },
   server: serverUrl
-    ? { url: serverUrl, cleartext: false, androidScheme: "https" }
+    ? { url: serverUrl, cleartext: serverUrl.startsWith("http://"), androidScheme: "https" }
     : { androidScheme: "https" },
   plugins: {
     Keyboard: {

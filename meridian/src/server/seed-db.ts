@@ -3,14 +3,15 @@ import { seedTriton } from "@/lib/seed/triton";
 import { workspaceOf } from "@/lib/workspaces";
 import type { WorkspaceData, WorkspaceId } from "@/lib/types";
 import { tokenize } from "./tokenize";
-import type {
-  DatabaseFile,
-  EmailList,
-  EmailListMember,
-  EmailTemplate,
-  GraphEdge,
-  GraphNode,
-  RagChunk,
+import {
+  emptyDb,
+  type DatabaseFile,
+  type EmailList,
+  type EmailListMember,
+  type EmailTemplate,
+  type GraphEdge,
+  type GraphNode,
+  type RagChunk,
 } from "./models";
 
 function node(
@@ -335,34 +336,5 @@ export function seedServerData(db: DatabaseFile): DatabaseFile {
 }
 
 function emptyLike(_db: DatabaseFile): DatabaseFile {
-  return {
-    version: 1,
-    lists: [],
-    members: [],
-    templates: [],
-    campaigns: [],
-    messages: [],
-    suppressions: [],
-    events: [],
-    nodes: [],
-    edges: [],
-    chunks: [],
-    companies: [],
-    contacts: [],
-    leads: [],
-    submissions: [],
-    inbox: [],
-    mailboxes: [],
-    workflows: [],
-    runs: [],
-    tasks: [],
-    crawls: [],
-    seoPages: [],
-    seoIssues: [],
-    keywords: [],
-    ranks: [],
-    briefs: [],
-    segments: [],
-    aiAudit: [],
-  };
+  return emptyDb();
 }

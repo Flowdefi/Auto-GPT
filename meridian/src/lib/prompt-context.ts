@@ -24,12 +24,16 @@ const RULES: PromptRule[] = [
   {
     match: /\/crm\/contacts/,
     triton: [
-      "Summarize this contact's history",
-      "Draft a re-engagement email",
-      "What is missing from this record?",
-      "Enrich this company from public sources",
+      "Enrich this contact from Gravatar and Wikidata",
+      "What phone, title, LinkedIn, and notes are missing?",
+      "Draft a coverage note for this seller contact",
+      "Summarize this contact's lifecycle and score",
     ],
-    aether: ["Summarize this counterparty", "Draft a desk intro", "Check Travel Rule readiness"],
+    aether: [
+      "Enrich this contact from public sources",
+      "What title, city, and LinkedIn are missing?",
+      "Draft a desk intro for this counterparty",
+    ],
   },
   {
     match: /\/crm\/companies/,
@@ -52,6 +56,20 @@ const RULES: PromptRule[] = [
     aether: ["Forecast desk revenue", "Which mandates slip?", "Explain the pipeline"],
   },
   {
+    match: /\/marketing\/social/,
+    triton: [
+      "Draft this week's social pack for the newest portfolio",
+      "Write a LinkedIn post that says marketplace, not a collection agency",
+      "Give me an X post under 280 characters for the open tape",
+      "Mark the Google Business draft scheduled after I review it",
+    ],
+    aether: [
+      "Draft a four-channel social pack for the newest block",
+      "Write a LinkedIn note for the desk",
+      "Give me a short X post for the open RFQ",
+    ],
+  },
+  {
     match: /\/marketing\/bulk/,
     triton: [
       "Write a buyer alert for the newest portfolio",
@@ -69,12 +87,16 @@ const RULES: PromptRule[] = [
   {
     match: /\/seo/,
     triton: [
+      "Build a path to #1 for sell charged-off debt",
+      "Which tracked keywords are still unmeasured?",
+      "What on-page changes get the homepage to #1?",
       "What should we fix first on debtmarket.net?",
-      "Build a content brief for 'sell charged-off debt'",
-      "Which keywords can we realistically win?",
-      "Write meta descriptions for the weakest pages",
     ],
-    aether: ["Audit the desk site", "Build a brief for 'institutional OTC crypto'", "Find keyword gaps"],
+    aether: [
+      "Build a path to #1 for institutional OTC crypto",
+      "Which tracked keywords are still unmeasured?",
+      "Audit the desk site",
+    ],
   },
   {
     match: /\/content/,
@@ -96,9 +118,18 @@ const RULES: PromptRule[] = [
     aether: ["Build a workflow for new RFQs", "Route hot leads to the desk lead"],
   },
   {
-    match: /\/marketplace/,
-    triton: ["Score the open portfolios", "Which buyers fit this tape?", "Draft a bid-window alert"],
-    aether: ["Which counterparties fit this block?", "Draft a listing note"],
+    match: /\/portfolios|\/marketplace/,
+    triton: [
+      "Which portfolios have not been worked in 14 days?",
+      "What is total face value versus seller price?",
+      "Who are the possible buyers on the newest tape?",
+      "Draft a bid-window note for the stale book",
+    ],
+    aether: [
+      "Which listings have not been worked in 14 days?",
+      "What is total notional versus ask?",
+      "Draft a listing note for the newest block",
+    ],
   },
   {
     match: /\/compliance/,
@@ -107,8 +138,17 @@ const RULES: PromptRule[] = [
   },
   {
     match: /\/reporting|\/data\/graph/,
-    triton: ["What changed this week?", "Explain the graph around FHB", "Where is pipeline leaking?"],
-    aether: ["What changed this week?", "Explain the desk graph"],
+    triton: [
+      "Where are SLA breaches concentrated?",
+      "How many form submissions became leads?",
+      "What is email delivery versus intended?",
+      "Summarize first-party page views and SEO health",
+    ],
+    aether: [
+      "Where are SLA breaches concentrated?",
+      "What is email delivery versus intended?",
+      "Summarize first-party traffic and open tasks",
+    ],
   },
   {
     match: /\/home/,

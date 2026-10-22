@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
 import { loadDb, mutate, nextId } from "@/server/db";
-import { fromAddress } from "@/server/mailer";
+import { abResults, fromAddress } from "@/server/mailer";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -65,5 +65,5 @@ export function GET(request: Request) {
   const campaign = db.campaigns.find((row) => row.id === campaignId);
   if (!campaign) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const messages = db.messages.filter((message) => message.campaignId === campaignId);
-  return NextResponse.json({ campaign, messages });
+  return NextResponse.json({ campaign, messages, ab: abResults(campaignId) });
 }
