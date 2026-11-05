@@ -74,7 +74,9 @@ export async function applySkipTrace(workspaceId: WorkspaceId, accountId: string
     });
     const reason = found.phoneLast4
       ? "Skip-trace stored a new number. Cell and SMS consent were cleared and the reassigned-number result is unknown until a new check. TCPA and the FCC RND rule still block first use."
-      : "Skip-trace stored a new email or address. Email consent was cleared when the address changed. Letters and email still stop at the compliance gate.";
+      : found.email
+        ? "Skip-trace stored a new email. Email consent was cleared. The compliance gate still blocks the first send."
+        : "Skip-trace stored a new mailing address. Letters still stop at the compliance gate.";
     db.complianceEvents = [
       {
         id: nextId("ce"),
