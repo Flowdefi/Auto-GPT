@@ -1093,13 +1093,20 @@ export function exportMetro2(workspaceId: WorkspaceId): ReturnType<typeof buildM
   return buildMetro2(accounts(workspaceId));
 }
 
-export function accessReview(): {
+export function accessReview(workspaceId: WorkspaceId = "triton"): {
   generatedAt: string;
   citation: string;
   needsCounselReview: true;
   operators: Array<{ email: string; role: CollectionsRole; mfaEnabled: boolean; canRevealPii: boolean; status: string; lastLoginAt: string | null }>;
 } {
-  const rows = sqliteAll("SELECT id, email, role, status, last_login_at FROM accounts ORDER BY email");
+  const otherWorkspace = new Set(
+    (loadDb().operatorRoles ?? [])
+      .filter((row) => row.workspaceId && row.workspaceId !== workspaceId)
+      .map((row) => row.email.toLowerCase()),
+  );
+  const rows = sqliteAll("SELECT id, email, role, status, last_login_at FROM accounts ORDER BY email").filter(
+    (row) => !otherWorkspace.has(String(row.email).toLowerCase()),
+  );
   return {
     generatedAt: new Date().toISOString(),
     citation: "16 CFR § 314.4(c)(1), (c)(5), and (d). Access controls, MFA, and a review of who can see customer information. This is a draft control, not a completed Safeguards program.",

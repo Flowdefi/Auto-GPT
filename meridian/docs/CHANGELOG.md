@@ -12,6 +12,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - Reg F validation end date and a one-page Model Form B-1 layout. It is not the CFPB's designed file. When the limitations date on file is past, the PDF says this draft does not include the state time-barred notice. Counsel must add that notice before mailing.
 - An NSF or reversal restores the balance and sends a draft email through the compliance gate. The notice does not ask for another debit, and no bank account number is stored.
 - Approving a reply that asks for payment stays pending when the limitations date on file is past. The email is held, and the draft is not marked sent.
+- The access review for one workspace leaves off a login limited to the other workspace. The screen keeps the counsel flag. Counsel still has to adopt the Safeguards program.
 
 ## Consumer, client, and public surfaces
 

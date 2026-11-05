@@ -416,7 +416,7 @@ export async function POST(request: Request) {
       case "metro2_export":
         return NextResponse.json(exportMetro2(body.workspaceId));
       case "access_review":
-        return NextResponse.json(accessReview());
+        return NextResponse.json(accessReview(body.workspaceId));
       case "client_bind":
         if (actor !== "admin" || !body.email || !body.sellerName) return NextResponse.json({ error: "Admin email and seller are required" }, { status: 403 });
         return NextResponse.json({ grant: bindClient(body.email, body.sellerName, actor) });

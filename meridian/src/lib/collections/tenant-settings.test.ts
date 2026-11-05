@@ -9,7 +9,7 @@ import { brandFor, currentBrand, saveBrand } from "../../server/brand";
 import { createLicense } from "../../server/billing";
 import { counselPacket } from "../../server/collections/counsel";
 import { digestRecipients, digestSubject, writeComplianceDigest } from "../../server/collections/observe";
-import { ensureRecordingTable, ensureSolTable, importPortfolio, issueValidation, saveRecordingRules, saveSolRules, setOperatorRole, startVoice } from "../../server/collections/service";
+import { accessReview, ensureRecordingTable, ensureSolTable, importPortfolio, issueValidation, saveRecordingRules, saveSolRules, setOperatorRole, startVoice } from "../../server/collections/service";
 import { loadDb, mutate } from "../../server/db";
 
 test("aether brand, limitations, and recording stay off the triton copies", () => {
@@ -181,6 +181,24 @@ test("a compliance seat limited to one workspace is left off the other digest", 
     assert.equal(digest.summary.includes(email), false);
     assert.match(digest.summary, /for triton/);
     assert.equal(digest.recipientCount, digestRecipients("triton").length);
+  } finally {
+    mutate((state) => {
+      state.operatorRoles = (state.operatorRoles ?? []).filter((row) => row.email !== email);
+    });
+  }
+});
+
+test("access review leaves off a login limited to the other workspace", () => {
+  const email = `seat-${Date.now().toString(36)}@example.test`;
+  createAccount({ email, name: "Example Seat", password: "sandbox-password-1" });
+  setOperatorRole(email, "collector", "aether");
+  try {
+    const triton = accessReview("triton");
+    const aether = accessReview("aether");
+    assert.equal(triton.needsCounselReview, true);
+    assert.equal(aether.needsCounselReview, true);
+    assert.equal(triton.operators.some((row) => row.email === email), false);
+    assert.equal(aether.operators.some((row) => row.email === email), true);
   } finally {
     mutate((state) => {
       state.operatorRoles = (state.operatorRoles ?? []).filter((row) => row.email !== email);

@@ -17,6 +17,7 @@ export default function AccessReviewPage() {
   const { workspaceId } = useActiveWorkspace();
   const [rows, setRows] = useState<OperatorRow[]>([]);
   const [citation, setCitation] = useState("");
+  const [needsCounselReview, setNeedsCounselReview] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -25,13 +26,14 @@ export default function AccessReviewPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ op: "access_review", workspaceId }),
     }).then(async (response) => {
-      const body = (await response.json()) as { error?: string; operators?: OperatorRow[]; citation?: string };
+      const body = (await response.json()) as { error?: string; operators?: OperatorRow[]; citation?: string; needsCounselReview?: boolean };
       if (!response.ok) {
         setNotice(body.error ?? "Sign in to review access.");
         return;
       }
       setRows(body.operators ?? []);
       setCitation(body.citation ?? "");
+      setNeedsCounselReview(body.needsCounselReview === true);
     });
   }, [workspaceId]);
 
@@ -43,7 +45,8 @@ export default function AccessReviewPage() {
         subtitle="Who can sign in, whether MFA is on, and who can reveal stored identifiers. Password hashes are not included. This supports the Safeguards Rule draft in docs/GLBA-SAFEGUARDS.md."
       />
       {notice ? <Card className="mb-4 p-4 text-sm">{notice}</Card> : null}
-      <Card className="mb-4 p-4 text-sm">{citation}</Card>
+      {needsCounselReview ? <Badge tone="warn">Counsel must adopt this Safeguards draft</Badge> : null}
+      <Card className="mb-4 mt-4 p-4 text-sm">{citation}</Card>
       <div className="grid gap-3">
         {rows.map((row) => (
           <Card key={row.email} className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
