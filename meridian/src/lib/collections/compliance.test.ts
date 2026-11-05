@@ -226,6 +226,27 @@ test("voice flow withholds the debt until two identifiers match and will not sto
   assert.equal(verifyTotp("JBSWY3DPEHPK3PXP", code, 1_700_000_000_000), true);
 });
 
+test("an ad-hoc email gets a draft mini-Miranda and voicemail does not", async () => {
+  const stamp = Date.now().toString(36);
+  const imported = importPortfolio({
+    workspaceId: "triton",
+    csv: `account_ref,consumer_name,consumer_state,zip,last4,balance\nDISC-${stamp},Example Buyer,OH,44101,4242,40.00\n`,
+  });
+  const account = imported.accounts.find((item) => item.accountRef === `DISC-${stamp}`);
+  assert.ok(account);
+  const email = await sendChannel({ workspaceId: "triton", accountId: account.id, channel: "email", body: "Hello from the desk" });
+  assert.match(email.bodyPreview ?? "", /debt collector/);
+  assert.match(email.bodyPreview ?? "", /draft for counsel review/);
+  assert.match(email.bodyPreview ?? "", /Hello from the desk/);
+  const drop = await sendChannel({
+    workspaceId: "triton",
+    accountId: account.id,
+    channel: "voicemail_drop",
+    body: "Hi, this is Ada calling from Example. Please contact me at 1-800-555-0199.",
+  });
+  assert.equal((drop.bodyPreview ?? "").includes("debt collector"), false);
+});
+
 test("sms and email payment asks stay held when the limitations date is past", async () => {
   assert.equal(timeBarredSolicitation("SMS-006", "offer"), true);
   assert.equal(timeBarredSolicitation("EML-005", "offer"), true);

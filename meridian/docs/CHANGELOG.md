@@ -20,6 +20,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - Metro 2 leaves out a past limitations date and any status other than workable. The status field stays blank. Counsel must decide before those accounts are furnished.
 - The ACH receipt and the NSF or reversal email include a draft mini-Miranda. Counsel must approve that sentence. The return email does not ask for another debit.
 - The account test-payment button points at the error alert. The public accessibility page lists the skip links and form alerts. This is not a formal WCAG audit.
+- An SMS, email, or letter that omits the debt-collector sentence now leads with a draft mini-Miranda. Voicemail is left unchanged. Counsel must approve that sentence.
 
 ## Consumer, client, and public surfaces
 

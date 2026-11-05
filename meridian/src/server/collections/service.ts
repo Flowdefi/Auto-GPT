@@ -579,6 +579,8 @@ export async function sendChannel(input: {
     }
     rendered = [renderMustache(template.subject, context.values), renderMustache(template.body, context.values)].filter(Boolean).join("\n\n");
   }
+  rendered = draftDisclosure(input.channel, rendered);
+  const outgoing = { ...input, body: rendered };
   const decision = gateFor(
     input.workspaceId,
     account,
@@ -587,7 +589,7 @@ export async function sendChannel(input: {
     statusResponseFor(template?.id),
   );
   logEvent(input.workspaceId, input.channel, input.accountId, decision.allowed, decision.reason);
-  if (!decision.allowed) return storeMessage(input, "blocked", decision.reason, null);
+  if (!decision.allowed) return storeMessage(outgoing, "blocked", decision.reason, null);
   const delivered = await deliverAllowedChannel(
     {
       channel: input.channel,
@@ -599,9 +601,20 @@ export async function sendChannel(input: {
     input.fetchImpl,
   );
   if (delivered) {
-    return storeMessage({ ...input, body: rendered }, "provider_accepted", decision.reason, delivered.providerId, delivered.provider);
+    return storeMessage(outgoing, "provider_accepted", decision.reason, delivered.providerId, delivered.provider);
   }
-  return storeMessage({ ...input, body: rendered }, "sandbox_queued", decision.reason, `sandbox_${nextId("msg")}`);
+  return storeMessage(outgoing, "sandbox_queued", decision.reason, `sandbox_${nextId("msg")}`);
+}
+
+const DRAFT_MINI_MIRANDA =
+  "This is an attempt to collect a debt and any information obtained will be used for that purpose. This communication is from a debt collector. This sentence is a draft for counsel review.";
+
+/** Voicemail stays untouched. A limited-content message cannot mention the debt. */
+function draftDisclosure(channel: CollectionChannel, body: string): string {
+  if (channel !== "sms" && channel !== "email" && channel !== "letter") return body;
+  if (!body.trim()) return body;
+  if (/debt collector|cobrador de deudas/i.test(body)) return body;
+  return `${DRAFT_MINI_MIRANDA} ${body}`;
 }
 
 function storeMessage(
