@@ -58,7 +58,7 @@ import {
   turnVoice,
   validationPdfBase64,
   updateEligibility,
-  updateVoiceSettings,
+  saveVoiceLimits,
   voiceSettingsFor,
 } from "@/server/collections/service";
 import type { ColumnMapping, WidthField } from "@/lib/collections/portfolio";
@@ -210,7 +210,7 @@ export async function POST(request: Request) {
         if (body.killSwitch === true) await freezeOutbound(body.workspaceId);
         if (body.killSwitch === false) liftOutboundFreeze(body.workspaceId);
         if (body.rndSandboxClear !== undefined) setRndSandboxClear(body.workspaceId, body.rndSandboxClear);
-        updateVoiceSettings({
+        saveVoiceLimits(body.workspaceId, {
           blockInbound: body.blockInbound,
           dailyOutboundCap: body.dailyOutboundCap,
           maxDiscountPercent: body.maxDiscountPercent,

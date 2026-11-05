@@ -26,6 +26,7 @@ import type {
   CollectionsRole,
   OperatorRole,
   TemplateApproval,
+  VoiceLimits,
   ConsumerConsent,
   ConsumerPayment,
   DraftReply,
@@ -40,6 +41,7 @@ import { defaultSolTable, type SolRule } from "@/lib/collections/sol";
 import { validationEndDate } from "@/lib/collections/validation-period";
 import { decryptSecret, encryptSecret, sha256Hex } from "@/server/auth-crypto";
 import { brandFor } from "@/server/brand";
+import { defaultVoiceSettings } from "@/server/collections/defaults";
 import { loadDb, mutate, nextId } from "@/server/db";
 import { logEvent as logLine } from "@/server/log";
 import { scanUpload, scanXlsx } from "@/server/security";
@@ -96,11 +98,51 @@ export function updateEligibility(code: string, patch: Partial<Pick<StateEligibi
 
 export function voiceSettingsFor(workspaceId: WorkspaceId): VoiceSettings {
   const db = loadDb();
-  const base = db.voiceSettings!;
+  const base = db.voiceSettings ?? defaultVoiceSettings();
   const frozen = (db.frozenWorkspaces ?? []).includes(workspaceId);
   const scopedClear = db.rndSandboxClearByWorkspace?.[workspaceId];
   const rndSandboxClear = scopedClear ?? (workspaceId === "triton" ? Boolean(base.rndSandboxClear) : false);
-  return { ...base, killSwitch: Boolean(base.killSwitch) || frozen, rndSandboxClear };
+  const limits = db.voiceLimitsByWorkspace?.[workspaceId];
+  const inherited = workspaceId === "triton" ? base : defaultVoiceSettings();
+  return {
+    ...base,
+    killSwitch: Boolean(base.killSwitch) || frozen,
+    rndSandboxClear,
+    blockInbound: limits?.blockInbound ?? inherited.blockInbound,
+    dailyOutboundCap: limits?.dailyOutboundCap ?? inherited.dailyOutboundCap,
+    maxDiscountPercent: limits?.maxDiscountPercent ?? inherited.maxDiscountPercent,
+    maxPlanMonths: limits?.maxPlanMonths ?? inherited.maxPlanMonths,
+  };
+}
+
+export function saveVoiceLimits(workspaceId: WorkspaceId, patch: VoiceLimits): VoiceSettings {
+  const clean: VoiceLimits = {};
+  if (patch.blockInbound !== undefined) {
+    if (typeof patch.blockInbound !== "boolean") throw new Error("Inbound block must be true or false.");
+    clean.blockInbound = patch.blockInbound;
+  }
+  if (patch.dailyOutboundCap !== undefined) {
+    const cap = Math.floor(Number(patch.dailyOutboundCap));
+    if (!Number.isInteger(cap) || cap < 1 || cap > 10000) throw new Error("Daily outbound cap must be 1 to 10000.");
+    clean.dailyOutboundCap = cap;
+  }
+  if (patch.maxDiscountPercent !== undefined) {
+    const percent = Math.floor(Number(patch.maxDiscountPercent));
+    if (!Number.isInteger(percent) || percent < 0 || percent > 100) throw new Error("Discount percent must be 0 to 100.");
+    clean.maxDiscountPercent = percent;
+  }
+  if (patch.maxPlanMonths !== undefined) {
+    const months = Math.floor(Number(patch.maxPlanMonths));
+    if (!Number.isInteger(months) || months < 1 || months > 60) throw new Error("Plan length must be 1 to 60 months.");
+    clean.maxPlanMonths = months;
+  }
+  if (Object.keys(clean).length === 0) return voiceSettingsFor(workspaceId);
+  mutate((db) => {
+    const current = db.voiceLimitsByWorkspace?.[workspaceId] ?? {};
+    db.voiceLimitsByWorkspace = { ...(db.voiceLimitsByWorkspace ?? {}), [workspaceId]: { ...current, ...clean } };
+    if (workspaceId === "triton" && db.voiceSettings) db.voiceSettings = { ...db.voiceSettings, ...clean };
+  });
+  return voiceSettingsFor(workspaceId);
 }
 
 export function setRndSandboxClear(workspaceId: WorkspaceId, enabled: boolean): VoiceSettings {
@@ -109,17 +151,6 @@ export function setRndSandboxClear(workspaceId: WorkspaceId, enabled: boolean): 
     if (workspaceId === "triton" && db.voiceSettings) db.voiceSettings.rndSandboxClear = enabled;
   });
   return voiceSettingsFor(workspaceId);
-}
-
-export function updateVoiceSettings(patch: Partial<VoiceSettings>): VoiceSettings {
-  return mutate((db) => {
-    const next = { ...db.voiceSettings! };
-    for (const [key, value] of Object.entries(patch) as Array<[keyof VoiceSettings, VoiceSettings[keyof VoiceSettings]]>) {
-      if (value !== undefined) next[key] = value as never;
-    }
-    db.voiceSettings = next;
-    return next;
-  });
 }
 
 export function importPortfolio(input: {
@@ -396,7 +427,7 @@ export function turnVoice(workspaceId: WorkspaceId, callId: string, turn: Consum
     transcript,
     turn,
     account,
-    settings: db.voiceSettings!,
+    settings: voiceSettingsFor(workspaceId),
     at: new Date().toISOString(),
     paymentUrl,
     agency: brandFor(workspaceId).name,
@@ -837,7 +868,7 @@ export function setupPaymentPlan(workspaceId: WorkspaceId, accountId: string, mo
   const decision = gateFor(workspaceId, account, "payment_portal");
   logEvent(workspaceId, "payment_portal", accountId, decision.allowed, decision.reason);
   if (!decision.allowed) throw new Error(decision.reason);
-  const maxMonths = loadDb().voiceSettings?.maxPlanMonths ?? 12;
+  const maxMonths = voiceSettingsFor(workspaceId).maxPlanMonths;
   if (!Number.isInteger(months) || months < 1 || months > maxMonths) {
     throw new Error(`A plan must be 1 to ${maxMonths} months.`);
   }

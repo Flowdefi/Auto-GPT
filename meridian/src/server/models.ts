@@ -9,6 +9,7 @@ import type {
   StateEligibility,
   VoiceCall,
   VoiceSettings,
+  VoiceLimits,
   CollectorTask,
   DraftReply,
   ConsumerPayment,
@@ -549,6 +550,8 @@ export interface DatabaseFile {
   /** Per-agency settlement authority. The legacy field remains the Triton copy. */
   settlementMatrices?: Partial<Record<WorkspaceId, SettlementMatrix>>;
   voiceSettings?: VoiceSettings;
+  /** Per-agency cap, inbound block, discount, and plan length. The legacy voice settings remain the Triton copy. */
+  voiceLimitsByWorkspace?: Partial<Record<WorkspaceId, VoiceLimits>>;
   collectorTasks?: CollectorTask[];
   draftReplies?: DraftReply[];
   consumerPayments?: ConsumerPayment[];

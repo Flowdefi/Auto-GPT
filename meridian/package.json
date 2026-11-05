@@ -10,7 +10,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "license:mint": "node scripts/mint-license.mjs",
-    "test:collections": "tsx --test src/lib/collections/compliance.test.ts src/lib/collections/templates.test.ts src/lib/collections/platform.test.ts src/lib/collections/closing.test.ts src/lib/collections/hardening.test.ts src/lib/collections/readiness.test.ts src/lib/collections/agency.test.ts src/lib/collections/launch.test.ts src/lib/hosts.test.ts src/lib/collections/desk-loop.test.ts src/lib/collections/matrix-guard.test.ts src/lib/collections/gates.test.ts src/lib/collections/tenant-settings.test.ts src/lib/collections/template-scope.test.ts src/lib/collections/metro-scope.test.ts",
+    "test:collections": "tsx --test src/lib/collections/compliance.test.ts src/lib/collections/templates.test.ts src/lib/collections/platform.test.ts src/lib/collections/closing.test.ts src/lib/collections/hardening.test.ts src/lib/collections/readiness.test.ts src/lib/collections/agency.test.ts src/lib/collections/launch.test.ts src/lib/hosts.test.ts src/lib/collections/desk-loop.test.ts src/lib/collections/matrix-guard.test.ts src/lib/collections/gates.test.ts src/lib/collections/tenant-settings.test.ts src/lib/collections/template-scope.test.ts src/lib/collections/metro-scope.test.ts src/lib/collections/voice-limits.test.ts",
     "bench:import": "tsx scripts/bench-import.ts",
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "test:e2e": "playwright test",

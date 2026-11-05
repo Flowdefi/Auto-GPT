@@ -137,7 +137,7 @@ export default function CollectionsDeskPage() {
               />
               Sandbox reassigned-number clear for this workspace (not the FCC database)
             </label>
-            <p>Daily cap {data.settings.dailyOutboundCap}. Settlement authority {data.settings.maxDiscountPercent}% / {data.settings.maxPlanMonths} months.</p>
+            <p>This workspace: daily cap {data.settings.dailyOutboundCap}, discount {data.settings.maxDiscountPercent}%, plan length {data.settings.maxPlanMonths} months. Another agency keeps its own numbers. State eligibility stays shared.</p>
             <label className="grid gap-1">
               Account
               <select className="min-h-11 rounded-xl border bg-transparent px-3" value={accountId} onChange={(event) => setAccountId(event.target.value)}>

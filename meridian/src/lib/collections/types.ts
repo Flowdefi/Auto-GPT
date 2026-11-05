@@ -199,6 +199,14 @@ export interface VoiceSettings {
   rndSandboxClear: boolean;
 }
 
+/** Desk limits that must not leak across agencies. Omitted fields fall back to Triton legacy or packaged defaults. */
+export interface VoiceLimits {
+  blockInbound?: boolean;
+  dailyOutboundCap?: number;
+  maxDiscountPercent?: number;
+  maxPlanMonths?: number;
+}
+
 export type CollectionChannel =
   | "voice_outbound"
   | "voice_inbound"
