@@ -39,6 +39,7 @@ function open(): SqliteHandle | null {
     ensureDir();
     handle = new DatabaseSync(sqliteFile()) as unknown as SqliteHandle;
     handle.exec("PRAGMA journal_mode = WAL;");
+    handle.exec("PRAGMA busy_timeout = 5000;");
     handle.exec("PRAGMA foreign_keys = ON;");
     const schema = readFileSync(path.join(process.cwd(), "src/server/schema.sql"), "utf8");
     handle.exec(schema);

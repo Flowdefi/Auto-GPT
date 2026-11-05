@@ -41,7 +41,7 @@ export default function OpsPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Compliance" title="Operations" subtitle="Counts only. Labels are reason codes, portfolio ids, and rates. A weekly digest is stored for the compliance role and is emailed only when the digest flag, live delivery, and a mail key are all set." />
+      <PageHeader eyebrow="Compliance" title="Operations" subtitle={`Counts for ${workspaceId} only. Labels are reason codes, portfolio ids, and rates. Sandbox stores the weekly digest and does not send email. A compliance seat with no workspace is counted on every digest. A seat limited to one workspace is counted only there.`} />
       {metrics ? (
         <div className="mb-4 grid gap-3">
           <Card className="p-4 text-sm">

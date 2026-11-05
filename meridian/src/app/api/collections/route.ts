@@ -116,6 +116,7 @@ export async function POST(request: Request) {
     amountCents?: number;
     email?: string;
     role?: "admin" | "manager" | "collector" | "compliance" | "read_only" | "client";
+    roleWorkspace?: string;
     sellerName?: string;
     recurring?: boolean;
     accepted?: boolean;
@@ -466,7 +467,7 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: "Admin email and role required" }, { status: 403 });
         }
         return NextResponse.json({
-          roles: setOperatorRole(body.email, body.role),
+          roles: setOperatorRole(body.email, body.role, isWorkspaceId(body.roleWorkspace) ? body.roleWorkspace : undefined),
         });
       default:
         return NextResponse.json({ error: "Unknown op" }, { status: 400 });

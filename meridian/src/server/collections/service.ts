@@ -24,6 +24,7 @@ import type {
   CollectionChannel,
   CollectionTemplate,
   CollectionsRole,
+  OperatorRole,
   ConsumerConsent,
   ConsumerPayment,
   DraftReply,
@@ -191,11 +192,13 @@ function sealAccount(account: PortfolioAccount): PortfolioAccount {
   return next;
 }
 
-export function setOperatorRole(email: string, role: CollectionsRole): CollectionsRole {
+export function setOperatorRole(email: string, role: CollectionsRole, workspaceId?: WorkspaceId | null): CollectionsRole {
   const normalized = email.toLowerCase();
   mutate((db) => {
     const rest = (db.operatorRoles ?? []).filter((row) => row.email !== normalized);
-    db.operatorRoles = [...rest, { email: normalized, role }];
+    const next: OperatorRole = { email: normalized, role };
+    if (workspaceId) next.workspaceId = workspaceId;
+    db.operatorRoles = [...rest, next];
   });
   return role;
 }

@@ -51,13 +51,24 @@ export async function emitDeskMetrics(workspaceId: WorkspaceId): Promise<void> {
   await emitCounter("meridian.jobs.error_rate_bps", Math.round(metrics.errorRate * 10000), { workspace: workspaceId });
 }
 
+export function digestSubject(workspaceId: WorkspaceId): string {
+  return `Weekly compliance digest for ${workspaceId}`;
+}
+
+/** Compliance seats with no workspace are counted everywhere. A seat limited to one workspace is not counted on the other. */
+export function digestRecipients(workspaceId: WorkspaceId): string[] {
+  return (loadDb().operatorRoles ?? [])
+    .filter((row) => row.role === "compliance" && (!row.workspaceId || row.workspaceId === workspaceId))
+    .map((row) => row.email);
+}
+
 export async function writeComplianceDigest(
   workspaceId: WorkspaceId,
   now = new Date(),
   fetchImpl: (url: string, init?: RequestInit) => Promise<{ ok: boolean }> = fetch,
 ): Promise<ComplianceDigest> {
   const metrics = deskMetrics(workspaceId);
-  const recipients = (loadDb().operatorRoles ?? []).filter((row) => row.role === "compliance").map((row) => row.email);
+  const recipients = digestRecipients(workspaceId);
   const blocked = Object.entries(metrics.blockedByReason).map(([code, count]) => `${code}=${count}`).join(", ") || "none";
   const connect = metrics.callConnectRate === null ? "no placed calls" : String(metrics.callConnectRate);
   const summary = `Weekly compliance digest for ${workspaceId}. Blocked sends by reason: ${blocked}. Call connect rate: ${connect}. Job lag seconds: ${metrics.jobLagSeconds}. Error rate: ${metrics.errorRate}. Portfolios in the recovery rollup: ${metrics.recoveryByPortfolio.length}. Compliance seats on file: ${recipients.length}. No consumer name, phone, or account number is included.`;
@@ -71,7 +82,7 @@ export async function writeComplianceDigest(
         body: JSON.stringify({
           from: process.env.SENDGRID_FROM || "compliance@example.test",
           to: recipients,
-          subject: "Weekly compliance digest",
+          subject: digestSubject(workspaceId),
           text: summary,
         }),
       });

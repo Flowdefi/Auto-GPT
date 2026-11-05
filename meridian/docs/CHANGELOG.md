@@ -44,9 +44,9 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - Bankruptcy and deceased scrubs. Sandbox returns unknown. A hit holds the account. The history log has no consumer name.
 - Metro 2 export stays off until the flag is on and owner and compliance have both approved. Accounts with no validation notice are excluded.
 - GLBA Safeguards draft, access review, incident playbook, tabletop checklist, and a per-workspace outbound freeze.
-- Retention purge, job worker, redacted logs, seated metrics, OpenTelemetry only when an endpoint is set, and a weekly compliance digest that emails only behind the digest flag and live delivery.
+- Retention purge, job worker, redacted logs, seated metrics, OpenTelemetry only when an endpoint is set, and a weekly compliance digest that emails only behind the digest flag and live delivery. The subject names the workspace. A compliance seat limited to one workspace is left off the other digest.
 - Workspace isolation between Triton and Example Harbor on Aether. Each workspace keeps its own limitations table, recording table, and brand for letters and notices. The public site stays on the Triton brand. Env brand values still win. State eligibility stays one table for the install.
-- Next.js 15.5.29. `npm audit` reports 0 critical and 0 high. CI fails on a new critical.
+- Next.js 15.5.29. `npm audit` reports 0 critical and 0 high. CI fails on a new critical. SQLite waits up to five seconds when the desk file is busy instead of failing the account write immediately.
 
 ## Hosts
 

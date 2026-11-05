@@ -94,6 +94,8 @@ export type CollectionsRole = "admin" | "manager" | "collector" | "compliance" |
 export interface OperatorRole {
   email: string;
   role: CollectionsRole;
+  /** When set, the weekly digest for the other workspace does not count this seat. */
+  workspaceId?: WorkspaceId;
 }
 
 /** Binds a client login to one seller. A client cannot read another seller's portfolios. */
