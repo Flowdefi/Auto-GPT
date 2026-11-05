@@ -10,7 +10,10 @@ import type { PortfolioAccount, VoiceSettings } from "./types";
 import { totp, verifyTotp } from "../../server/totp";
 import { queueLetter } from "../../server/collections/letters";
 import { postAchPayment } from "../../server/collections/payments";
-import { importPortfolio, sandboxPayment, sendChannel, setTemplateApproval, setupPaymentPlan, syncCollectionTemplates, templateForWorkspace } from "../../server/collections/service";
+import { encryptSecret } from "../../server/auth-crypto";
+import { importPortfolio, recordConsent, sandboxPayment, sendChannel, setTemplateApproval, setupPaymentPlan, syncCollectionTemplates, templateForWorkspace } from "../../server/collections/service";
+import { applyEmailEvent } from "../../server/collections/webhooks";
+import { masterSecret } from "../../server/secrets";
 import { loadDb, mutate } from "../../server/db";
 import { emptyTranscript, redactSensitive, stepCall } from "./voice";
 
@@ -224,6 +227,32 @@ test("voice flow withholds the debt until two identifiers match and will not sto
   assert.equal(open.disposition, "plan_offered");
   const code = totp("JBSWY3DPEHPK3PXP", 1_700_000_000_000);
   assert.equal(verifyTotp("JBSWY3DPEHPK3PXP", code, 1_700_000_000_000), true);
+});
+
+test("an email unsubscribe suppresses that workspace and leaves the other alone", async () => {
+  const stamp = Date.now().toString(36);
+  const email = `ada.${stamp}@example.test`;
+  const csv = (ref: string) => `account_ref,consumer_name,consumer_state,zip,last4,balance\n${ref},Ada Example,OH,44101,4242,40.00\n`;
+  const triton = importPortfolio({ workspaceId: "triton", csv: csv(`UNSUB-${stamp}`) });
+  const aether = importPortfolio({ workspaceId: "aether", csv: csv(`UNSUB-A-${stamp}`) });
+  const tritonAccount = triton.accounts.find((item) => item.accountRef === `UNSUB-${stamp}`);
+  const aetherAccount = aether.accounts.find((item) => item.accountRef === `UNSUB-A-${stamp}`);
+  assert.ok(tritonAccount && aetherAccount);
+  const cipher = encryptSecret(email, masterSecret());
+  mutate((db) => {
+    db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) =>
+      item.id === tritonAccount.id || item.id === aetherAccount.id ? { ...item, emailCiphertext: cipher } : item,
+    );
+  });
+  recordConsent("triton", tritonAccount.id, "email", "sandbox test");
+  recordConsent("aether", aetherAccount.id, "email", "sandbox test");
+  applyEmailEvent("triton", email, "unsubscribe");
+  const blocked = await sendChannel({ workspaceId: "triton", accountId: tritonAccount.id, channel: "email", body: "Hello from the desk" });
+  assert.equal(blocked.status, "blocked");
+  assert.match(blocked.reason ?? "", /suppressed/);
+  assert.equal((blocked.reason ?? "").includes(email), false);
+  const open = await sendChannel({ workspaceId: "aether", accountId: aetherAccount.id, channel: "email", body: "Hello from the desk" });
+  assert.equal((open.reason ?? "").includes("suppressed"), false);
 });
 
 test("an ad-hoc email gets a draft mini-Miranda and voicemail does not", async () => {

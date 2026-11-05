@@ -52,6 +52,7 @@ import { publicBaseUrl } from "@/server/mailer";
 import { sqliteAll, sqliteGet } from "@/server/sqlite";
 import { createStripeCheckout, deliverAllowedChannel, type FetchLike } from "@/server/collections/providers";
 import { checkReassignedNumber, checkScraStatus } from "@/server/collections/scrub";
+import { emailIsSuppressed } from "@/server/collections/webhooks";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -339,6 +340,7 @@ export function gateFor(
     voicemailBody,
     campaignSentToday: sentToday,
     statusResponse,
+    emailSuppressed: account ? emailIsSuppressed(workspaceId, account) : false,
   };
   return evaluateGate(ctx);
 }

@@ -32,6 +32,8 @@ export interface GateContext {
   campaignSentToday: number;
   /** When set, an acknowledgment for this exact status may pass the hold. */
   statusResponse?: AccountStatus | null;
+  /** True when this account's stored email is on the workspace suppression list. */
+  emailSuppressed?: boolean;
 }
 
 const OUTBOUND = new Set<CollectionChannel>([
@@ -216,6 +218,13 @@ export function evaluateGate(ctx: GateContext): GateDecision {
 
   if (channel === "sms" && !hasConsent(ctx, "sms")) {
     return block("SMS needs stored prior express consent.", "47 U.S.C. § 227. Confirm the campaign's consent standard with counsel.", true);
+  }
+  if (channel === "email" && ctx.emailSuppressed) {
+    return block(
+      "This email is suppressed after a bounce or unsubscribe.",
+      "Consumer opt-out. This block is a draft control for counsel review.",
+      true,
+    );
   }
   if (channel === "email" && !hasConsent(ctx, "email")) {
     return block(

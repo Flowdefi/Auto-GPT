@@ -1,6 +1,8 @@
 import type { WorkspaceId } from "@/lib/types";
+import { decryptSecret } from "@/server/auth-crypto";
 import { brandFor } from "@/server/brand";
 import { loadDb, mutate, nextId } from "@/server/db";
+import { masterSecret } from "@/server/secrets";
 
 const SMS_REPLY_DRAFT = "This reply is a draft for counsel review.";
 
@@ -30,6 +32,22 @@ export function applySmsKeyword(workspaceId: WorkspaceId, from: string, keyword:
   return { action: "stop", reply: `You are opted out. No further texts will be sent. ${SMS_REPLY_DRAFT}` };
 }
 
+export function accountEmail(account: { emailCiphertext?: string | null }): string | null {
+  if (!account.emailCiphertext) return null;
+  try {
+    const value = decryptSecret(account.emailCiphertext, masterSecret()).trim().toLowerCase();
+    return value.includes("@") ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function emailIsSuppressed(workspaceId: WorkspaceId, account: { emailCiphertext?: string | null }): boolean {
+  const email = accountEmail(account);
+  if (!email) return false;
+  return (loadDb().suppressions ?? []).some((row) => row.workspaceId === workspaceId && row.email.trim().toLowerCase() === email);
+}
+
 export function applyEmailEvent(workspaceId: WorkspaceId, email: string, reason: "bounce" | "unsubscribe"): void {
   const normalized = email.trim().toLowerCase();
   if (!normalized.includes("@")) throw new Error("Email is required");
@@ -41,6 +59,10 @@ export function applyEmailEvent(workspaceId: WorkspaceId, email: string, reason:
     ];
     for (const contact of db.contacts ?? []) {
       if (contact.workspaceId === workspaceId && contact.email.toLowerCase() === normalized) contact.doNotEmail = true;
+    }
+    for (const account of db.portfolioAccounts ?? []) {
+      if (account.workspaceId !== workspaceId || accountEmail(account) !== normalized) continue;
+      db.consents = (db.consents ?? []).filter((row) => !(row.accountId === account.id && row.channel === "email"));
     }
   });
 }

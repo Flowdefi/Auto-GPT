@@ -22,6 +22,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - The account test-payment button points at the error alert. The public accessibility page lists the skip links and form alerts. This is not a formal WCAG audit.
 - An SMS, email, or letter that omits the debt-collector sentence now leads with a draft mini-Miranda. Voicemail is left unchanged. Counsel must approve that sentence.
 - HELP uses the workspace name and does not invent a phone number. STOP and HELP do not confirm an account. Both replies are drafts for counsel.
+- An email bounce or unsubscribe suppresses that address for one workspace and blocks a later collections email. The other workspace keeps its consent.
 
 ## Consumer, client, and public surfaces
 
