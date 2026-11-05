@@ -542,6 +542,8 @@ export interface DatabaseFile {
   complianceEvents?: ComplianceEvent[];
   collectionTemplates?: CollectionTemplate[];
   settlementMatrix?: SettlementMatrix;
+  /** Per-agency settlement authority. The legacy field remains the Triton copy. */
+  settlementMatrices?: Partial<Record<WorkspaceId, SettlementMatrix>>;
   voiceSettings?: VoiceSettings;
   collectorTasks?: CollectorTask[];
   draftReplies?: DraftReply[];

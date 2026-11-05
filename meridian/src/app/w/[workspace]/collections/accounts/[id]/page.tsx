@@ -69,7 +69,13 @@ export default function Account360Page() {
       live?: { sandbox?: boolean; held?: string | null };
       say?: string;
       event?: { status?: string; kind?: string };
+      account?: { rndStatus?: string; scraStatus?: string };
     };
+    if (payload.op === "compliance_scrub" && body.account) {
+      setNotice(`RND ${body.account.rndStatus ?? "unknown"}. SCRA ${body.account.scraStatus ?? "unknown"}. Unknown is not a clearance.`);
+      await refresh();
+      return;
+    }
     if (payload.op === "scrub" && body.event?.status) {
       setNotice(`Scrub ${body.event.kind ?? ""}: ${body.event.status}. A hit places a hold. Unknown is not a clearance.`.trim());
       await refresh();
@@ -135,6 +141,7 @@ export default function Account360Page() {
           <Button tone="soft" onClick={() => void post({ op: "promise_set", amountCents: 2500, dueOn })}>Promise $25</Button>
           <Button tone="soft" onClick={() => void post({ op: "promise_kept" })}>Mark kept</Button>
           <Button tone="soft" onClick={() => void post({ op: "skip_trace" })}>Skip-trace</Button>
+          <Button tone="soft" onClick={() => void post({ op: "compliance_scrub" })}>RND and SCRA</Button>
           <Button tone="soft" onClick={() => void post({ op: "scrub", scrubKind: "bankruptcy" })}>Bankruptcy scrub</Button>
           <Button tone="soft" onClick={() => void post({ op: "scrub", scrubKind: "deceased" })}>Deceased scrub</Button>
         </div>

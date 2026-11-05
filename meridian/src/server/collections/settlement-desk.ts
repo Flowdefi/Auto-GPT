@@ -13,7 +13,7 @@ export function settlementPolicy(): { dualThresholdCents: number; holdDays: numb
 export function previewSettlement(workspaceId: WorkspaceId, accountId: string) {
   const account = (loadDb().portfolioAccounts ?? []).find((item) => item.id === accountId && item.workspaceId === workspaceId);
   if (!account) throw new Error("Account not found");
-  const offer = settlementOffer(account, ensureSettlementMatrix());
+  const offer = settlementOffer(account, ensureSettlementMatrix(workspaceId));
   const policy = settlementPolicy();
   return {
     accountId: account.id,
@@ -46,7 +46,7 @@ function amountOf(row: SettlementCase): number {
 export function openSettlement(workspaceId: WorkspaceId, accountId: string): SettlementCase {
   const account = (loadDb().portfolioAccounts ?? []).find((item) => item.id === accountId && item.workspaceId === workspaceId);
   if (!account) throw new Error("Account not found");
-  const offer = settlementOffer(account, ensureSettlementMatrix());
+  const offer = settlementOffer(account, ensureSettlementMatrix(workspaceId));
   if (offer.blockedReason) throw new Error(offer.blockedReason);
   const row: SettlementCase = {
     id: nextId("stl"),

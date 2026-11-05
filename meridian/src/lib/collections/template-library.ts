@@ -159,6 +159,22 @@ export function loadSettlementMatrix(root = LIBRARY): SettlementMatrix {
   return raw;
 }
 
+export function validateSettlementMatrix(matrix: SettlementMatrix): void {
+  for (const tier of matrix.tiers) {
+    const opening = tier.opening_offer_pct?.value;
+    const floor = tier.floor_pct?.value;
+    if (opening !== undefined && (!Number.isFinite(opening) || opening < 0 || opening > 100)) {
+      throw new Error(`Opening percent for ${tier.tier_id} must be between 0 and 100`);
+    }
+    if (floor !== undefined && (!Number.isFinite(floor) || floor < 0 || floor > 100)) {
+      throw new Error(`Floor percent for ${tier.tier_id} must be between 0 and 100`);
+    }
+    if (opening !== undefined && floor !== undefined && floor > opening) {
+      throw new Error(`Floor percent for ${tier.tier_id} cannot be above the opening percent`);
+    }
+  }
+}
+
 export function clearMatrixDefaults(matrix: SettlementMatrix): SettlementMatrix {
   const next = structuredClone(matrix);
   const visit = (value: unknown): void => {

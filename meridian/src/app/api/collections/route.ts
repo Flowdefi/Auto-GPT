@@ -7,7 +7,7 @@ import type { CollectionChannel, ConsumerConsent } from "@/lib/collections/types
 import type { ConsumerTurn } from "@/lib/collections/voice";
 import { isWorkspaceId } from "@/lib/workspace-id";
 import { requireSeat } from "@/server/api-guard";
-import { assertPrivilegedMfa } from "@/server/mfa-policy";
+import { assertPrivilegedMfa, isPrivilegedCollectionOp } from "@/server/mfa-policy";
 import { assertSameOrigin } from "@/server/security";
 import { bindClient, clientHome, placeForClient, recallForClient } from "@/server/collections/client-portal";
 import { complaintReport, fileComplaint, setComplaintStatus } from "@/server/collections/complaint-store";
@@ -156,8 +156,7 @@ export async function POST(request: Request) {
     taskIds?: string[];
   };
   const actor = collectionsRole(gate.account.email, gate.account.role);
-  const privileged = new Set(["reveal", "eligibility", "template_approval", "matrix", "role", "sol_save", "recording_save", "metro2_approve", "settlement_approve", "freeze_outbound", "freeze_drill"]);
-  if (body.op && privileged.has(body.op)) {
+  if (body.op && isPrivilegedCollectionOp(body.op)) {
     try {
       assertPrivilegedMfa(gate.account.id, actor);
     } catch (error) {
@@ -361,7 +360,7 @@ export async function POST(request: Request) {
         return NextResponse.json(renderTemplatePreview(body.workspaceId, body.templateId, body.accountId));
       case "matrix":
         if (!body.matrix) return NextResponse.json({ error: "matrix required" }, { status: 400 });
-        return NextResponse.json({ matrix: saveSettlementMatrix(body.matrix, actor) });
+        return NextResponse.json({ matrix: saveSettlementMatrix(body.matrix, actor, body.workspaceId) });
       case "reveal":
         if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
         return NextResponse.json({ pii: revealAccount(body.workspaceId, body.accountId, actor, gate.account.email) });
@@ -396,7 +395,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ enqueued: enrollSequence(body.workspaceId, body.sequenceId, body.accountId) });
       case "sol_save":
         return NextResponse.json({ rules: saveSolRules(body.solRules ?? [], actor) });
-      case "scrub":
+      case "compliance_scrub":
         if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
         return NextResponse.json({ account: await scrubAccount(body.workspaceId, body.accountId) });
       case "recording_save":

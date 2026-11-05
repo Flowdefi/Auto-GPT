@@ -56,6 +56,18 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - A freeze drill checks voice, SMS, email, and letters, then lifts the freeze unless that workspace was already frozen. It does not place a live call while delivery is sandbox.
 - The counsel packet lists draft surfaces. Those flags stay on until counsel signs them.
 
+## Still partial
+
+These match the status table. They are not finished by this changelog.
+
+- Limitations for states outside the cited no-license set and Texas stay blank for counsel.
+- The validation PDF follows Model Form B-1 section order. It is not the CFPB designed file.
+- SCRA and reassigned-number checks stay sandbox. Unknown is not a clearance.
+- Card checkout and ACH stay sandbox. No bank account number is stored.
+- Portal accessibility and privacy copy are drafts. This is not a formal WCAG audit.
+- Metro 2 and the Safeguards pack stay drafts until counsel and both approvers sign.
+- Settlement authority is now stored per workspace. The agency brand, limitations table, and recording table are still shared by the install.
+
 ## Still for the owner and counsel
 
 Counsel review, the Texas bond on file, a private repository, MFA enrollment, owner-set settlement values, and vendor keys only after those are done. See `docs/OWNER-ONBOARDING.md`.

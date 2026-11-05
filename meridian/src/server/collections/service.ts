@@ -7,6 +7,7 @@ import { filterVoiceUtterance, loadVoiceGuardrails } from "@/lib/collections/gua
 import { disputeDeadline, validationNotice } from "@/lib/collections/notice";
 import {
   clearMatrixDefaults,
+  validateSettlementMatrix,
   loadSettlementMatrix,
   loadTemplateFiles,
   mergeContext,
@@ -68,7 +69,7 @@ export function collectionSnapshot(workspaceId: WorkspaceId) {
     calls: (db.voiceCalls ?? []).filter((call) => call.workspaceId === workspaceId).slice(0, 30),
     messages: (db.channelMessages ?? []).filter((message) => message.workspaceId === workspaceId).slice(0, 30),
     templates: syncCollectionTemplates(),
-    settlementMatrix: ensureSettlementMatrix(),
+    settlementMatrix: ensureSettlementMatrix(workspaceId),
     events: (db.complianceEvents ?? []).filter((event) => event.workspaceId === workspaceId).slice(0, 40),
     sequences: (db.sequences ?? []).filter((item) => item.workspaceId === workspaceId),
     jobs: (db.jobs ?? []).filter((job) => job.workspaceId === workspaceId).slice(0, 40),
@@ -484,7 +485,7 @@ export async function sendChannel(input: {
   }
   let rendered = input.body;
   if (template && account) {
-    const matrix = ensureSettlementMatrix();
+    const matrix = ensureSettlementMatrix(account.workspaceId);
     const context = mergeContext({ account, agencyName: currentBrand().name, domain: currentBrand().domain, matrix });
     const missing = missingInterpolations(`${template.subject}\n${template.body}`, context.values);
     if (missing.length > 0) {
@@ -563,21 +564,22 @@ function storeMessage(
   return message;
 }
 
-export function ensureSettlementMatrix(): SettlementMatrix {
+export function ensureSettlementMatrix(workspaceId: WorkspaceId = "triton"): SettlementMatrix {
   const db = loadDb();
-  if (db.settlementMatrix?.customized) return db.settlementMatrix;
-  const seeded = loadSettlementMatrix();
-  mutate((state) => {
-    if (!state.settlementMatrix?.customized) state.settlementMatrix = seeded;
-  });
-  return loadDb().settlementMatrix ?? seeded;
+  const scoped = db.settlementMatrices?.[workspaceId];
+  if (scoped?.customized) return scoped;
+  if (!scoped && workspaceId === "triton" && db.settlementMatrix?.customized) return db.settlementMatrix;
+  return loadSettlementMatrix();
 }
 
-export function saveSettlementMatrix(matrix: SettlementMatrix, role: CollectionsRole): SettlementMatrix {
+export function saveSettlementMatrix(matrix: SettlementMatrix, role: CollectionsRole, workspaceId: WorkspaceId): SettlementMatrix {
   if (role !== "admin" && role !== "compliance") throw new Error("Only admin or compliance can edit settlement authority");
+  validateSettlementMatrix(matrix);
   const saved = clearMatrixDefaults(matrix);
+  saved.needs_counsel_review = true;
   mutate((db) => {
-    db.settlementMatrix = saved;
+    db.settlementMatrices = { ...(db.settlementMatrices ?? {}), [workspaceId]: saved };
+    if (workspaceId === "triton") db.settlementMatrix = saved;
   });
   return saved;
 }
@@ -609,7 +611,7 @@ export function renderTemplatePreview(workspaceId: WorkspaceId, templateId: stri
   const template = (loadDb().collectionTemplates ?? []).find((item) => item.id === templateId);
   const account = accounts(workspaceId).find((item) => item.id === accountId);
   if (!template || !account) throw new Error("Template and account are required");
-  const context = mergeContext({ account, agencyName: currentBrand().name, domain: currentBrand().domain, matrix: ensureSettlementMatrix() });
+  const context = mergeContext({ account, agencyName: currentBrand().name, domain: currentBrand().domain, matrix: ensureSettlementMatrix(account.workspaceId) });
   return {
     subject: renderMustache(template.subject, context.values),
     body: renderMustache(template.body, context.values),
