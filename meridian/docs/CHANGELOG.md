@@ -38,6 +38,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - A Social Security number or card number typed into a dispute is stored as [redacted]. The dispute still stops outreach.
 - The same redaction applies to inbound draft text and to a spoken turn on a call. The other words stay.
 - A Social Security number or card number in a complaint summary is stored as [redacted]. The complaint still opens.
+- After-call notes redact a Social Security number or card number before the note is encrypted. The other words stay.
 
 ## Consumer, client, and public surfaces
 

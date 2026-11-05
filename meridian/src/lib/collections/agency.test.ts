@@ -6,7 +6,9 @@ import { createDialCampaign, previewOutbound, wrapCall } from "../../server/coll
 import { markMailReturned, queueLetter } from "../../server/collections/letters";
 import { deskMetrics, writeComplianceDigest } from "../../server/collections/observe";
 import { scoreAndStore, trainingCleared } from "../../server/collections/training";
+import { decryptSecret } from "../../server/auth-crypto";
 import { importPortfolio, startVoice } from "../../server/collections/service";
+import { masterSecret } from "../../server/secrets";
 import { loadDb, mutate, nextId } from "../../server/db";
 import { emitCounter } from "../../server/otel";
 
@@ -94,7 +96,7 @@ test("wrap-up records a promise and a callback without storing the note in clear
     workspaceId: "triton",
     callId: call.id,
     disposition: "promise",
-    notes: "Example promised twenty five dollars",
+    notes: "Example promised twenty five dollars. SSN 123-45-6789.",
     operator: "desk@example.test",
     promiseCents: 2500,
     promiseDue: "2026-12-01",
@@ -103,6 +105,10 @@ test("wrap-up records a promise and a callback without storing the note in clear
   const stored = (loadDb().voiceCalls ?? []).find((item) => item.id === call.id);
   assert.equal(stored?.disposition, "promise");
   assert.equal(JSON.stringify(stored).includes("Example promised"), false);
+  assert.ok(stored?.notesCiphertext);
+  const opened = decryptSecret(stored.notesCiphertext, masterSecret());
+  assert.match(opened, /Example promised twenty five dollars/);
+  assert.equal(opened.includes("123-45-6789"), false);
   const saved = (loadDb().portfolioAccounts ?? []).find((item) => item.id === account.id);
   assert.equal(saved?.promise?.status, "open");
   assert.ok((loadDb().collectorTasks ?? []).some((task) => task.accountId === account.id && task.title === "Scheduled callback"));

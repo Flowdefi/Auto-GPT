@@ -2,6 +2,7 @@ import type { WorkspaceId } from "@/lib/types";
 import { isWrapDisposition, type AgentPresence, type DialAttempt, type DialCampaign, type PresenceStatus, type WrapDisposition } from "@/lib/collections/desk";
 import { reasonCode } from "@/lib/collections/reason-code";
 import { encryptSecret } from "@/server/auth-crypto";
+import { redactIdentifiers } from "@/server/log";
 import { loadDb, mutate, nextId } from "@/server/db";
 import { masterSecret } from "@/server/secrets";
 import { setPromise } from "./floor";
@@ -64,7 +65,7 @@ export function wrapCall(input: {
   const disposition = input.disposition;
   const call = (loadDb().voiceCalls ?? []).find((item) => item.id === input.callId && item.workspaceId === input.workspaceId);
   if (!call) throw new Error("Call not found");
-  const notes = input.notes.replace(/\s+/g, " ").trim().slice(0, 500);
+  const notes = redactIdentifiers(input.notes).replace(/\s+/g, " ").trim().slice(0, 500);
   const callbackAt = input.callbackAt && /^\d{4}-\d{2}-\d{2}$/.test(input.callbackAt) ? input.callbackAt : null;
   mutate((db) => {
     db.voiceCalls = (db.voiceCalls ?? []).map((item) =>
