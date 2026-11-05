@@ -190,9 +190,13 @@ test("Metro 2 stays disabled and will not furnish before consumer contact", () =
   const built = buildMetro2([
     account({ validationMailedAt: null }),
     account({ accountRef: "DEMO-2", validationMailedAt: "2026-03-02T00:00:00.000Z", state: "OH", zip: "44101" }),
+    account({ accountRef: "DEMO-3", validationMailedAt: "2026-03-02T00:00:00.000Z", status: "disputed" }),
+    account({ accountRef: "DEMO-4", validationMailedAt: "2026-03-02T00:00:00.000Z", solExpiresOn: "2020-01-01" }),
   ]);
   assert.equal(built.included, 1);
   assert.match(built.excluded[0]?.reason ?? "", /1006\.30/);
+  assert.match(built.excluded.find((row) => row.accountRef === "DEMO-3")?.reason ?? "", /disputed/);
+  assert.match(built.excluded.find((row) => row.accountRef === "DEMO-4")?.reason ?? "", /Counsel must decide/);
   const line = built.file.split("\n")[0] ?? "";
   assert.equal(line.length, METRO2_BASE_LENGTH);
   assert.equal(line.slice(413, 415), "OH");

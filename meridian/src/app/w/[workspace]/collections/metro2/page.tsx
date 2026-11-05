@@ -34,7 +34,7 @@ export default function Metro2Page() {
       body: JSON.stringify({ op, workspaceId }),
     });
     const body = (await response.json()) as { error?: string; metro2?: MetroStatus; included?: number; excluded?: unknown[] };
-    setNotice(body.error ?? (body.included != null ? `Included ${body.included}. Excluded ${body.excluded?.length ?? 0} with no consumer contact.` : "Recorded"));
+    setNotice(body.error ?? (body.included != null ? `Included ${body.included}. Excluded ${body.excluded?.length ?? 0}.` : "Recorded"));
     if (body.metro2) setStatus(body.metro2);
     else await refresh();
   }
@@ -44,7 +44,7 @@ export default function Metro2Page() {
       <PageHeader
         eyebrow="Collections"
         title="Metro 2 export"
-        subtitle="Disabled unless MERIDIAN_METRO2_EXPORT=enabled and both an owner and a compliance user approve it for this workspace. Another agency's approval does not carry over. Accounts with no mailed validation notice are left out under 12 CFR § 1006.30(a). Social Security numbers are not written into the file. Approval is not counsel sign-off of the layout."
+        subtitle="Disabled unless MERIDIAN_METRO2_EXPORT=enabled and both an owner and a compliance user approve it for this workspace. Another agency's approval does not carry over. Accounts with no mailed validation notice are left out under 12 CFR § 1006.30(a). A past limitations date, and any status other than workable, also stay out until counsel maps them. Social Security numbers are not written into the file. Approval is not counsel sign-off of the layout."
       />
       {notice ? <Card className="mb-4 p-4 text-sm">{notice}</Card> : null}
       <Card className="space-y-3 p-5 text-sm">

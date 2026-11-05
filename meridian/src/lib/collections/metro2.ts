@@ -1,3 +1,4 @@
+import { limitationsDatePassed } from "./sol";
 import type { PortfolioAccount } from "./types";
 
 /** CDIA Metro 2 base segment length. Positions must be checked against the current Credit Reporting Resource Guide before any bureau file is sent. */
@@ -63,6 +64,22 @@ export function buildMetro2(accounts: PortfolioAccount[], now = new Date()): Met
       });
       continue;
     }
+    if (account.status !== "workable") {
+      excluded.push({
+        accountRef: account.accountRef,
+        included: false,
+        reason: `Account is marked ${account.status}. This draft leaves the Metro 2 status blank, so the account stays out until counsel maps that status.`,
+      });
+      continue;
+    }
+    if (limitationsDatePassed(account.solExpiresOn, now.toISOString())) {
+      excluded.push({
+        accountRef: account.accountRef,
+        included: false,
+        reason: "Limitations date on file is in the past. This draft does not furnish that account. Counsel must decide before it is included.",
+      });
+      continue;
+    }
     const line = blank(METRO2_BASE_LENGTH);
     put(line, 1, 4, String(METRO2_BASE_LENGTH), true);
     put(line, 5, 1, "1");
@@ -87,7 +104,7 @@ export function buildMetro2(accounts: PortfolioAccount[], now = new Date()): Met
     included: lines.length,
     excluded,
     needsCounselReview: true,
-    citation: "12 CFR § 1006.30(a). Base-segment positions follow the published Metro 2 layout and must be verified against the current CDIA guide. Account status is left blank rather than guessed.",
+    citation: "12 CFR § 1006.30(a). A past limitations date and any status other than workable stay out of this draft because the status field is left blank. Counsel must decide before those accounts are furnished. Base-segment positions follow the published Metro 2 layout and must be verified against the current CDIA guide.",
   };
 }
 
