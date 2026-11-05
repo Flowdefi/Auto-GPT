@@ -15,15 +15,17 @@ export function queueLetter(workspaceId: WorkspaceId, accountId: string, templat
   const account = (loadDb().portfolioAccounts ?? []).find((item) => item.id === accountId && item.workspaceId === workspaceId);
   if (!account) throw new Error("Account not found");
   const preview = renderTemplatePreview(workspaceId, templateId, accountId);
-  const pdf = Buffer.from(textPdf(preview.subject || template.id, preview.body)).toString("base64");
+  const holdReason = "Limitations date on file is in the past. This payment or settlement message stays held. Use the counsel-reviewed time-barred notice.";
+  const timeBarred = limitationsDatePassed(account.solExpiresOn, new Date().toISOString()) && timeBarredSolicitation(template.id, preview.body);
+  const pdf = Buffer.from(textPdf(preview.subject || template.id, timeBarred ? holdReason : preview.body)).toString("base64");
   let status: MailJob["status"] = "queued";
   let reason: string | null = null;
   if (account.addressStatus === "returned") {
     status = "paused";
     reason = "Returned mail is on file. Letter sequences stay paused until the address is reviewed.";
-  } else if (limitationsDatePassed(account.solExpiresOn, new Date().toISOString()) && timeBarredSolicitation(template.id, preview.body)) {
+  } else if (timeBarred) {
     status = "paused";
-    reason = "Limitations date on file is in the past. This payment or settlement message stays held. Use the counsel-reviewed time-barred notice.";
+    reason = holdReason;
   } else if (preview.missing.length > 0) {
     status = "paused";
     reason = "Required merge fields are empty.";
@@ -75,8 +77,8 @@ export function mailPdf(workspaceId: WorkspaceId, mailJobId: string): string {
 }
 
 /** Files queued letters through the same gate and Lob path as a one-off send. */
-export async function runMailQueue(workspaceId?: WorkspaceId): Promise<number> {
-  const queued = (loadDb().mailJobs ?? []).filter((job) => job.status === "queued" && (!workspaceId || job.workspaceId === workspaceId));
+export async function runMailQueue(workspaceId?: WorkspaceId, onlyJobId?: string): Promise<number> {
+  const queued = (loadDb().mailJobs ?? []).filter((job) => job.status === "queued" && (!workspaceId || job.workspaceId === workspaceId) && (!onlyJobId || job.id === onlyJobId));
   let filed = 0;
   for (const job of queued.slice(0, 20)) {
     const message = await sendChannel({
@@ -91,9 +93,14 @@ export async function runMailQueue(workspaceId?: WorkspaceId): Promise<number> {
       : message.provider === "sandbox"
         ? "sandbox_filed"
         : "provider_accepted";
+    const holdPdf = message.reason?.includes("time-barred notice")
+      ? Buffer.from(textPdf(job.templateId, message.reason)).toString("base64")
+      : null;
     mutate((db) => {
       db.mailJobs = (db.mailJobs ?? []).map((item) =>
-        item.id === job.id ? { ...item, status, provider: message.provider, providerId: message.providerId, reason: message.reason } : item,
+        item.id === job.id
+          ? { ...item, status, provider: message.provider, providerId: message.providerId, reason: message.reason, ...(holdPdf ? { pdfBase64: holdPdf } : {}) }
+          : item,
       );
     });
     if (status !== "paused") filed += 1;

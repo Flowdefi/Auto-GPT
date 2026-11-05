@@ -125,8 +125,10 @@ export function releaseSettlementLetter(workspaceId: WorkspaceId, caseId: string
   if (row.status !== "held" || !row.holdUntil) throw new Error("This settlement is not in the hold period");
   if (row.holdUntil > today) throw new Error(`The settling letter stays queued until ${row.holdUntil}`);
   const mail = queueLetter(workspaceId, row.accountId, "LTR-010");
-  mutate((db) => {
-    db.settlementCases = (db.settlementCases ?? []).map((item) => (item.id === row.id ? { ...item, status: "sent" } : item));
-  });
+  if (mail.status !== "paused") {
+    mutate((db) => {
+      db.settlementCases = (db.settlementCases ?? []).map((item) => (item.id === row.id ? { ...item, status: "sent" } : item));
+    });
+  }
   return { settlementId: row.id, mailStatus: mail.status, reason: mail.reason };
 }

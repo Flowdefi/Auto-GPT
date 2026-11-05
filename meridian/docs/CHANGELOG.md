@@ -22,7 +22,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 
 ## Voice, campaigns, and the collector floor
 
-- Sandbox voice console with mini-Miranda, recording consent from a per-state table, encrypted transcripts, and guardrails. If the limitations date on file is in the past, the assistant does not offer a plan or a payment page, and SMS, email, and letter payment or settlement asks stay held. The mail queue pauses those letters before filing. The counsel-reviewed time-barred notices can still be sent. A blank limitations date does not trigger the hold.
+- Sandbox voice console with mini-Miranda, recording consent from a per-state table, encrypted transcripts, and guardrails. If the limitations date on file is in the past, the assistant does not offer a plan or a payment page, and SMS, email, and letter payment or settlement asks stay held. The mail queue pauses those letters before filing, including one that was already queued, and replaces the stored PDF with the hold note. A paused settling letter is not marked sent. The counsel-reviewed time-barred notices can still be sent. A blank limitations date does not trigger the hold.
 - Live Twilio or Telnyx dialing only behind `MERIDIAN_VOICE_LIVE=enabled` and live delivery, with signature checks, encrypted recordings, and a hangup on the kill switch.
 - Account 360 timeline, click-to-call pre-check, after-call wrap, promise-to-pay, and broken-promise tasks.
 - Presence board, paced campaign dialer, and a daily scorecard.

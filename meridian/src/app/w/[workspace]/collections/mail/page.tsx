@@ -42,7 +42,7 @@ export default function MailPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Collector" title="Mail house" subtitle="Every letter template renders to a one-page PDF and waits in the queue. The job worker files it through the compliance gate. Lob is used only when the letter provider and live delivery are both set. Returned mail pauses later letter steps on that account." />
+      <PageHeader eyebrow="Collector" title="Mail house" subtitle="Every letter template renders to a one-page PDF and waits in the queue. The job worker files it through the compliance gate. A payment or settlement letter pauses when the limitations date on file is in the past, and the stored PDF is that hold note, not the offer. Lob is used only when the letter provider and live delivery are both set. Returned mail pauses later letter steps on that account." />
       {notice ? <Card className="mb-4 p-4 text-sm">{notice}</Card> : null}
       <Card className="mb-4 grid gap-3 p-4 text-sm sm:grid-cols-2">
         <label className="grid gap-1">Account id
