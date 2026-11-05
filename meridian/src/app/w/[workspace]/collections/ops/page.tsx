@@ -51,6 +51,7 @@ export default function OpsPage() {
           <Card className="p-4 text-sm">
             <div className="font-semibold">Sends blocked by reason</div>
             <p className="mt-2">{Object.entries(metrics.blockedByReason).map(([code, count]) => `${code} ${count}`).join(" · ") || "None recorded"}</p>
+            {metrics.blockedByReason.time_barred ? <p className="mt-2">time_barred is the limitations-date hold. The notice is still a draft for counsel.</p> : null}
           </Card>
           <Card className="p-4 text-sm">
             <div className="font-semibold">Limits for this workspace</div>

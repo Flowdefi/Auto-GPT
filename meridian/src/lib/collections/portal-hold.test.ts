@@ -3,6 +3,7 @@ import test from "node:test";
 import { POST } from "../../app/api/portal/route";
 import { reasonCode } from "./reason-code";
 import { TIME_BARRED_HOLD } from "./sol";
+import { deskMetrics, writeComplianceDigest } from "../../server/collections/observe";
 import { importPortfolio, openPortal, sendChannel, setTemplateApproval, syncCollectionTemplates, templateForWorkspace } from "../../server/collections/service";
 import { loadDb, mutate } from "../../server/db";
 
@@ -28,6 +29,8 @@ test("the portal route refuses payment and still accepts a dispute", async () =>
     db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) => (item.id === account.id ? { ...item, solExpiresOn: "2020-01-01" } : item));
   });
   const opened = openPortal("triton", ref, "4242", "44101");
+  const beforeTriton = deskMetrics("triton").blockedByReason.time_barred ?? 0;
+  const beforeAether = deskMetrics("aether").blockedByReason.time_barred ?? 0;
   try {
     const pay = await POST(portalRequest(opened.token, { op: "pay", amountCents: 1000 }));
     const plan = await POST(portalRequest(opened.token, { op: "plan", months: 2, amountCents: 1000 }));
@@ -38,6 +41,14 @@ test("the portal route refuses payment and still accepts a dispute", async () =>
     assert.match(((await pay.json()) as { error?: string }).error ?? "", /counsel-reviewed time-barred notice/);
     assert.match(((await plan.json()) as { error?: string }).error ?? "", /counsel-reviewed time-barred notice/);
     assert.match(((await ach.json()) as { error?: string }).error ?? "", /counsel-reviewed time-barred notice/);
+    assert.equal(deskMetrics("triton").blockedByReason.time_barred ?? 0, beforeTriton + 3);
+    assert.equal(deskMetrics("aether").blockedByReason.time_barred ?? 0, beforeAether);
+    const digest = await writeComplianceDigest("triton");
+    assert.equal(digest.delivery, "sandbox");
+    assert.match(digest.summary, /time_barred=/);
+    assert.equal(digest.summary.includes(ref), false);
+    const other = await writeComplianceDigest("aether");
+    assert.equal(other.summary.includes(ref), false);
     const dispute = await POST(portalRequest(opened.token, { op: "dispute", text: "I dispute this debt" }));
     assert.equal(dispute.status, 200);
     const notice = await POST(portalRequest(opened.token, { op: "notice" }));
