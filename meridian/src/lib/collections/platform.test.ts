@@ -107,11 +107,24 @@ test("sandbox providers do not call the network and webhooks record STOP", async
   process.env.TWILIO_AUTH_TOKEN = "token_example";
   process.env.TWILIO_FROM = "+15555550100";
   try {
+    let called = false;
+    await assert.rejects(
+      () => deliverSms({ to: "+12125551212", body: "Example notice" }, async () => {
+        called = true;
+        return { ok: true, status: 201, json: async () => ({ sid: "SM_example" }), text: async () => "" };
+      }),
+      /555 test number/,
+    );
+    assert.equal(called, false);
+    process.env.TWILIO_FROM = "+12125551212";
     let url = "";
-    const live = await deliverSms({ to: "+15555550199", body: "Example notice" }, async (target) => {
+    let body = "";
+    const live = await deliverSms({ to: "+12125551212", body: "Example notice" }, async (target, init) => {
       url = target;
+      body = String(init?.body ?? "");
       return { ok: true, status: 201, json: async () => ({ sid: "SM_example" }), text: async () => "" };
     });
+    assert.equal(body.includes("5555550100"), false);
     assert.match(url, /Accounts\/AC_example\/Messages\.json$/);
     assert.equal(live.provider, "twilio");
     assert.equal(live.sandbox, false);

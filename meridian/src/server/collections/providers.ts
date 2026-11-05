@@ -39,14 +39,23 @@ function sandboxId(prefix: string): DeliveryResult {
   return { provider: "sandbox", providerId: `sandbox_${prefix}_${Math.random().toString(36).slice(2, 10)}`, sandbox: true };
 }
 
+export function liveFromNumber(value: string | undefined, label: string): string {
+  const raw = value?.trim() ?? "";
+  const digits = raw.replace(/\D/g, "");
+  const national = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  if (national.length < 10) throw new Error(`${label} is missing.`);
+  if (national.startsWith("555")) throw new Error(`${label} will not use a 555 test number.`);
+  return raw;
+}
+
 export async function deliverSms(input: { to: string; body: string }, fetchImpl: FetchLike = fetch): Promise<DeliveryResult> {
   const provider = smsProvider();
   if (!liveDeliveryEnabled() || provider === "sandbox") return sandboxId("sms");
   if (provider === "twilio") {
     const sid = process.env.TWILIO_ACCOUNT_SID;
     const token = process.env.TWILIO_AUTH_TOKEN;
-    const from = process.env.TWILIO_FROM;
-    if (!sid || !token || !from) throw new Error("Twilio keys are missing");
+    if (!sid || !token) throw new Error("Twilio keys are missing");
+    const from = liveFromNumber(process.env.TWILIO_FROM, "Twilio from number");
     const response = await fetchImpl(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
       method: "POST",
       headers: { Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded" },
@@ -57,8 +66,8 @@ export async function deliverSms(input: { to: string; body: string }, fetchImpl:
     return { provider: "twilio", providerId: payload.sid ?? "twilio", sandbox: false };
   }
   const key = process.env.TELNYX_API_KEY;
-  const from = process.env.TELNYX_FROM;
-  if (!key || !from) throw new Error("Telnyx keys are missing");
+  if (!key) throw new Error("Telnyx keys are missing");
+  const from = liveFromNumber(process.env.TELNYX_FROM, "Telnyx from number");
   const response = await fetchImpl("https://api.telnyx.com/v2/messages", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
