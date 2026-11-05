@@ -6,6 +6,7 @@ import { solFor } from "./sol";
 import { saveSolRules } from "../../server/collections/service";
 import { enrollSequence, purgeExpiredIdentifiers, runDueJobs, saveSequence } from "../../server/collections/runner";
 import { deliverAllowedChannel, deliverSms } from "../../server/collections/providers";
+import { brandFor } from "../../server/brand";
 import { applySmsKeyword, reconcileProviderPayment } from "../../server/collections/webhooks";
 import { roleRequiresMfa } from "../../server/mfa-policy";
 import { mutate } from "../../server/db";
@@ -82,6 +83,14 @@ test("sandbox providers do not call the network and webhooks record STOP", async
   assert.equal(result.sandbox, true);
   const stop = applySmsKeyword("triton", "+15555550199", "STOP");
   assert.equal(stop.action, "stop");
+  assert.match(stop.reply ?? "", /opted out/i);
+  assert.equal((stop.reply ?? "").toLowerCase().includes("account"), false);
+  assert.match(stop.reply ?? "", /draft for counsel review/);
+  const help = applySmsKeyword("aether", "+15555550199", "HELP");
+  assert.equal(help.action, "help");
+  assert.ok(help.reply?.startsWith(brandFor("aether").name));
+  assert.equal((help.reply ?? "").includes("1-800-555-0199"), false);
+  assert.match(help.reply ?? "", /draft for counsel review/);
   assert.equal(reconcileProviderPayment("missing"), false);
   const previous = {
     deliver: process.env.MERIDIAN_CHANNEL_DELIVER,

@@ -1,10 +1,17 @@
 import type { WorkspaceId } from "@/lib/types";
+import { brandFor } from "@/server/brand";
 import { loadDb, mutate, nextId } from "@/server/db";
+
+const SMS_REPLY_DRAFT = "This reply is a draft for counsel review.";
 
 export function applySmsKeyword(workspaceId: WorkspaceId, from: string, keyword: string): { action: "stop" | "help" | "ignore"; reply?: string } {
   const word = keyword.trim().toUpperCase();
   if (word === "HELP" || word === "INFO") {
-    return { action: "help", reply: "Example Collections. Call 1-800-555-0199. Reply STOP to opt out. Msg and data rates may apply." };
+    const name = brandFor(workspaceId).name;
+    return {
+      action: "help",
+      reply: `${name}. Reply STOP to opt out. Msg and data rates may apply. For help, use the phone number on your notice. ${SMS_REPLY_DRAFT}`,
+    };
   }
   if (!["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"].includes(word)) return { action: "ignore" };
   const last4 = from.replace(/\D/g, "").slice(-4);
@@ -20,7 +27,7 @@ export function applySmsKeyword(workspaceId: WorkspaceId, from: string, keyword:
       ];
     }
   });
-  return { action: "stop", reply: "You are opted out of texts about this account. No further messages will be sent." };
+  return { action: "stop", reply: `You are opted out. No further texts will be sent. ${SMS_REPLY_DRAFT}` };
 }
 
 export function applyEmailEvent(workspaceId: WorkspaceId, email: string, reason: "bounce" | "unsubscribe"): void {
