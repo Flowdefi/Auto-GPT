@@ -1,5 +1,6 @@
 import type { WorkspaceId } from "@/lib/types";
 import type { MailJob } from "@/lib/collections/desk";
+import { limitationsDatePassed, timeBarredSolicitation } from "@/lib/collections/sol";
 import { textPdf } from "@/lib/collections/text-pdf";
 import { loadDb, mutate, nextId } from "@/server/db";
 import { sendChannel, renderTemplatePreview, syncCollectionTemplates, templateForWorkspace } from "./service";
@@ -20,6 +21,9 @@ export function queueLetter(workspaceId: WorkspaceId, accountId: string, templat
   if (account.addressStatus === "returned") {
     status = "paused";
     reason = "Returned mail is on file. Letter sequences stay paused until the address is reviewed.";
+  } else if (limitationsDatePassed(account.solExpiresOn, new Date().toISOString()) && timeBarredSolicitation(template.id, preview.body)) {
+    status = "paused";
+    reason = "Limitations date on file is in the past. This payment or settlement message stays held. Use the counsel-reviewed time-barred notice.";
   } else if (preview.missing.length > 0) {
     status = "paused";
     reason = "Required merge fields are empty.";

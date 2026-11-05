@@ -8,7 +8,9 @@ import { limitationsDatePassed, solFor, timeBarredSolicitation } from "./sol";
 import { withinCallingWindow } from "./time";
 import type { PortfolioAccount, VoiceSettings } from "./types";
 import { totp, verifyTotp } from "../../server/totp";
-import { importPortfolio, sendChannel, setupPaymentPlan } from "../../server/collections/service";
+import { queueLetter } from "../../server/collections/letters";
+import { importPortfolio, sendChannel, setTemplateApproval, setupPaymentPlan, syncCollectionTemplates, templateForWorkspace } from "../../server/collections/service";
+import { loadDb, mutate } from "../../server/db";
 import { emptyTranscript, redactSensitive, stepCall } from "./voice";
 
 const settings: VoiceSettings = {
@@ -249,6 +251,38 @@ test("sms and email payment asks stay held when the limitations date is past", a
   assert.match(email.reason ?? "", /counsel-reviewed time-barred notice/);
   const later = await sendChannel({ workspaceId: "triton", accountId: futureAccount.id, channel: "sms", body: "Please pay the balance" });
   assert.equal((later.reason ?? "").includes("time-barred notice"), false);
+  const templates = syncCollectionTemplates();
+  const offerTemplate = templates.find((item) => item.id === "LTR-010");
+  const noticeTemplate = templates.find((item) => item.id === "LTR-060");
+  assert.ok(offerTemplate && noticeTemplate);
+  const beforeOffer = templateForWorkspace("triton", offerTemplate);
+  const beforeNotice = templateForWorkspace("triton", noticeTemplate);
+  const priorOffer = loadDb().templateApprovals?.triton?.["LTR-010"];
+  const priorNotice = loadDb().templateApprovals?.triton?.["LTR-060"];
+  setTemplateApproval("LTR-010", { ownerApproved: true }, "admin", "triton");
+  setTemplateApproval("LTR-060", { ownerApproved: true }, "admin", "triton");
+  try {
+    const offer = await sendChannel({ workspaceId: "triton", accountId: pastAccount.id, channel: "letter", body: "", templateId: "LTR-010" });
+    const notice = await sendChannel({ workspaceId: "triton", accountId: pastAccount.id, channel: "letter", body: "Please pay", templateId: "LTR-060" });
+    assert.match(offer.reason ?? "", /counsel-reviewed time-barred notice/);
+    assert.equal((notice.reason ?? "").includes("time-barred notice"), false);
+    const queuedOffer = queueLetter("triton", pastAccount.id, "LTR-010");
+    const queuedNotice = queueLetter("triton", pastAccount.id, "LTR-060");
+    assert.equal(queuedOffer.status, "paused");
+    assert.match(queuedOffer.reason ?? "", /counsel-reviewed time-barred notice/);
+    assert.equal((queuedNotice.reason ?? "").includes("time-barred"), false);
+  } finally {
+    setTemplateApproval("LTR-010", { ownerApproved: beforeOffer.ownerApproved, counselReviewed: beforeOffer.counselReviewed }, "admin", "triton");
+    setTemplateApproval("LTR-060", { ownerApproved: beforeNotice.ownerApproved, counselReviewed: beforeNotice.counselReviewed }, "admin", "triton");
+    if (!priorOffer || !priorNotice) {
+      mutate((db) => {
+        const bucket = db.templateApprovals?.triton;
+        if (!bucket) return;
+        if (!priorOffer) delete bucket["LTR-010"];
+        if (!priorNotice) delete bucket["LTR-060"];
+      });
+    }
+  }
 });
 
 test("sandbox payment plan stays inside the balance and the month cap", () => {
