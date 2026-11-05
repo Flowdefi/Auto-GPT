@@ -6,6 +6,7 @@ import { seedServerData } from "./seed-db";
 import { persistSqlite, seedCrmSnapshot } from "./sqlite";
 import { seedCrmRecords } from "./crm";
 import { seedSegmentsInto } from "./segments";
+import { ensureCollectionDefaults } from "./collections/defaults";
 import { seedDemoLeads, seedWorkflows } from "./workflow";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -48,6 +49,7 @@ function migrate(db: DatabaseFile): DatabaseFile {
     }
   }
   if (!Array.isArray(db.demoPurgedWorkspaces)) db.demoPurgedWorkspaces = [];
+  ensureCollectionDefaults(db);
   seedCrmRecords(db);
   seedWorkflows(db);
   seedDemoLeads(db);

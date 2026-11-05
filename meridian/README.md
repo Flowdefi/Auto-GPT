@@ -156,6 +156,18 @@ docker compose exec meridian npm run import:csv -- \
 
 Do not commit lead files. Bulk send skips suppressed addresses and any contact with `doNotEmail`, including test sends.
 
+## Collections desk (sandbox)
+
+The collections desk is a separate path from the buyer/seller CRM. It is for a third-party operation that only collects where the consumer lives in a state with no collector or debt-buyer license, plus Texas. Texas still requires the **$10,000** surety bond in Tex. Fin. Code § 392.101 and the time-barred rules in § 392.307. The eligibility table is editable at **State eligibility**. Uncertain states stay quarantined until counsel marks them eligible. This is not legal advice.
+
+Outbound AI calls, SMS, email, Lob-style letters, limited-content voicemail, portal chat, and the payment handoff all pass the same gate: kill switch, daily cap, state eligibility, cease/dispute/bankruptcy/attorney holds, Reg F calling hours and the 7-in-7 / 7-day conversation cap, TCPA consent for AI voice on cell phones (FCC 24-17), internal DNC, and a reassigned-number scrub. The default scrub is "unknown", which blocks cell calls. The sandbox clear switch is not the FCC database. Transcripts are encrypted. Card numbers and SSNs are redacted and are not stored. Payment goes to `/pay/sandbox/[token]`, which does not collect a card.
+
+```bash
+npm run test:collections
+```
+
+Put counsel-reviewed Markdown templates in `templates/collections/` and use **Sync templates**. Nothing in that folder is sent until `counselReviewed: true`. The public repo must stay free of real debtor files.
+
 ## Environment
 
 Copy `.env.example` to `.env.local` (dev) or `.env` (Compose). Empty values are fine until you use that feature.
@@ -165,6 +177,7 @@ Copy `.env.example` to `.env.local` (dev) or `.env` (Compose). Empty values are 
 | `MERIDIAN_AUTH_SECRET` | Production | Session signing secret, 32+ characters |
 | `MERIDIAN_SECRET_KEY` | Production if you store BYOK secrets | Encryption key for provider secrets |
 | `MERIDIAN_SEED_DEMO` | No | `false` disables `seedCrmRecords` and `seedDemoLeads`. Unset/`true` seeds demo data. Compose defaults to `false` |
+| `MERIDIAN_CHANNEL_DELIVER` | No | `sandbox` records collection attempts locally. `live` is refused |
 | `MERIDIAN_PUBLIC_URL` | Recommended | Public origin for unsubscribe and tracking links |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Same origin for the client |
 | `RESEND_API_KEY` | To send as `portfolios@debtmarket.net` | Resend |

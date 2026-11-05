@@ -6,6 +6,7 @@ const PUBLIC_PAGES = new Set(["/", "/pricing", "/login", "/signup"]);
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PAGES.has(pathname)) return true;
   if (pathname.startsWith("/u/")) return true;
+  if (pathname.startsWith("/pay/sandbox/")) return true;
   if (PUBLIC_API_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
     return true;
   }

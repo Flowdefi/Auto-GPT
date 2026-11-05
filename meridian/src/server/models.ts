@@ -1,3 +1,15 @@
+import type {
+  ChannelMessage,
+  CollectionTemplate,
+  ComplianceEvent,
+  ConsumerConsent,
+  DncEntry,
+  PortfolioAccount,
+  StateEligibility,
+  VoiceCall,
+  VoiceSettings,
+} from "@/lib/collections/types";
+
 export type WorkspaceId = "triton" | "aether";
 
 export interface EmailList {
@@ -506,6 +518,15 @@ export interface DatabaseFile {
   aiAudit: AiAuditEntry[];
   /** Workspaces whose demo CRM rows were purged and must not be reseeded. */
   demoPurgedWorkspaces?: WorkspaceId[];
+  stateEligibility?: StateEligibility[];
+  portfolioAccounts?: PortfolioAccount[];
+  consents?: ConsumerConsent[];
+  dncEntries?: DncEntry[];
+  voiceCalls?: VoiceCall[];
+  channelMessages?: ChannelMessage[];
+  complianceEvents?: ComplianceEvent[];
+  collectionTemplates?: CollectionTemplate[];
+  voiceSettings?: VoiceSettings;
 }
 
 export function emptyDb(): DatabaseFile {
@@ -539,5 +560,13 @@ export function emptyDb(): DatabaseFile {
     segments: [],
     aiAudit: [],
     demoPurgedWorkspaces: [],
+    stateEligibility: [],
+    portfolioAccounts: [],
+    consents: [],
+    dncEntries: [],
+    voiceCalls: [],
+    channelMessages: [],
+    complianceEvents: [],
+    collectionTemplates: [],
   };
 }

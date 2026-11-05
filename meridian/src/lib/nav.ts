@@ -34,6 +34,8 @@ export function navFor(workspaceId: WorkspaceId): NavItem[] {
     { href: `${base}/data/graph`, label: "Graph / RAG", hub: "automation", icon: "Network", group: "Platform" },
     { href: `${base}/reporting`, label: "Reporting", hub: "reporting", icon: "BarChart3", group: "Platform" },
     { href: `${base}/service/tickets`, label: "Service", hub: "service", icon: "LifeBuoy", group: "Platform" },
+    { href: `${base}/collections`, label: "Collections desk", hub: "compliance", icon: "Phone", group: "Platform" },
+    { href: `${base}/settings/eligibility`, label: "State eligibility", hub: "compliance", icon: "ShieldCheck", group: "Platform" },
     { href: `${base}/compliance`, label: "Compliance", hub: "compliance", icon: "ShieldCheck", group: "Platform" },
     { href: `${base}/settings/integrations`, label: "Integrations", hub: "automation", icon: "Plug", group: "Platform" },
   ];
@@ -53,7 +55,7 @@ export function hubFromPath(pathname: string): HubId {
   if (pathname.includes("/settings")) return "automation";
   if (pathname.includes("/data/")) return "automation";
   if (pathname.includes("/reporting")) return "reporting";
-  if (pathname.includes("/compliance")) return "compliance";
+  if (pathname.includes("/compliance") || pathname.includes("/collections") || pathname.includes("/eligibility")) return "compliance";
   if (pathname.includes("/ai")) return "ai";
   return "home";
 }
