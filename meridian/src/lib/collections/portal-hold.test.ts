@@ -4,7 +4,8 @@ import { POST } from "../../app/api/portal/route";
 import { reasonCode } from "./reason-code";
 import { TIME_BARRED_HOLD } from "./sol";
 import { deskMetrics, writeComplianceDigest } from "../../server/collections/observe";
-import { importPortfolio, openPortal, sendChannel, setTemplateApproval, syncCollectionTemplates, templateForWorkspace } from "../../server/collections/service";
+import type { DraftReply } from "./types";
+import { approveDraft, importPortfolio, openPortal, recordConsent, sendChannel, setTemplateApproval, syncCollectionTemplates, templateForWorkspace } from "../../server/collections/service";
 import { loadDb, mutate } from "../../server/db";
 
 function portalRequest(token: string, body: Record<string, unknown>): Request {
@@ -62,6 +63,40 @@ test("the portal route refuses payment and still accepts a dispute", async () =>
       db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) => (item.id === account.id ? { ...item, solExpiresOn: prior } : item));
     });
   }
+});
+
+test("approving a promise reply stays pending when the limitations date is past", async () => {
+  const stamp = Date.now().toString(36);
+  const ref = `DRAFT-${stamp}`;
+  const imported = importPortfolio({
+    workspaceId: "triton",
+    csv: `account_ref,consumer_name,consumer_state,zip,last4,balance\n${ref},Ada Example,OH,44101,4242,40.00\n`,
+  });
+  const account = imported.accounts.find((item) => item.accountRef === ref);
+  assert.ok(account);
+  recordConsent("triton", account.id, "email", "sandbox test");
+  const draft: DraftReply = {
+    id: `draft_${stamp}`,
+    workspaceId: "triton",
+    accountId: account.id,
+    inbound: "I can pay next week",
+    classification: "promise",
+    draft: "Ada, we noted a promise to pay. A collector must confirm the amount and date before it is treated as an arrangement.",
+    status: "pending_approval",
+    gateAllowed: true,
+    gateReason: "preview",
+    createdAt: new Date().toISOString(),
+  };
+  mutate((db) => {
+    db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) => (item.id === account.id ? { ...item, solExpiresOn: "2020-01-01" } : item));
+    db.draftReplies = [draft, ...(db.draftReplies ?? [])];
+  });
+  await assert.rejects(() => approveDraft("triton", draft.id, true), /counsel-reviewed time-barred notice/);
+  const saved = (loadDb().draftReplies ?? []).find((item) => item.id === draft.id);
+  assert.equal(saved?.status, "pending_approval");
+  assert.equal(saved?.gateAllowed, false);
+  const message = (loadDb().channelMessages ?? []).find((item) => item.accountId === account.id && item.reason === TIME_BARRED_HOLD);
+  assert.equal(message?.status, "blocked");
 });
 
 test("a scheduled settlement text is held when the body is empty", async () => {

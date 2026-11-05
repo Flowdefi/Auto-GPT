@@ -870,8 +870,15 @@ export async function approveDraft(workspaceId: WorkspaceId, draftId: string, ap
   const account = accounts(workspaceId).find((item) => item.id === draft.accountId);
   const decision = gateFor(workspaceId, account ?? null, "email");
   if (!decision.allowed) throw new Error(decision.reason);
-  await sendChannel({ workspaceId, accountId: draft.accountId, channel: "email", body: draft.draft });
-  const approved = { ...draft, status: "approved" as const, gateAllowed: true, gateReason: decision.reason };
+  const sent = await sendChannel({ workspaceId, accountId: draft.accountId, channel: "email", body: draft.draft });
+  if (sent.status === "blocked") {
+    const held = { ...draft, gateAllowed: false, gateReason: sent.reason ?? "blocked" };
+    mutate((state) => {
+      state.draftReplies = (state.draftReplies ?? []).map((item) => (item.id === draftId ? held : item));
+    });
+    throw new Error(sent.reason ?? "blocked");
+  }
+  const approved = { ...draft, status: "approved" as const, gateAllowed: true, gateReason: sent.reason ?? decision.reason };
   mutate((state) => {
     state.draftReplies = (state.draftReplies ?? []).map((item) => (item.id === draftId ? approved : item));
   });

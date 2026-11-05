@@ -11,6 +11,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - Limitation years are filled, with citations and `needs_counsel_review`, for TX, GA, MO, MT, NH, OH, SC, SD, VT, and VA. Every other state stays blank. Counsel can edit the table.
 - Reg F validation end date and a one-page Model Form B-1 layout. It is not the CFPB's designed file. When the limitations date on file is past, the PDF says this draft does not include the state time-barred notice. Counsel must add that notice before mailing.
 - An NSF or reversal restores the balance and sends a draft email through the compliance gate. The notice does not ask for another debit, and no bank account number is stored.
+- Approving a reply that asks for payment stays pending when the limitations date on file is past. The email is held, and the draft is not marked sent.
 
 ## Consumer, client, and public surfaces
 
