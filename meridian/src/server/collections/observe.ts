@@ -2,6 +2,7 @@ import type { WorkspaceId } from "@/lib/types";
 import type { ComplianceDigest } from "@/lib/collections/desk";
 import { reasonCode } from "@/lib/collections/reason-code";
 import { loadDb, mutate, nextId } from "@/server/db";
+import { voiceSettingsFor } from "@/server/collections/service";
 import { emitCounter } from "@/server/otel";
 
 export function deskMetrics(workspaceId: WorkspaceId) {
@@ -34,12 +35,17 @@ export function deskMetrics(workspaceId: WorkspaceId) {
   const jobLagSeconds = pending.reduce((max, job) => Math.max(max, Math.floor((now - Date.parse(job.runAt)) / 1000)), 0);
   const finished = (db.jobs ?? []).filter((job) => job.workspaceId === workspaceId && job.status !== "pending");
   const failed = finished.filter((job) => job.status === "failed").length;
+  const limits = voiceSettingsFor(workspaceId);
   return {
     blockedByReason,
     callConnectRate: placed.length ? Number((connected.length / placed.length).toFixed(2)) : null,
     recoveryByPortfolio: [...recovery.entries()].map(([portfolioId, row]) => ({ portfolioId, ...row })),
     jobLagSeconds,
     errorRate: finished.length ? Number((failed / finished.length).toFixed(2)) : 0,
+    dailyOutboundCap: limits.dailyOutboundCap,
+    blockInbound: limits.blockInbound,
+    maxDiscountPercent: limits.maxDiscountPercent,
+    maxPlanMonths: limits.maxPlanMonths,
   };
 }
 
@@ -69,9 +75,10 @@ export async function writeComplianceDigest(
 ): Promise<ComplianceDigest> {
   const metrics = deskMetrics(workspaceId);
   const recipients = digestRecipients(workspaceId);
+  const limits = `Daily cap ${metrics.dailyOutboundCap}. Inbound block ${metrics.blockInbound ? "on" : "off"}. Discount ${metrics.maxDiscountPercent} percent. Plan length ${metrics.maxPlanMonths} months.`;
   const blocked = Object.entries(metrics.blockedByReason).map(([code, count]) => `${code}=${count}`).join(", ") || "none";
   const connect = metrics.callConnectRate === null ? "no placed calls" : String(metrics.callConnectRate);
-  const summary = `Weekly compliance digest for ${workspaceId}. Blocked sends by reason: ${blocked}. Call connect rate: ${connect}. Job lag seconds: ${metrics.jobLagSeconds}. Error rate: ${metrics.errorRate}. Portfolios in the recovery rollup: ${metrics.recoveryByPortfolio.length}. Compliance seats on file: ${recipients.length}. No consumer name, phone, or account number is included.`;
+  const summary = `Weekly compliance digest for ${workspaceId}. Blocked sends by reason: ${blocked}. Call connect rate: ${connect}. Job lag seconds: ${metrics.jobLagSeconds}. Error rate: ${metrics.errorRate}. Portfolios in the recovery rollup: ${metrics.recoveryByPortfolio.length}. Compliance seats on file: ${recipients.length}. ${limits} No consumer name, phone, or account number is included.`;
   const liveRequested = process.env.MERIDIAN_COMPLIANCE_DIGEST === "enabled" && process.env.MERIDIAN_CHANNEL_DELIVER === "live";
   let delivery: ComplianceDigest["delivery"] = "sandbox";
   if (liveRequested && process.env.RESEND_API_KEY && recipients.length > 0) {

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { reasonCode } from "./reason-code";
+import type { ChannelMessage } from "./types";
 import { defaultVoiceSettings } from "../../server/collections/defaults";
-import { saveVoiceLimits, voiceSettingsFor } from "../../server/collections/service";
-import { loadDb, mutate } from "../../server/db";
+import { gateFor, saveVoiceLimits, voiceSettingsFor } from "../../server/collections/service";
+import { loadDb, mutate, nextId } from "../../server/db";
 
 test("daily cap, inbound block, and discount stay inside the workspace", () => {
   const before = voiceSettingsFor("triton");
@@ -45,6 +47,63 @@ test("daily cap, inbound block, and discount stay inside the workspace", () => {
         db.voiceSettings.maxDiscountPercent = before.maxDiscountPercent;
         db.voiceSettings.maxPlanMonths = before.maxPlanMonths;
       }
+    });
+  }
+});
+
+test("the gate applies one workspace's cap and inbound block", () => {
+  const priorTriton = loadDb().voiceLimitsByWorkspace?.triton;
+  const priorAether = loadDb().voiceLimitsByWorkspace?.aether;
+  const stored = loadDb().voiceSettings;
+  const priorKill = stored?.killSwitch ?? false;
+  const priorCap = stored?.dailyOutboundCap ?? defaultVoiceSettings().dailyOutboundCap;
+  const priorBlock = stored?.blockInbound ?? false;
+  const priorDiscount = stored?.maxDiscountPercent ?? defaultVoiceSettings().maxDiscountPercent;
+  const priorMonths = stored?.maxPlanMonths ?? defaultVoiceSettings().maxPlanMonths;
+  const priorFrozen = [...(loadDb().frozenWorkspaces ?? [])];
+  const messageId = nextId("msg");
+  try {
+    mutate((db) => {
+      if (db.voiceSettings) db.voiceSettings.killSwitch = false;
+      db.frozenWorkspaces = (db.frozenWorkspaces ?? []).filter((id) => id !== "aether" && id !== "triton");
+      const message: ChannelMessage = {
+        id: messageId,
+        workspaceId: "aether",
+        accountId: "missing",
+        channel: "email",
+        status: "sandbox_queued",
+        reason: null,
+        templateId: null,
+        provider: "sandbox",
+        providerId: null,
+        at: new Date().toISOString(),
+      };
+      db.channelMessages = [message, ...(db.channelMessages ?? [])];
+    });
+    saveVoiceLimits("aether", { dailyOutboundCap: 1, blockInbound: true });
+    saveVoiceLimits("triton", { dailyOutboundCap: 10000, blockInbound: false });
+    assert.match(gateFor("aether", null, "email").reason, /Daily outbound cap of 1/);
+    assert.equal(gateFor("triton", null, "email").reason.includes("Daily outbound cap"), false);
+    assert.match(gateFor("aether", null, "voice_inbound").reason, /Inbound voice is switched off/);
+    assert.equal(gateFor("triton", null, "voice_inbound").reason.includes("Inbound voice"), false);
+    assert.equal(reasonCode("Inbound voice is switched off."), "inbound_block");
+    assert.equal(reasonCode("Daily outbound cap of 1 is reached."), "daily_cap");
+  } finally {
+    mutate((db) => {
+      db.channelMessages = (db.channelMessages ?? []).filter((row) => row.id !== messageId);
+      db.frozenWorkspaces = priorFrozen;
+      if (db.voiceSettings) {
+        db.voiceSettings.killSwitch = priorKill;
+        db.voiceSettings.dailyOutboundCap = priorCap;
+        db.voiceSettings.blockInbound = priorBlock;
+        db.voiceSettings.maxDiscountPercent = priorDiscount;
+        db.voiceSettings.maxPlanMonths = priorMonths;
+      }
+      db.voiceLimitsByWorkspace = { ...(db.voiceLimitsByWorkspace ?? {}) };
+      if (priorTriton) db.voiceLimitsByWorkspace.triton = priorTriton;
+      else delete db.voiceLimitsByWorkspace.triton;
+      if (priorAether) db.voiceLimitsByWorkspace.aether = priorAether;
+      else delete db.voiceLimitsByWorkspace.aether;
     });
   }
 });

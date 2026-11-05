@@ -10,6 +10,10 @@ interface Metrics {
   recoveryByPortfolio: { portfolioId: string; collectedCents: number; balanceCents: number }[];
   jobLagSeconds: number;
   errorRate: number;
+  dailyOutboundCap: number;
+  blockInbound: boolean;
+  maxDiscountPercent: number;
+  maxPlanMonths: number;
 }
 
 interface Digest {
@@ -47,6 +51,10 @@ export default function OpsPage() {
           <Card className="p-4 text-sm">
             <div className="font-semibold">Sends blocked by reason</div>
             <p className="mt-2">{Object.entries(metrics.blockedByReason).map(([code, count]) => `${code} ${count}`).join(" · ") || "None recorded"}</p>
+          </Card>
+          <Card className="p-4 text-sm">
+            <div className="font-semibold">Limits for this workspace</div>
+            <p className="mt-2">Daily cap {metrics.dailyOutboundCap}. Inbound block {metrics.blockInbound ? "on" : "off"}. Discount {metrics.maxDiscountPercent}%. Plan length {metrics.maxPlanMonths} months.</p>
           </Card>
           <Card className="p-4 text-sm">
             <p>Call connect rate {metrics.callConnectRate === null ? "—" : metrics.callConnectRate}</p>

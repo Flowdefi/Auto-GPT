@@ -12,6 +12,7 @@ export function reasonCode(reason: string): string {
   if (text.includes("do-not-call")) return "dnc";
   if (text.includes("marked") || text.includes("ceased") || text.includes("disputed")) return "account_hold";
   if (text.includes("cap")) return "daily_cap";
+  if (text.includes("inbound voice")) return "inbound_block";
   if (text.includes("template")) return "template";
   if (text.includes("scra") || text.includes("active duty")) return "scra";
   if (text.includes("training")) return "training";
