@@ -36,7 +36,7 @@ import type {
   VoiceSettings,
 } from "@/lib/collections/types";
 import type { WorkspaceId } from "@/lib/types";
-import { modelFormPdf } from "@/lib/collections/model-form-pdf";
+import { VALIDATION_LIMITATIONS_NOTE, modelFormPdf } from "@/lib/collections/model-form-pdf";
 import { REPORT_DRAFT_LABEL } from "@/lib/collections/report-csv";
 import { TIME_BARRED_HOLD, defaultSolTable, limitationsDatePassed, timeBarredSolicitation, type SolRule } from "@/lib/collections/sol";
 import { validationEndDate } from "@/lib/collections/validation-period";
@@ -1136,6 +1136,7 @@ export function validationPdfBase64(workspaceId: WorkspaceId, accountId: string)
     currentBalance: (account.balanceCents / 100).toFixed(2),
     currentCreditor: account.sellerName,
     validationEndDate: end,
+    limitationsNote: limitationsDatePassed(account.solExpiresOn, new Date().toISOString()) ? VALIDATION_LIMITATIONS_NOTE : undefined,
   });
   return Buffer.from(pdf).toString("base64");
 }

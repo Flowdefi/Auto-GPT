@@ -148,7 +148,32 @@ test("model form pdf follows the B-1 section order", () => {
   assert.ok(pdf.startsWith("%PDF"));
   assert.match(pdf, /debt collector/);
   assert.match(pdf, /Total amount of the debt now/);
+  assert.match(pdf, /Counsel must compare it to the current CFPB form/);
+  assert.equal(pdf.includes("state time-barred notice"), false);
   assert.equal(pdf.includes("900-"), false);
+  const flagged = new TextDecoder().decode(modelFormPdf({
+    agencyName: "Example Collections",
+    agencyAddress: "PO Box 100",
+    agencyPhone: "1-800-555-0199",
+    noticeDate: "2026-03-02",
+    consumerName: "Ada Example",
+    consumerAddress: "OH 44101",
+    accountRef: "DEMO-1",
+    accountType: "credit card",
+    creditorOnItemizationDate: "Example Bank",
+    accountLast4: "1001",
+    itemizationDate: "2024-01-15",
+    amountOnItemizationDate: "80.00",
+    interestSince: "0.00",
+    feesSince: "0.00",
+    paymentsCreditsSince: "0.00",
+    currentBalance: "80.00",
+    currentCreditor: "Example Creditor",
+    validationEndDate: "2026-04-08",
+    limitationsNote: "Draft: the limitations date on file is in the past. This layout does not include a state time-barred notice. Counsel must add that notice before mailing.",
+  }));
+  assert.match(flagged, /does not include a state/);
+  assert.match(flagged, /time-barred notice/);
 });
 
 test("limitations table can be edited and still leaves unreviewed states blank", () => {

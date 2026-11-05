@@ -4,6 +4,9 @@
  * before any notice is mailed.
  */
 
+export const VALIDATION_LIMITATIONS_NOTE =
+  "Draft: the limitations date on file is in the past. This layout does not include a state time-barred notice. Counsel must add that notice before mailing.";
+
 export interface ModelFormFields {
   agencyName: string;
   agencyAddress: string;
@@ -23,6 +26,8 @@ export interface ModelFormFields {
   currentBalance: string;
   currentCreditor: string;
   validationEndDate: string;
+  /** Shown only when a calculated limitations date is already past. */
+  limitationsNote?: string;
 }
 
 function escapePdf(value: string): string {
@@ -93,6 +98,7 @@ export function modelFormPdf(fields: ModelFormFields): Uint8Array {
   block("Go to www.cfpb.gov/debt-collection to learn more about your rights under federal law. For instance, you have the right to stop or limit how we contact you.");
   block("Contact us about your payment options.");
   block("Pongase en contacto con nosotros para solicitar una copia de este formulario en espanol.");
+  if (fields.limitationsNote) block(fields.limitationsNote);
   y -= 8;
   commands.push(`${left} ${y} m 558 ${y} l S`);
   y -= 14;
