@@ -64,6 +64,10 @@ export interface PortfolioAccount {
   solExpiresOn?: string | null;
   solCitation?: string;
   solNeedsCounselReview?: boolean;
+  /** FCC RND result. Unknown is not a clearance. */
+  rndStatus?: "ok" | "reassigned" | "unknown";
+  /** DMDC SCRA result. Unknown is not "not on active duty." */
+  scraStatus?: "active" | "inactive" | "unknown";
   ssnCiphertext?: string | null;
   dobCiphertext?: string | null;
   accountNumberCiphertext?: string | null;
@@ -108,6 +112,9 @@ export interface DraftReply {
   gateAllowed: boolean;
   gateReason: string;
   createdAt: string;
+  draftSource?: "model" | "rules";
+  guardNote?: string;
+  model?: string | null;
 }
 
 export interface ConsumerPayment {

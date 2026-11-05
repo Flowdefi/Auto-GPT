@@ -24,6 +24,8 @@ export interface GateContext {
   lastConversationAt: string | null;
   /** Result of the reassigned-numbers hook. Unknown blocks cell AI calls. */
   reassigned: "ok" | "reassigned" | "unknown";
+  /** DMDC SCRA result. Active blocks. Unknown blocks only when the DMDC adapter is selected. */
+  scra?: "active" | "inactive" | "unknown";
   channel: CollectionChannel;
   /** Voicemail body, when channel is voicemail_drop. */
   voicemailBody?: string;
@@ -52,6 +54,12 @@ const CLOSED_STATUSES = new Set<PortfolioAccount["status"]>([
   "military",
 ]);
 
+function scraUnknownBlocks(): boolean {
+  if (process.env.MERIDIAN_SCRA_BLOCK_UNKNOWN === "false") return false;
+  if (process.env.MERIDIAN_SCRA_BLOCK_UNKNOWN === "true") return true;
+  return process.env.MERIDIAN_SCRA_PROVIDER === "dmdc";
+}
+
 function block(reason: string, citation: string, needsCounselReview = false): GateDecision {
   return { allowed: false, reason, citation, needsCounselReview };
 }
@@ -70,6 +78,21 @@ const DEBT_WORDS = /\b(debt|owe|owing|balance|past due|collection|collector|deli
 export function evaluateGate(ctx: GateContext): GateDecision {
   const { channel, settings, account } = ctx;
 
+  const scra = ctx.scra ?? "unknown";
+  if (OUTBOUND.has(channel) && scra === "active") {
+    return block(
+      "SCRA check returned active duty. Collection contact is stopped.",
+      "50 U.S.C. § 3937 and 50 U.S.C. § 3911. Counsel must confirm the current sections before relying on a status result.",
+      true,
+    );
+  }
+  if (OUTBOUND.has(channel) && scra !== "inactive" && scraUnknownBlocks()) {
+    return block(
+      "SCRA status is unknown, so contact is blocked. An unknown result is not a clearance.",
+      "DMDC SCRA. Unknown stays blocked when the DMDC adapter is selected.",
+      true,
+    );
+  }
   if (settings.killSwitch && OUTBOUND.has(channel)) {
     return block("Outbound kill switch is on.", "Owner control. Inbound answering and a consumer-started payment stay available.");
   }

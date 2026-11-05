@@ -1,6 +1,8 @@
-import { requiresAllPartyRecording, emptyTranscript, rulesSummary, stepCall, type ConsumerTurn } from "@/lib/collections/voice";
+import { composeConsumerDraft } from "@/lib/collections/drafting";
+import { buildMetro2 } from "@/lib/collections/metro2";
+import { defaultRecordingTable, requiresAllPartyRecording, type RecordingRule } from "@/lib/collections/recording";
+import { emptyTranscript, rulesSummary, stepCall, type ConsumerTurn } from "@/lib/collections/voice";
 import { evaluateGate, type GateContext } from "@/lib/collections/gate";
-import { classifyInbound, draftConsumerReply } from "@/lib/collections/inbox";
 import { filterVoiceUtterance, loadVoiceGuardrails } from "@/lib/collections/guardrails";
 import { disputeDeadline, validationNotice } from "@/lib/collections/notice";
 import {
@@ -37,8 +39,11 @@ import { validationEndDate } from "@/lib/collections/validation-period";
 import { decryptSecret, encryptSecret, sha256Hex } from "@/server/auth-crypto";
 import { loadDb, mutate, nextId } from "@/server/db";
 import { masterSecret } from "@/server/secrets";
+import { completeFast } from "@/server/ai/complete";
 import { publicBaseUrl } from "@/server/mailer";
+import { sqliteAll, sqliteGet } from "@/server/sqlite";
 import { createStripeCheckout, deliverAllowedChannel, type FetchLike } from "@/server/collections/providers";
+import { checkReassignedNumber, checkScraStatus } from "@/server/collections/scrub";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -63,6 +68,8 @@ export function collectionSnapshot(workspaceId: WorkspaceId) {
     sequences: (db.sequences ?? []).filter((item) => item.workspaceId === workspaceId),
     jobs: (db.jobs ?? []).filter((job) => job.workspaceId === workspaceId).slice(0, 40),
     solRules: ensureSolTable(),
+    recordingRules: ensureRecordingTable(),
+    metro2: metro2Status(),
   };
 }
 
@@ -256,7 +263,8 @@ function gateFor(
     dnc: (db.dncEntries ?? []).filter((row) => row.workspaceId === workspaceId),
     outboundCallsIn7Days,
     lastConversationAt,
-    reassigned: settings.rndSandboxClear ? "ok" : "unknown",
+    reassigned: settings.rndSandboxClear ? "ok" : account?.rndStatus ?? "unknown",
+    scra: account?.scraStatus ?? "unknown",
     channel,
     voicemailBody,
     campaignSentToday: sentToday,
@@ -285,7 +293,7 @@ export function startVoice(input: {
   logEvent(input.workspaceId, channel, account?.id ?? null, decision.allowed, decision.reason);
   const now = new Date().toISOString();
   const agency = workspaceOf(input.workspaceId).legalName;
-  const allParty = account ? requiresAllPartyRecording(account.state) : true;
+  const allParty = account ? requiresAllPartyRecording(account.state, ensureRecordingTable()) : true;
   const transcript = emptyTranscript(agency, allParty, now);
   if (!decision.allowed) {
     const blocked: VoiceCall = {
@@ -680,27 +688,43 @@ export function fileDispute(workspaceId: WorkspaceId, accountId: string, text: s
   return publicAccount(updated);
 }
 
-export function proposeDraft(workspaceId: WorkspaceId, accountId: string, inbound: string): DraftReply {
+export async function proposeDraft(workspaceId: WorkspaceId, accountId: string, inbound: string): Promise<DraftReply> {
   const account = accounts(workspaceId).find((item) => item.id === accountId);
   if (!account) throw new Error("Account not found");
-  const classification = classifyInbound(inbound);
-  const draft = draftConsumerReply({
-    classification,
-    firstName: account.consumerName.split(" ")[0] ?? "",
-    agency: workspaceOf(workspaceId).legalName,
-  });
+  const agency = workspaceOf(workspaceId).legalName;
+  const firstName = account.consumerName.split(" ")[0] ?? "";
+  let modelText: string | null = null;
+  let model: string | null = null;
+  try {
+    const completed = await completeFast([
+      {
+        role: "system",
+        content:
+          "Classify one consumer collections message and draft a reply. Return JSON only: {\"classification\":\"dispute|cease|hardship|promise|bankruptcy|attorney|other\",\"draft\":\"...\"}. Do not threaten. Include that you are a debt collector. Do not include a Social Security number or a card number. The draft is not sent.",
+      },
+      { role: "user", content: inbound.slice(0, 2000) },
+    ]);
+    modelText = completed?.text ?? null;
+    model = completed?.model ?? null;
+  } catch {
+    modelText = null;
+  }
+  const composed = composeConsumerDraft({ inbound, firstName, agency, modelText, model });
   const decision = gateFor(workspaceId, account, "email");
   const row: DraftReply = {
     id: nextId("draft"),
     workspaceId,
     accountId,
     inbound: inbound.slice(0, 2000),
-    classification,
-    draft,
+    classification: composed.classification,
+    draft: composed.draft,
     status: "pending_approval",
     gateAllowed: decision.allowed,
     gateReason: decision.reason,
     createdAt: new Date().toISOString(),
+    draftSource: composed.source,
+    guardNote: composed.guardNote,
+    model: composed.model,
   };
   mutate((db) => {
     db.draftReplies = [row, ...(db.draftReplies ?? [])].slice(0, 200);
@@ -798,6 +822,119 @@ export function saveSolRules(rules: SolRule[], role: CollectionsRole): SolRule[]
     db.solRules = defaultSolTable().map((rule) => clean.find((item) => item.code === rule.code) ?? rule);
   });
   return ensureSolTable();
+}
+
+export function ensureRecordingTable(): RecordingRule[] {
+  const saved = loadDb().recordingRules ?? [];
+  const byCode = new Map(saved.map((rule) => [rule.code, rule]));
+  const table = defaultRecordingTable().map((rule) => byCode.get(rule.code) ?? rule);
+  if (saved.length === 0) {
+    mutate((db) => {
+      if (!db.recordingRules?.length) db.recordingRules = table;
+    });
+  }
+  return table;
+}
+
+export function saveRecordingRules(rules: RecordingRule[], role: CollectionsRole): RecordingRule[] {
+  if (role !== "admin" && role !== "compliance") throw new Error("Only admin or compliance can edit recording consent");
+  const allowed = new Set(defaultRecordingTable().map((rule) => rule.code));
+  const parties = new Set(["all", "one", "uncertain"]);
+  const clean = rules
+    .filter((rule) => allowed.has(rule.code) && parties.has(rule.party))
+    .map((rule) => ({
+      code: rule.code,
+      party: rule.party,
+      citation: String(rule.citation || "Counsel must confirm this state's recording rule.").slice(0, 500),
+      needsCounselReview: true as const,
+    }));
+  mutate((db) => {
+    db.recordingRules = defaultRecordingTable().map((rule) => clean.find((item) => item.code === rule.code) ?? rule);
+  });
+  return ensureRecordingTable();
+}
+
+export async function scrubAccount(workspaceId: WorkspaceId, accountId: string): Promise<PortfolioAccount> {
+  const account = accounts(workspaceId).find((item) => item.id === accountId);
+  if (!account) throw new Error("Account not found");
+  const consent = (loadDb().consents ?? []).find((row) => row.accountId === accountId && row.channel === "voice_cell");
+  const rnd = await checkReassignedNumber({ phoneLast4: account.phoneLast4, consentDate: consent?.at ?? null });
+  const scra = await checkScraStatus({
+    lastName: account.consumerName.split(" ").slice(-1)[0] ?? account.consumerName,
+    activeDutyDate: new Date().toISOString().slice(0, 10),
+  });
+  const updated: PortfolioAccount = { ...account, rndStatus: rnd.result, scraStatus: scra.result };
+  mutate((db) => {
+    db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) => (item.id === accountId ? updated : item));
+  });
+  logEvent(
+    workspaceId,
+    "voice_outbound",
+    accountId,
+    rnd.result !== "reassigned" && scra.result !== "active",
+    `RND ${rnd.result}${rnd.sandbox ? " (sandbox)" : ""}. SCRA ${scra.result}${scra.sandbox ? " (sandbox)" : ""}. Unknown is not a clearance.`,
+  );
+  return publicAccount(updated);
+}
+
+function metro2Status() {
+  const approval = loadDb().metro2Approval;
+  return {
+    enabled: process.env.MERIDIAN_METRO2_EXPORT === "enabled",
+    ownerApproved: Boolean(approval?.ownerApprovedAt),
+    complianceApproved: Boolean(approval?.complianceApprovedAt),
+    needsCounselReview: true as const,
+  };
+}
+
+export function approveMetro2(role: CollectionsRole, actor: string): ReturnType<typeof metro2Status> {
+  if (role !== "admin" && role !== "compliance") throw new Error("Owner and compliance must approve Metro 2");
+  const now = new Date().toISOString();
+  mutate((db) => {
+    const current = db.metro2Approval ?? { ownerApprovedAt: null, ownerApprovedBy: null, complianceApprovedAt: null, complianceApprovedBy: null };
+    if (role === "admin") db.metro2Approval = { ...current, ownerApprovedAt: now, ownerApprovedBy: actor };
+    else db.metro2Approval = { ...current, complianceApprovedAt: now, complianceApprovedBy: actor };
+  });
+  return metro2Status();
+}
+
+export function exportMetro2(workspaceId: WorkspaceId): ReturnType<typeof buildMetro2> {
+  if (process.env.MERIDIAN_METRO2_EXPORT !== "enabled") {
+    throw new Error("Metro 2 export is disabled. Set MERIDIAN_METRO2_EXPORT=enabled only after owner and compliance approval.");
+  }
+  const approval = loadDb().metro2Approval;
+  if (!approval?.ownerApprovedAt || !approval.complianceApprovedAt) {
+    throw new Error("Owner and compliance must both approve Metro 2 before an export.");
+  }
+  return buildMetro2(accounts(workspaceId));
+}
+
+export function accessReview(): {
+  generatedAt: string;
+  citation: string;
+  needsCounselReview: true;
+  operators: Array<{ email: string; role: CollectionsRole; mfaEnabled: boolean; canRevealPii: boolean; status: string; lastLoginAt: string | null }>;
+} {
+  const rows = sqliteAll("SELECT id, email, role, status, last_login_at FROM accounts ORDER BY email");
+  return {
+    generatedAt: new Date().toISOString(),
+    citation: "16 CFR § 314.4(c)(1), (c)(5), and (d). Access controls, MFA, and a review of who can see customer information. This is a draft control, not a completed Safeguards program.",
+    needsCounselReview: true,
+    operators: rows.map((row) => {
+      const email = String(row.email);
+      const accountRole = row.role === "member" ? "member" : "owner";
+      const role = collectionsRole(email, accountRole);
+      const mfa = sqliteGet("SELECT enabled FROM account_mfa WHERE account_id = ?", String(row.id));
+      return {
+        email,
+        role,
+        mfaEnabled: Number(mfa?.enabled) === 1,
+        canRevealPii: role === "admin" || role === "compliance",
+        status: String(row.status ?? ""),
+        lastLoginAt: row.last_login_at ? String(row.last_login_at) : null,
+      };
+    }),
+  };
 }
 
 export function validationPdfBase64(workspaceId: WorkspaceId, accountId: string): string {

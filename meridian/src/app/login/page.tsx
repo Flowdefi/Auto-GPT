@@ -45,8 +45,9 @@ function LoginForm() {
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-400">Sign in</p>
         <h1 className="mt-3 text-3xl font-semibold">Welcome back</h1>
         <p className="mt-2 text-sm text-ink-400">A lifetime seat is required to open a workspace.</p>
-        <label className="mt-8 block text-xs uppercase tracking-wide text-ink-400">Email</label>
+        <label className="mt-8 block text-xs uppercase tracking-wide text-ink-400" htmlFor="login-email">Email</label>
         <input
+          id="login-email"
           type="email"
           required
           autoComplete="email"
@@ -54,8 +55,9 @@ function LoginForm() {
           onChange={(event) => setEmail(event.target.value)}
           className="mt-1 h-11 w-full rounded-xl border border-white/15 bg-white/5 px-3 text-sm outline-none focus:border-white/40"
         />
-        <label className="mt-4 block text-xs uppercase tracking-wide text-ink-400">Password</label>
+        <label className="mt-4 block text-xs uppercase tracking-wide text-ink-400" htmlFor="login-password">Password</label>
         <input
+          id="login-password"
           type="password"
           required
           minLength={PASSWORD_MIN}

@@ -50,7 +50,7 @@ export default function CollectorQueuePage() {
       <PageHeader
         eyebrow="Collections"
         title="Collector queue"
-        subtitle="Open tasks from imports, disputes, hardship, and warm transfers. AI reply drafts stay unsent until a person approves them."
+        subtitle="Open tasks from imports, disputes, hardship, and warm transfers. A model may draft a reply. The rules engine can replace it. Nothing is sent until a person approves and the compliance gate allows it."
       />
       {notice ? <Card className="mb-4 p-4 text-sm">{notice}</Card> : null}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -83,11 +83,12 @@ export default function CollectorQueuePage() {
             <article key={draft.id} className="border-t pt-3">
               <div className="flex flex-wrap gap-2">
                 <Badge>{draft.classification}</Badge>
+                <Badge>{draft.draftSource === "model" ? "Model" : "Rules"}</Badge>
                 <Badge tone={draft.status === "pending_approval" ? "warn" : draft.status === "approved" ? "good" : "bad"}>{draft.status}</Badge>
                 <Badge tone={draft.gateAllowed ? "good" : "bad"}>{draft.gateAllowed ? "Gate allows email" : "Gate would block"}</Badge>
               </div>
               <p className="mt-2 whitespace-pre-wrap">{draft.draft}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{draft.gateReason}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{draft.guardNote} {draft.gateReason}</p>
               {draft.status === "pending_approval" ? (
                 <div className="mt-2 flex gap-2">
                   <Button onClick={() => void post({ op: "approve", draftId: draft.id, approve: true })}>Approve send</Button>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { CollectionSequence } from "@/lib/collections/jobs";
+import type { RecordingRule } from "@/lib/collections/recording";
 import type { SolRule } from "@/lib/collections/sol";
 import type { SettlementMatrix } from "@/lib/collections/template-library";
 import type { CollectionChannel, ConsumerConsent } from "@/lib/collections/types";
@@ -24,8 +25,13 @@ import {
   returnQuarantined,
   renderTemplatePreview,
   sandboxPayment,
+  accessReview,
+  approveMetro2,
+  exportMetro2,
+  saveRecordingRules,
   saveSolRules,
   saveSettlementMatrix,
+  scrubAccount,
   sendChannel,
   setOperatorRole,
   setTemplateApproval,
@@ -93,9 +99,10 @@ export async function POST(request: Request) {
     sequence?: CollectionSequence;
     sequenceId?: string;
     solRules?: SolRule[];
+    recordingRules?: RecordingRule[];
   };
   const actor = collectionsRole(gate.account.email, gate.account.role);
-  const privileged = new Set(["reveal", "eligibility", "template_approval", "matrix", "role", "sol_save"]);
+  const privileged = new Set(["reveal", "eligibility", "template_approval", "matrix", "role", "sol_save", "recording_save", "metro2_approve"]);
   if (body.op && privileged.has(body.op)) {
     try {
       assertPrivilegedMfa(gate.account.id, actor);
@@ -103,7 +110,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error instanceof Error ? error.message : "MFA required", mfaRequired: true }, { status: 403 });
     }
   }
-  if (actor === "read_only" && body.op && body.op !== "report") {
+  if (actor === "read_only" && body.op && body.op !== "report" && body.op !== "access_review") {
     return NextResponse.json({ error: "Read-only role" }, { status: 403 });
   }
   if (!isWorkspaceId(body.workspaceId)) {
@@ -199,7 +206,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ account: fileDispute(body.workspaceId, body.accountId, body.inbound ?? body.body ?? "Dispute") });
       case "draft":
         if (!body.accountId || !body.inbound) return NextResponse.json({ error: "accountId and inbound required" }, { status: 400 });
-        return NextResponse.json({ draft: proposeDraft(body.workspaceId, body.accountId, body.inbound) });
+        return NextResponse.json({ draft: await proposeDraft(body.workspaceId, body.accountId, body.inbound) });
       case "approve":
         if (!body.draftId) return NextResponse.json({ error: "draftId required" }, { status: 400 });
         return NextResponse.json({ draft: await approveDraft(body.workspaceId, body.draftId, body.approve !== false) });
@@ -222,6 +229,17 @@ export async function POST(request: Request) {
         return NextResponse.json({ enqueued: enrollSequence(body.workspaceId, body.sequenceId, body.accountId) });
       case "sol_save":
         return NextResponse.json({ rules: saveSolRules(body.solRules ?? [], actor) });
+      case "scrub":
+        if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
+        return NextResponse.json({ account: await scrubAccount(body.workspaceId, body.accountId) });
+      case "recording_save":
+        return NextResponse.json({ rules: saveRecordingRules(body.recordingRules ?? [], actor) });
+      case "metro2_approve":
+        return NextResponse.json({ metro2: approveMetro2(actor, gate.account.email) });
+      case "metro2_export":
+        return NextResponse.json(exportMetro2(body.workspaceId));
+      case "access_review":
+        return NextResponse.json(accessReview());
       case "notice_pdf":
         if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
         return NextResponse.json({ pdfBase64: validationPdfBase64(body.workspaceId, body.accountId) });

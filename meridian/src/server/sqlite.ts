@@ -4,11 +4,13 @@ import { DatabaseSync } from "node:sqlite";
 import { seedAether } from "@/lib/seed/aether";
 import { seedTriton } from "@/lib/seed/triton";
 import type { WorkspaceData, WorkspaceId } from "@/lib/types";
+import { meridianDataDir } from "./data-dir";
 import { demoSeedEnabled } from "./demo-seed";
 import type { DatabaseFile } from "./models";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const SQLITE_FILE = path.join(DATA_DIR, "meridian.db");
+function sqliteFile(): string {
+  return path.join(meridianDataDir(), "meridian.db");
+}
 
 type RunResult = { changes?: number };
 type Statement = {
@@ -27,14 +29,15 @@ let handle: SqliteHandle | null = null;
 let available = false;
 
 function ensureDir(): void {
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+  const dir = meridianDataDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
 function open(): SqliteHandle | null {
   if (handle) return handle;
   try {
     ensureDir();
-    handle = new DatabaseSync(SQLITE_FILE) as unknown as SqliteHandle;
+    handle = new DatabaseSync(sqliteFile()) as unknown as SqliteHandle;
     handle.exec("PRAGMA journal_mode = WAL;");
     handle.exec("PRAGMA foreign_keys = ON;");
     const schema = readFileSync(path.join(process.cwd(), "src/server/schema.sql"), "utf8");
@@ -391,7 +394,7 @@ export function searchFts(workspaceId: WorkspaceId, prompt: string, limit = 8): 
 }
 
 export function sqliteStats(): { path: string; ready: boolean } {
-  return { path: SQLITE_FILE, ready: sqliteReady() };
+  return { path: sqliteFile(), ready: sqliteReady() };
 }
 
 /** Auth/billing tables. Never passed to persistSqlite's replaceTable wipe. */

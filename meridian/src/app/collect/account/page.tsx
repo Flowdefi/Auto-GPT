@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { usePortalCopy } from "@/components/collect/portal-frame";
 import type { ConsumerPayment, PortfolioAccount } from "@/lib/collections/types";
 
 function money(cents: number | undefined): string {
@@ -8,10 +9,11 @@ function money(cents: number | undefined): string {
 }
 
 export default function CollectAccountPage() {
+  const copy = usePortalCopy();
   const [account, setAccount] = useState<PortfolioAccount | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ConsumerPayment | null>(null);
-  const [dispute, setDispute] = useState("I dispute this debt.");
+  const [dispute, setDispute] = useState("");
   const [months, setMonths] = useState("4");
   const [installment, setInstallment] = useState("25");
 
@@ -20,13 +22,13 @@ export default function CollectAccountPage() {
       .then(async (response) => {
         const body = (await response.json()) as { account?: PortfolioAccount; error?: string };
         if (!response.ok || !body.account) {
-          setError(body.error ?? "Lookup required");
+          setError(body.error ?? copy.loading);
           return;
         }
         setAccount(body.account);
       })
-      .catch(() => setError("Lookup required"));
-  }, []);
+      .catch(() => setError(copy.loading));
+  }, [copy.loading]);
 
   async function pay() {
     if (!account) return;
@@ -38,7 +40,7 @@ export default function CollectAccountPage() {
     });
     const body = (await response.json()) as { error?: string; payment?: ConsumerPayment; account?: PortfolioAccount };
     if (!response.ok || !body.payment) {
-      setError(body.error ?? "Payment was not accepted");
+      setError(body.error ?? copy.error);
       return;
     }
     setReceipt(body.payment);
@@ -56,7 +58,7 @@ export default function CollectAccountPage() {
     });
     const body = (await response.json()) as { error?: string; account?: PortfolioAccount };
     if (!response.ok || !body.account) {
-      setError(body.error ?? "Plan was not saved");
+      setError(body.error ?? copy.error);
       return;
     }
     setAccount(body.account);
@@ -71,7 +73,7 @@ export default function CollectAccountPage() {
     });
     const body = (await response.json()) as { error?: string; account?: PortfolioAccount; pdfBase64?: string };
     if (!response.ok || !body.pdfBase64) {
-      setError(body.error ?? "Validation notice was not issued");
+      setError(body.error ?? copy.error);
       return;
     }
     if (body.account) setAccount(body.account);
@@ -94,7 +96,7 @@ export default function CollectAccountPage() {
     });
     const body = (await response.json()) as { error?: string; account?: PortfolioAccount };
     if (!response.ok || !body.account) {
-      setError(body.error ?? "Dispute was not saved");
+      setError(body.error ?? copy.error);
       return;
     }
     setAccount(body.account);
@@ -102,73 +104,72 @@ export default function CollectAccountPage() {
 
   if (!account) {
     return (
-      <main className="mx-auto max-w-lg px-6 py-16">
-        <h1 className="text-2xl font-semibold">Account</h1>
-        <p className="mt-3 text-sm">{error ?? "Loading…"}</p>
-        <a className="mt-4 inline-block underline" href="/collect">
-          Back to lookup
+      <main className="mx-auto max-w-lg px-6 py-10">
+        <h1 className="text-2xl font-semibold">{copy.accountTitle}</h1>
+        <p className="mt-3 text-sm" role="status">{error ?? copy.loading}</p>
+        <a className="mt-4 inline-flex min-h-11 items-center underline" href="/collect">
+          {copy.back}
         </a>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-lg px-6 py-16">
-      <p className="text-xs font-semibold uppercase tracking-wide">Reference {account.accountRef}</p>
+    <main className="mx-auto max-w-lg px-6 py-10">
+      <p className="text-xs font-semibold uppercase tracking-wide">{copy.reference} {account.accountRef}</p>
       <h1 className="mt-2 text-3xl font-semibold">{money(account.balanceCents)}</h1>
-      <p className="mt-2 text-sm">Current balance. Account ending {account.last4 || "not supplied"}.</p>
-      <section className="mt-8 grid gap-2 text-sm">
-        <h2 className="font-semibold">Itemization</h2>
-        <p>Original creditor: {account.originalCreditor || "not supplied"}</p>
-        <p>Itemization date: {account.itemizationDate || "not supplied"}</p>
-        <p>Amount then: {money(account.itemizationAmountCents)}</p>
-        <p>Payments since: {money(account.paymentsSinceItemizationCents)}</p>
-        <p>Credits since: {money(account.creditsSinceItemizationCents)}</p>
-        <p>Fees since: {money(account.feesSinceItemizationCents)}</p>
-        <p>Chain of title: {account.chainOfTitle || "not supplied"}</p>
-        <p>Limitations date on file: {account.solExpiresOn || "not calculated"} {account.solNeedsCounselReview ? "(counsel review)" : ""}</p>
+      <p className="mt-2 text-sm">{copy.balanceLabel}. {copy.ending} {account.last4 || copy.notSupplied}.</p>
+      <section className="mt-8 grid gap-2 text-sm" aria-labelledby="itemization-heading">
+        <h2 id="itemization-heading" className="font-semibold">{copy.itemization}</h2>
+        <p>{copy.creditor}: {account.originalCreditor || copy.notSupplied}</p>
+        <p>{copy.itemDate}: {account.itemizationDate || copy.notSupplied}</p>
+        <p>{copy.amountThen}: {money(account.itemizationAmountCents)}</p>
+        <p>{copy.payments}: {money(account.paymentsSinceItemizationCents)}</p>
+        <p>{copy.credits}: {money(account.creditsSinceItemizationCents)}</p>
+        <p>{copy.fees}: {money(account.feesSinceItemizationCents)}</p>
+        <p>{copy.chain}: {account.chainOfTitle || copy.notSupplied}</p>
+        <p>{copy.limitations}: {account.solExpiresOn || copy.notCalculated} {account.solNeedsCounselReview ? `(${copy.counselShort})` : ""}</p>
       </section>
       <button className="mt-4 min-h-11 underline" type="button" onClick={() => void downloadNotice()}>
-        Download validation notice (PDF)
+        {copy.download}
       </button>
-      {account.disputeDeadline ? <p className="text-sm">Validation period ends {account.disputeDeadline}.</p> : null}
+      {account.disputeDeadline ? <p className="text-sm">{copy.periodEnds} {account.disputeDeadline}.</p> : null}
       <form onSubmit={(event) => void savePlan(event)} className="mt-6 grid gap-2">
-        <h2 className="font-semibold">Payment plan</h2>
-        <p className="text-sm">Test mode only. The plan total cannot exceed the balance, and no card is stored.</p>
+        <h2 className="font-semibold">{copy.planTitle}</h2>
+        <p className="text-sm">{copy.planBody}</p>
         {account.paymentPlan ? (
           <p className="text-sm">
-            Current plan: {account.paymentPlan.months} payments of {money(account.paymentPlan.installmentCents)}.
+            {copy.currentPlan}: {account.paymentPlan.months} {copy.paymentsOf} {money(account.paymentPlan.installmentCents)}.
           </p>
         ) : null}
-        <label className="grid gap-1 text-sm">
-          Months
-          <input className="min-h-11 rounded-xl border px-3" inputMode="numeric" value={months} onChange={(event) => setMonths(event.target.value)} />
+        <label className="grid gap-1 text-sm" htmlFor="plan-months">
+          {copy.months}
+          <input id="plan-months" className="min-h-11 rounded-xl border border-[#1c2430] px-3" inputMode="numeric" value={months} onChange={(event) => setMonths(event.target.value)} />
         </label>
-        <label className="grid gap-1 text-sm">
-          Each payment in dollars
-          <input className="min-h-11 rounded-xl border px-3" inputMode="decimal" value={installment} onChange={(event) => setInstallment(event.target.value)} />
+        <label className="grid gap-1 text-sm" htmlFor="plan-amount">
+          {copy.eachPayment}
+          <input id="plan-amount" className="min-h-11 rounded-xl border border-[#1c2430] px-3" inputMode="decimal" value={installment} onChange={(event) => setInstallment(event.target.value)} />
         </label>
-        <button className="min-h-11 rounded-xl border px-4" type="submit">
-          Save test-mode plan
+        <button className="min-h-11 rounded-xl border border-[#1c2430] px-4" type="submit">
+          {copy.savePlan}
         </button>
       </form>
-      <button className="mt-6 min-h-11 rounded-xl bg-black px-4 text-white" type="button" onClick={() => void pay()}>
-        Pay $25.00 in test mode
+      <button className="mt-6 min-h-11 rounded-xl bg-[#1c2430] px-4 text-white" type="button" onClick={() => void pay()}>
+        {copy.pay}
       </button>
-      {receipt ? <p className="mt-3 text-sm">Test payment {receipt.providerId} succeeded for {money(receipt.amountCents)}. No card was collected.</p> : null}
+      {receipt ? <p className="mt-3 text-sm" role="status">{copy.receipt} {receipt.providerId} {money(receipt.amountCents)}. {copy.noCard}</p> : null}
       <form onSubmit={(event) => void sendDispute(event)} className="mt-8 grid gap-2">
-        <label className="grid gap-1 text-sm">
-          Dispute
-          <textarea className="min-h-24 rounded-xl border p-3" value={dispute} onChange={(event) => setDispute(event.target.value)} />
+        <label className="grid gap-1 text-sm" htmlFor="dispute-text">
+          {copy.dispute}
+          <textarea id="dispute-text" className="min-h-24 rounded-xl border border-[#1c2430] p-3" value={dispute} onChange={(event) => setDispute(event.target.value)} />
         </label>
-        <button className="min-h-11 rounded-xl border px-4" type="submit">
-          Submit dispute
+        <button className="min-h-11 rounded-xl border border-[#1c2430] px-4" type="submit">
+          {copy.submitDispute}
         </button>
       </form>
-      {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
+      {error ? <p className="mt-3 text-sm text-[#7f1d1d]" role="alert">{copy.error}: {error}</p> : null}
       <p className="mt-8 text-sm leading-6">
-        This is an attempt to collect a debt and any information obtained will be used for that purpose. This communication is from a debt collector.
-        Status: {account.status}.
+        {copy.disclosure} {copy.status}: {account.status}.
       </p>
     </main>
   );

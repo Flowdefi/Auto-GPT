@@ -16,6 +16,7 @@ import type {
   PortalSession,
 } from "@/lib/collections/types";
 import type { CollectionJob, CollectionSequence } from "@/lib/collections/jobs";
+import type { RecordingRule } from "@/lib/collections/recording";
 import type { SolRule } from "@/lib/collections/sol";
 import type { SettlementMatrix } from "@/lib/collections/template-library";
 
@@ -546,6 +547,13 @@ export interface DatabaseFile {
   jobs?: CollectionJob[];
   sequences?: CollectionSequence[];
   solRules?: SolRule[];
+  recordingRules?: RecordingRule[];
+  metro2Approval?: {
+    ownerApprovedAt: string | null;
+    ownerApprovedBy: string | null;
+    complianceApprovedAt: string | null;
+    complianceApprovedBy: string | null;
+  };
 }
 
 export function emptyDb(): DatabaseFile {

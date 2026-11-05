@@ -55,6 +55,13 @@ export function accountsReadyToPurge(accounts: PortfolioAccount[], now: Date, da
   });
 }
 
+/** Floor of 15 seconds so a worker cannot spin. Default is one minute. */
+export function jobIntervalSeconds(raw = process.env.MERIDIAN_JOB_INTERVAL_SECONDS): number {
+  const parsed = Number(raw ?? 60);
+  if (!Number.isFinite(parsed) || parsed < 15) return 60;
+  return Math.floor(parsed);
+}
+
 export function scheduleSteps(steps: SequenceStep[], start: Date): Array<{ step: SequenceStep; runAt: string }> {
   let cursor = start.getTime();
   return steps.map((step) => {

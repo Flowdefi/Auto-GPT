@@ -31,6 +31,18 @@ services:
     volumes:
       - meridian-data:/app/data
     restart: unless-stopped
+  jobs:
+    build: .
+    command: ["npm", "run", "jobs:worker"]
+    environment:
+      MERIDIAN_AUTH_SECRET: ${MERIDIAN_AUTH_SECRET:-}
+      MERIDIAN_SECRET_KEY: ${MERIDIAN_SECRET_KEY:-}
+      MERIDIAN_CHANNEL_DELIVER: sandbox
+      MERIDIAN_JOB_INTERVAL_SECONDS: ${MERIDIAN_JOB_INTERVAL_SECONDS:-60}
+      MERIDIAN_SEED_DEMO: "false"
+    volumes:
+      - meridian-data:/app/data
+    restart: unless-stopped
 
 volumes:
   meridian-data:

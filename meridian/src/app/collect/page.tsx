@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { usePortalCopy } from "@/components/collect/portal-frame";
 
 export default function CollectLookupPage() {
-  const [accountRef, setAccountRef] = useState("DEMO-TX-4242");
-  const [last4, setLast4] = useState("4242");
-  const [zip, setZip] = useState("75201");
+  const copy = usePortalCopy();
+  const [accountRef, setAccountRef] = useState("");
+  const [last4, setLast4] = useState("");
+  const [zip, setZip] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   async function lookup(event: FormEvent) {
@@ -18,41 +20,39 @@ export default function CollectLookupPage() {
     });
     const body = (await response.json()) as { error?: string };
     if (!response.ok) {
-      setError(body.error ?? "No match");
+      setError(body.error ?? copy.error);
       return;
     }
     window.location.href = "/collect/account";
   }
 
   return (
-    <main className="mx-auto max-w-lg px-6 py-16">
-      <p className="text-xs font-semibold uppercase tracking-wide">Consumer portal</p>
-      <h1 className="mt-2 text-3xl font-semibold">Look up an account</h1>
-      <p className="mt-3 text-sm leading-6">
-        Use the reference number, the last four of the account, and the ZIP code. Do not put a Social Security number in this page or in the address bar.
-      </p>
-      <form onSubmit={(event) => void lookup(event)} className="mt-8 grid gap-4">
-        <label className="grid gap-1 text-sm">
-          Reference number
-          <input className="min-h-11 rounded-xl border px-3" value={accountRef} onChange={(event) => setAccountRef(event.target.value)} required />
+    <main className="mx-auto max-w-lg px-6 py-10">
+      <p className="text-xs font-semibold uppercase tracking-wide">{copy.lookupEyebrow}</p>
+      <h1 className="mt-2 text-3xl font-semibold">{copy.lookupTitle}</h1>
+      <p className="mt-3 text-sm leading-6">{copy.lookupBody}</p>
+      <form onSubmit={(event) => void lookup(event)} className="mt-8 grid gap-4" aria-describedby="portal-disclosure">
+        <label className="grid gap-1 text-sm" htmlFor="account-ref">
+          {copy.reference}
+          <input id="account-ref" className="min-h-11 rounded-xl border border-[#1c2430] px-3" autoComplete="off" value={accountRef} onChange={(event) => setAccountRef(event.target.value)} required aria-invalid={error ? true : undefined} />
         </label>
-        <label className="grid gap-1 text-sm">
-          Last four
-          <input className="min-h-11 rounded-xl border px-3" inputMode="numeric" value={last4} onChange={(event) => setLast4(event.target.value)} required />
+        <label className="grid gap-1 text-sm" htmlFor="last-four">
+          {copy.last4}
+          <input id="last-four" className="min-h-11 rounded-xl border border-[#1c2430] px-3" inputMode="numeric" autoComplete="off" value={last4} onChange={(event) => setLast4(event.target.value)} required />
         </label>
-        <label className="grid gap-1 text-sm">
-          ZIP code
-          <input className="min-h-11 rounded-xl border px-3" inputMode="numeric" value={zip} onChange={(event) => setZip(event.target.value)} required />
+        <label className="grid gap-1 text-sm" htmlFor="zip-code">
+          {copy.zip}
+          <input id="zip-code" className="min-h-11 rounded-xl border border-[#1c2430] px-3" inputMode="numeric" autoComplete="postal-code" value={zip} onChange={(event) => setZip(event.target.value)} required />
         </label>
-        {error ? <p className="text-sm text-red-700">{error}</p> : null}
-        <button className="min-h-11 rounded-xl bg-black px-4 text-white" type="submit">
-          Continue
+        {error ? <p className="text-sm text-[#7f1d1d]" role="alert">{copy.error}: {error}</p> : null}
+        <button className="min-h-11 rounded-xl bg-[#1c2430] px-4 text-white" type="submit">
+          {copy.continue}
         </button>
       </form>
-      <p className="mt-6 text-sm leading-6">
-        This is an attempt to collect a debt and any information obtained will be used for that purpose. This communication is from a debt collector.{" "}
+      <p id="portal-disclosure" className="mt-6 text-sm leading-6">
+        {copy.disclosure}{" "}
         <a className="underline" href="/collect/privacy">
-          Privacy
+          {copy.privacy}
         </a>
       </p>
     </main>

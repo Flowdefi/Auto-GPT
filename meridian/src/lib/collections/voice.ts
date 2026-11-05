@@ -1,4 +1,7 @@
+import { requiresAllPartyRecording } from "./recording";
 import type { CallTranscript, CallTurn, PortfolioAccount, QaFlag, VoiceSettings } from "./types";
+
+export { requiresAllPartyRecording };
 
 export type ConsumerTurn =
   | { type: "consent"; accepted: boolean }
@@ -48,13 +51,6 @@ export function emptyTranscript(agency: string, allParty: boolean, at: string): 
     verified: false,
     turns: [{ role: "agent", text: say, at }],
   };
-}
-
-const ALL_PARTY = new Set(["CA", "CT", "FL", "IL", "MD", "MA", "MI", "MT", "NH", "OR", "PA", "WA"]);
-
-/** Commonly treated as all-party. Confirm every statute with counsel before relying on it. */
-export function requiresAllPartyRecording(state: string): boolean {
-  return ALL_PARTY.has(state.trim().toUpperCase());
 }
 
 function push(transcript: CallTranscript, role: CallTurn["role"], text: string, at: string): CallTranscript {
