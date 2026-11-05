@@ -35,6 +35,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - Live Twilio and Telnyx refuse a from number in the 555 test range. Sandbox SMS does not call the provider.
 - Live voice uses the same 555 from-number refusal and will not send the call webhook to example.test. Sandbox voice does not dial.
 - Live Lob is not called. The account file stores state and ZIP only, not a street address. Sandbox letters still render and queue.
+- A Social Security number or card number typed into a dispute is stored as [redacted]. The dispute still stops outreach.
 
 ## Consumer, client, and public surfaces
 

@@ -44,7 +44,7 @@ import { decryptSecret, encryptSecret, sha256Hex } from "@/server/auth-crypto";
 import { brandFor } from "@/server/brand";
 import { defaultVoiceSettings } from "@/server/collections/defaults";
 import { loadDb, mutate, nextId } from "@/server/db";
-import { logEvent as logLine } from "@/server/log";
+import { logEvent as logLine, redactIdentifiers } from "@/server/log";
 import { scanUpload, scanXlsx } from "@/server/security";
 import { masterSecret } from "@/server/secrets";
 import { completeFast } from "@/server/ai/complete";
@@ -806,7 +806,7 @@ export function fileDispute(workspaceId: WorkspaceId, accountId: string, text: s
   const updated: PortfolioAccount = {
     ...account,
     status: "disputed",
-    quarantineReason: text.slice(0, 500),
+    quarantineReason: redactIdentifiers(text).slice(0, 500),
   };
   mutate((db) => {
     db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) => (item.id === accountId ? updated : item));

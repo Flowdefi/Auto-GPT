@@ -5,7 +5,7 @@ import { reasonCode } from "./reason-code";
 import { TIME_BARRED_HOLD } from "./sol";
 import { deskMetrics, writeComplianceDigest } from "../../server/collections/observe";
 import type { DraftReply } from "./types";
-import { approveDraft, importPortfolio, openPortal, proposeDraft, recordConsent, sendChannel, setTemplateApproval, syncCollectionTemplates, templateForWorkspace } from "../../server/collections/service";
+import { approveDraft, fileDispute, importPortfolio, openPortal, proposeDraft, recordConsent, sendChannel, setTemplateApproval, syncCollectionTemplates, templateForWorkspace } from "../../server/collections/service";
 import { loadDb, mutate } from "../../server/db";
 
 function portalRequest(token: string, body: Record<string, unknown>): Request {
@@ -63,6 +63,22 @@ test("the portal route refuses payment and still accepts a dispute", async () =>
       db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) => (item.id === account.id ? { ...item, solExpiresOn: prior } : item));
     });
   }
+});
+
+test("a dispute keeps its words and redacts an identifier", () => {
+  const stamp = Date.now().toString(36);
+  const ref = `RED-${stamp}`;
+  const imported = importPortfolio({
+    workspaceId: "triton",
+    csv: `account_ref,consumer_name,consumer_state,zip,last4,balance\n${ref},Ada Example,OH,44101,4242,40.00\n`,
+  });
+  const account = imported.accounts.find((item) => item.accountRef === ref);
+  assert.ok(account);
+  const updated = fileDispute("triton", account.id, "I dispute this debt. SSN 123-45-6789. Card 4242424242424242.");
+  assert.equal(updated.status, "disputed");
+  assert.match(updated.quarantineReason ?? "", /I dispute this debt/);
+  assert.equal((updated.quarantineReason ?? "").includes("123-45-6789"), false);
+  assert.equal((updated.quarantineReason ?? "").includes("4242424242424242"), false);
 });
 
 test("approving a promise reply stays pending when the limitations date is past", async () => {
