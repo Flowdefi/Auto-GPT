@@ -288,7 +288,7 @@ export function mergeContext(input: {
     creditor_on_itemization_date: input.account.originalCreditor || "Example Bank",
     current_balance: money(input.account.balanceCents),
     amount_on_itemization_date: money(input.account.itemizationAmountCents),
-    interest_since_itemization: "0.00",
+    interest_since_itemization: input.account.interestSinceItemizationCents == null ? "not supplied" : money(input.account.interestSinceItemizationCents),
     fees_since_itemization: money(input.account.feesSinceItemizationCents),
     payments_credits_since_itemization: money(paymentsCredits),
     itemization_date: input.account.itemizationDate || today,

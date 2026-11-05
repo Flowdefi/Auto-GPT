@@ -66,6 +66,8 @@ export interface PortfolioAccount {
   paymentsSinceItemizationCents?: number;
   creditsSinceItemizationCents?: number;
   feesSinceItemizationCents?: number;
+  /** Omitted when the placement file did not include interest. A missing value is not zero. */
+  interestSinceItemizationCents?: number;
   lastPaymentDate?: string | null;
   solExpiresOn?: string | null;
   solCitation?: string;

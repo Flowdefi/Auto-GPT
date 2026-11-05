@@ -3,7 +3,7 @@ import test from "node:test";
 import { scheduleSteps } from "./jobs";
 import { modelFormPdf } from "./model-form-pdf";
 import { solFor } from "./sol";
-import { saveSolRules } from "../../server/collections/service";
+import { importPortfolio, saveSolRules, validationPdfBase64 } from "../../server/collections/service";
 import { enrollSequence, purgeExpiredIdentifiers, runDueJobs, saveSequence } from "../../server/collections/runner";
 import { deliverAllowedChannel, deliverSms } from "../../server/collections/providers";
 import { brandFor } from "../../server/brand";
@@ -183,6 +183,29 @@ test("model form pdf follows the B-1 section order", () => {
   }));
   assert.match(flagged, /does not include a state/);
   assert.match(flagged, /time-barred notice/);
+});
+
+test("validation pdf does not invent interest or an account type", () => {
+  const stamp = Date.now().toString(36);
+  const plain = importPortfolio({
+    workspaceId: "triton",
+    csv: `account_ref,consumer_name,consumer_state,zip,last4,balance\nPDF-${stamp},Ada Example,OH,44101,4242,40.00\n`,
+  });
+  const plainAccount = plain.accounts.find((item) => item.accountRef === `PDF-${stamp}`);
+  assert.ok(plainAccount);
+  assert.equal(plainAccount.interestSinceItemizationCents, undefined);
+  const omitted = new TextDecoder().decode(Buffer.from(validationPdfBase64("triton", plainAccount.id), "base64"));
+  assert.match(omitted, /Account type was/);
+  assert.match(omitted, /missing interest figure as zero/);
+  assert.equal(omitted.includes("+ $not supplied"), false);
+  const supplied = importPortfolio({
+    workspaceId: "triton",
+    csv: `account_ref,consumer_name,consumer_state,zip,last4,balance,interest_since\nPDF2-${stamp},Ada Example,OH,44101,4242,40.00,1.50\n`,
+  });
+  const suppliedAccount = supplied.accounts.find((item) => item.accountRef === `PDF2-${stamp}`);
+  assert.equal(suppliedAccount?.interestSinceItemizationCents, 150);
+  const printed = new TextDecoder().decode(Buffer.from(validationPdfBase64("triton", suppliedAccount!.id), "base64"));
+  assert.match(printed, /\+ \$1\.50/);
 });
 
 test("limitations table can be edited and still leaves unreviewed states blank", () => {

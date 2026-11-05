@@ -25,6 +25,7 @@ export interface ColumnMapping {
   payments_since?: string;
   credits_since?: string;
   fees_since?: string;
+  interest_since?: string;
   last_payment_date?: string;
   ssn?: string;
   dob?: string;
@@ -113,6 +114,7 @@ export function parsePortfolioCsv(input: {
       paymentsSinceItemizationCents: dollarsToCents(pick("payments_since", "payments_since", "payments since itemization")),
       creditsSinceItemizationCents: dollarsToCents(pick("credits_since", "credits_since", "credits since itemization")),
       feesSinceItemizationCents: dollarsToCents(pick("fees_since", "fees_since", "fees since itemization")),
+      interestSinceItemizationCents: optionalCents(pick("interest_since", "interest_since", "interest since itemization")),
       lastPaymentDate,
       ...sol,
       ssnMasked: ssn ? maskSsn(ssn) : "",
@@ -201,6 +203,11 @@ function phoneType(value: string): PortfolioAccount["phoneType"] {
   if (raw.includes("land")) return "landline";
   if (raw.includes("cell") || raw.includes("mobile")) return "cell";
   return "unknown";
+}
+
+function optionalCents(value: string): number | undefined {
+  if (!value.trim()) return undefined;
+  return dollarsToCents(value);
 }
 
 function dollarsToCents(value: string): number {

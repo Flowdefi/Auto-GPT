@@ -74,7 +74,11 @@ export function modelFormPdf(fields: ModelFormFields): Uint8Array {
   block(`${fields.agencyName} is a debt collector. We are trying to collect a debt that you owe to ${fields.currentCreditor}. We will use any information you give us to help collect the debt.`);
   y -= 6;
   write("Our information shows:", 12);
-  block(`You had a ${fields.accountType} account from ${fields.creditorOnItemizationDate} with account number ending in ${fields.accountLast4}.`);
+  block(
+    fields.accountType === "not supplied"
+      ? `You had an account from ${fields.creditorOnItemizationDate} with account number ending in ${fields.accountLast4}. Account type was not supplied.`
+      : `You had a ${fields.accountType} account from ${fields.creditorOnItemizationDate} with account number ending in ${fields.accountLast4}.`,
+  );
   y -= 4;
   const row = (label: string, amount: string) => {
     commands.push(`BT /F1 10 Tf ${left} ${y} Td (${escapePdf(label)}) Tj ET`);
@@ -84,7 +88,7 @@ export function modelFormPdf(fields: ModelFormFields): Uint8Array {
   };
   row(`As of ${fields.itemizationDate}, you owed:`, `$${fields.amountOnItemizationDate}`);
   write(`Between ${fields.itemizationDate} and today:`);
-  row("You were charged this amount in interest:", `+ $${fields.interestSince}`);
+  row("You were charged this amount in interest:", fields.interestSince === "not supplied" ? "not supplied" : `+ $${fields.interestSince}`);
   row("You were charged this amount in fees:", `+ $${fields.feesSince}`);
   row("You paid or were credited this amount toward the debt:", `- $${fields.paymentsCreditsSince}`);
   row("Total amount of the debt now:", `$${fields.currentBalance}`);
@@ -112,6 +116,10 @@ export function modelFormPdf(fields: ModelFormFields): Uint8Array {
   write("[ ] I want you to send me the name and address of the original creditor.");
   y -= 8;
   write("Draft layout of 12 CFR Part 1006 Appendix B Model Form B-1. Counsel must compare it to the current CFPB form before mailing.", 8);
+  if (fields.interestSince === "not supplied" || fields.accountType === "not supplied") {
+    y -= 12;
+    write("Interest or account type shows not supplied when the file omitted it. Do not treat a missing interest figure as zero.", 8);
+  }
   const stream = commands.join("\n");
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
