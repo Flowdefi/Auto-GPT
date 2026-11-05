@@ -3,7 +3,7 @@ import type { WorkspaceId } from "@/lib/types";
 import { decryptSecret, encryptSecret } from "@/server/auth-crypto";
 import { loadDb, mutate } from "@/server/db";
 import { masterSecret } from "@/server/secrets";
-import type { FetchLike } from "./providers";
+import { liveFromNumber, livePublicOrigin, type FetchLike } from "./providers";
 
 export function voiceLiveEnabled(): boolean {
   return process.env.MERIDIAN_VOICE_LIVE === "enabled" && process.env.MERIDIAN_CHANNEL_DELIVER === "live";
@@ -42,20 +42,20 @@ export async function dialVoice(
   if (provider === "twilio") {
     const sid = process.env.TWILIO_ACCOUNT_SID;
     const token = process.env.TWILIO_AUTH_TOKEN;
-    const from = process.env.TWILIO_FROM;
-    if (!sid || !token || !from || !input.to) throw new Error("Twilio voice keys or destination are missing");
+    if (!sid || !token || !input.to) throw new Error("Twilio voice keys or destination are missing");
+    const from = liveFromNumber(process.env.TWILIO_FROM, "Twilio from number");
     const response = await fetchImpl(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Calls.json`, {
       method: "POST",
       headers: { Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ To: input.to, From: from, Url: `${process.env.MERIDIAN_PUBLIC_URL || ""}/api/webhooks/voice` }),
+      body: new URLSearchParams({ To: input.to, From: from, Url: `${livePublicOrigin("Live voice")}/api/webhooks/voice` }),
     });
     if (!response.ok) throw new Error(`Twilio voice failed (${response.status})`);
     const payload = (await response.json()) as { sid?: string };
     return { sandbox: false, provider: "twilio", providerId: payload.sid ?? null, realtime: { model, connectUrl } };
   }
   const key = process.env.TELNYX_API_KEY;
-  const from = process.env.TELNYX_FROM;
-  if (!key || !from || !input.to) throw new Error("Telnyx voice keys or destination are missing");
+  if (!key || !input.to) throw new Error("Telnyx voice keys or destination are missing");
+  const from = liveFromNumber(process.env.TELNYX_FROM, "Telnyx from number");
   const response = await fetchImpl("https://api.telnyx.com/v2/calls", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },

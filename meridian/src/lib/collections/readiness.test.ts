@@ -46,6 +46,52 @@ test("live voice stays sandbox unless the flag and live delivery are both set", 
   }
 });
 
+test("live voice refuses a 555 from number and example.test", async () => {
+  const previous = {
+    voice: process.env.MERIDIAN_VOICE_LIVE,
+    deliver: process.env.MERIDIAN_CHANNEL_DELIVER,
+    sid: process.env.TWILIO_ACCOUNT_SID,
+    token: process.env.TWILIO_AUTH_TOKEN,
+    from: process.env.TWILIO_FROM,
+    url: process.env.MERIDIAN_PUBLIC_URL,
+  };
+  const restore = () => {
+    const pairs: Array<[string, string | undefined]> = [
+      ["MERIDIAN_VOICE_LIVE", previous.voice],
+      ["MERIDIAN_CHANNEL_DELIVER", previous.deliver],
+      ["TWILIO_ACCOUNT_SID", previous.sid],
+      ["TWILIO_AUTH_TOKEN", previous.token],
+      ["TWILIO_FROM", previous.from],
+      ["MERIDIAN_PUBLIC_URL", previous.url],
+    ];
+    for (const [name, value] of pairs) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  };
+  process.env.MERIDIAN_VOICE_LIVE = "enabled";
+  process.env.MERIDIAN_CHANNEL_DELIVER = "live";
+  process.env.TWILIO_ACCOUNT_SID = "AC_example";
+  process.env.TWILIO_AUTH_TOKEN = "token_example";
+  process.env.TWILIO_FROM = "+15555550100";
+  delete process.env.MERIDIAN_PUBLIC_URL;
+  let called = false;
+  const fetchImpl = async () => {
+    called = true;
+    return { ok: true, status: 201, json: async () => ({ sid: "CA_example" }), text: async () => "" };
+  };
+  try {
+    await assert.rejects(() => dialVoice({ to: "+12125551212", callId: "call_live" }, fetchImpl), /555 test number/);
+    assert.equal(called, false);
+    process.env.TWILIO_FROM = "+12125551212";
+    process.env.MERIDIAN_PUBLIC_URL = "https://example.test";
+    await assert.rejects(() => dialVoice({ to: "+12125551212", callId: "call_live" }, fetchImpl), /example\.test/);
+    assert.equal(called, false);
+  } finally {
+    restore();
+  }
+});
+
 test("kill switch ends active sandbox calls without dialing", async () => {
   const stamp = Date.now().toString(36);
   const imported = importPortfolio({

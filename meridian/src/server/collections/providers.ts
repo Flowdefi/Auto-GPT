@@ -148,20 +148,20 @@ export async function deliverAllowedChannel(
   return null;
 }
 
-function stripeReturnOrigin(): string {
+export function livePublicOrigin(label: string): string {
   const raw = process.env.MERIDIAN_PUBLIC_URL?.trim() ?? "";
-  if (!raw) throw new Error("Live Stripe checkout needs MERIDIAN_PUBLIC_URL. example.test is not used.");
+  if (!raw) throw new Error(`${label} needs MERIDIAN_PUBLIC_URL. example.test is not used.`);
   let origin = "";
   try {
     const url = new URL(raw);
     origin = url.origin;
-    if (url.protocol !== "https:") throw new Error("Live Stripe checkout needs an https MERIDIAN_PUBLIC_URL.");
+    if (url.protocol !== "https:") throw new Error(`${label} needs an https MERIDIAN_PUBLIC_URL.`);
     if (!url.host || url.host === "example.test" || url.host.endsWith(".example.test")) {
-      throw new Error("Live Stripe checkout will not use example.test.");
+      throw new Error(`${label} will not use example.test.`);
     }
   } catch (error) {
-    if (error instanceof Error && error.message.includes("example.test")) throw error;
-    throw new Error("Live Stripe checkout needs an https MERIDIAN_PUBLIC_URL.");
+    if (error instanceof Error && (error.message.includes("example.test") || error.message.includes("MERIDIAN_PUBLIC_URL"))) throw error;
+    throw new Error(`${label} needs an https MERIDIAN_PUBLIC_URL.`);
   }
   return origin;
 }
@@ -173,7 +173,7 @@ export async function createStripeCheckout(input: { amountCents: number; referen
   }
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("Stripe key is missing");
-  const origin = stripeReturnOrigin();
+  const origin = livePublicOrigin("Live Stripe checkout");
   const params = new URLSearchParams({
     mode: "payment",
     success_url: `${origin}/collect/account`,

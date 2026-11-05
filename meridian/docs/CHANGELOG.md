@@ -33,6 +33,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - Live Stripe checkout uses MERIDIAN_PUBLIC_URL for the return page, refuses example.test, and does not send the account reference. Sandbox checkout still stays on the local payment page.
 - Live SendGrid, Postmark, and the weekly digest refuse a from address on example.test. Sandbox mail does not call the provider.
 - Live Twilio and Telnyx refuse a from number in the 555 test range. Sandbox SMS does not call the provider.
+- Live voice uses the same 555 from-number refusal and will not send the call webhook to example.test. Sandbox voice does not dial.
 
 ## Consumer, client, and public surfaces
 
