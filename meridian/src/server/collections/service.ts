@@ -1161,8 +1161,8 @@ export function validationPdfBase64(workspaceId: WorkspaceId, accountId: string)
   const end = account.validationMailedAt ? validationEndDate(account.validationMailedAt) : account.disputeDeadline || "";
   const pdf = modelFormPdf({
     agencyName: brandFor(workspaceId).name,
-    agencyAddress: "PO Box 100, Example City, OH 44101",
-    agencyPhone: "1-800-555-0199",
+    agencyAddress: "not supplied",
+    agencyPhone: "not supplied",
     noticeDate: (account.validationMailedAt || new Date().toISOString()).slice(0, 10),
     consumerName: account.consumerName,
     consumerAddress: `${account.state} ${account.zip}`,

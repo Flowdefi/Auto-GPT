@@ -117,10 +117,10 @@ export function modelFormPdf(fields: ModelFormFields): Uint8Array {
   write("[ ] I want you to send me the name and address of the original creditor.");
   y -= 8;
   write("Draft layout of 12 CFR Part 1006 Appendix B Model Form B-1. Counsel must compare it to the current CFPB form before mailing.", 8);
-  const omittedFigure = [fields.interestSince, fields.feesSince, fields.paymentsCreditsSince, fields.amountOnItemizationDate, fields.accountType].includes("not supplied");
+  const omittedFigure = [fields.interestSince, fields.feesSince, fields.paymentsCreditsSince, fields.amountOnItemizationDate, fields.accountType, fields.agencyAddress, fields.agencyPhone].includes("not supplied");
   if (omittedFigure) {
     y -= 12;
-    write("A missing itemization figure or account type shows not supplied. Do not treat it as zero.", 8);
+    write("A missing itemization figure, account type, address, or phone shows not supplied. Do not treat it as zero or as a real contact number.", 8);
   }
   const stream = commands.join("\n");
   const objects = [

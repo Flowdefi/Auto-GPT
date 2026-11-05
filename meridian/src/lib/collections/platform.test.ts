@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { scheduleSteps } from "./jobs";
 import { modelFormPdf } from "./model-form-pdf";
+import { mergeContext } from "./template-library";
 import { solFor } from "./sol";
 import { importPortfolio, saveSolRules, validationPdfBase64 } from "../../server/collections/service";
 import { enrollSequence, purgeExpiredIdentifiers, runDueJobs, saveSequence } from "../../server/collections/runner";
@@ -199,7 +200,15 @@ test("validation pdf does not invent interest or an account type", () => {
   const omitted = new TextDecoder().decode(Buffer.from(validationPdfBase64("triton", plainAccount.id), "base64"));
   assert.match(omitted, /Account type was/);
   assert.match(omitted, /Do not treat it as zero/);
+  assert.equal(omitted.includes("1-800-555-0199"), false);
+  assert.equal(omitted.includes("PO Box 100"), false);
   assert.equal(omitted.includes("+ $not supplied"), false);
+  const merged = mergeContext({ account: plainAccount, agencyName: "Example Agency" });
+  assert.equal(merged.values.agency_phone, "not supplied");
+  assert.equal(merged.values.account_type, "not supplied");
+  assert.equal(merged.values.original_creditor, "not supplied");
+  assert.equal(merged.values.itemization_date, "not supplied");
+  assert.equal(String(merged.values.consumer_mailing_address).includes("Example Street"), false);
   const supplied = importPortfolio({
     workspaceId: "triton",
     csv: `account_ref,consumer_name,consumer_state,zip,last4,balance,interest_since,fees_since,itemization_amount,payments_since\nPDF2-${stamp},Ada Example,OH,44101,4242,40.00,1.50,2.00,10.00,1.00\n`,

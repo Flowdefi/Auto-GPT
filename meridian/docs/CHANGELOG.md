@@ -26,6 +26,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - SMS uses the same 8:00 a.m.–9:00 p.m. local window as calls. An unknown ZIP blocks the text. Email and letters are not held for that clock. Counsel should confirm the SMS reading.
 - The validation PDF prints interest and account type as not supplied when the file omitted them. A supplied interest amount is printed. A missing interest figure is not shown as zero.
 - Fees, payments, and the itemization amount follow the same rule. A missing figure is not shown as zero. A supplied amount is printed.
+- Validation notices and letter merge no longer invent a phone number, a street address, a creditor, or an account type. Missing contact facts show not supplied.
 
 ## Consumer, client, and public surfaces
 
