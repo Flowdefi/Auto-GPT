@@ -877,10 +877,16 @@ export async function approveDraft(workspaceId: WorkspaceId, draftId: string, ap
   return approved;
 }
 
+export function refusePastLimitations(account: PortfolioAccount): void {
+  if (!limitationsDatePassed(account.solExpiresOn, new Date().toISOString())) return;
+  logEvent(account.workspaceId, "payment_portal", account.id, false, TIME_BARRED_HOLD);
+  throw new Error(TIME_BARRED_HOLD);
+}
+
 export function setupPaymentPlan(workspaceId: WorkspaceId, accountId: string, months: number, installmentCents: number): PortfolioAccount {
   const account = accounts(workspaceId).find((item) => item.id === accountId);
   if (!account) throw new Error("Account not found");
-  if (limitationsDatePassed(account.solExpiresOn, new Date().toISOString())) throw new Error(TIME_BARRED_HOLD);
+  refusePastLimitations(account);
   const decision = gateFor(workspaceId, account, "payment_portal");
   logEvent(workspaceId, "payment_portal", accountId, decision.allowed, decision.reason);
   if (!decision.allowed) throw new Error(decision.reason);
@@ -1136,7 +1142,7 @@ export function validationPdfBase64(workspaceId: WorkspaceId, accountId: string)
 export async function sandboxPayment(workspaceId: WorkspaceId, accountId: string, amountCents: number): Promise<ConsumerPayment> {
   const account = accounts(workspaceId).find((item) => item.id === accountId);
   if (!account) throw new Error("Account not found");
-  if (limitationsDatePassed(account.solExpiresOn, new Date().toISOString())) throw new Error(TIME_BARRED_HOLD);
+  refusePastLimitations(account);
   const decision = gateFor(workspaceId, account, "payment_portal");
   logEvent(workspaceId, "payment_portal", accountId, decision.allowed, decision.reason);
   if (!decision.allowed) throw new Error(decision.reason);
