@@ -3,6 +3,7 @@ import test from "node:test";
 import { POST } from "../../app/api/portal/route";
 import { reasonCode } from "./reason-code";
 import { TIME_BARRED_HOLD } from "./sol";
+import { fileComplaint } from "../../server/collections/complaint-store";
 import { deskMetrics, writeComplianceDigest } from "../../server/collections/observe";
 import type { DraftReply } from "./types";
 import { approveDraft, fileDispute, importPortfolio, openPortal, proposeDraft, recordConsent, sendChannel, setTemplateApproval, startVoice, syncCollectionTemplates, templateForWorkspace, turnVoice } from "../../server/collections/service";
@@ -79,6 +80,18 @@ test("a dispute keeps its words and redacts an identifier", () => {
   assert.match(updated.quarantineReason ?? "", /I dispute this debt/);
   assert.equal((updated.quarantineReason ?? "").includes("123-45-6789"), false);
   assert.equal((updated.quarantineReason ?? "").includes("4242424242424242"), false);
+});
+
+test("a complaint stores an identifier as redacted and still opens", () => {
+  const complaint = fileComplaint("triton", {
+    channel: "portal",
+    summary: "The letter was wrong. SSN 123-45-6789. Card 4242424242424242.",
+    rootCause: "communication",
+  });
+  assert.match(complaint.summary, /The letter was wrong/);
+  assert.equal(complaint.summary.includes("123-45-6789"), false);
+  assert.equal(complaint.summary.includes("4242424242424242"), false);
+  assert.ok(complaint.responseDueAt > complaint.receivedAt);
 });
 
 test("a draft and a voice turn store an identifier as redacted", async () => {

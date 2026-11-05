@@ -37,6 +37,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - Live Lob is not called. The account file stores state and ZIP only, not a street address. Sandbox letters still render and queue.
 - A Social Security number or card number typed into a dispute is stored as [redacted]. The dispute still stops outreach.
 - The same redaction applies to inbound draft text and to a spoken turn on a call. The other words stay.
+- A Social Security number or card number in a complaint summary is stored as [redacted]. The complaint still opens.
 
 ## Consumer, client, and public surfaces
 

@@ -1,7 +1,7 @@
 import type { WorkspaceId } from "@/lib/types";
 import { parseComplaintInput, responseDue, type Complaint, type ComplaintStatus } from "@/lib/collections/complaints";
 import { loadDb, mutate, nextId } from "@/server/db";
-import { logEvent } from "@/server/log";
+import { logEvent, redactIdentifiers } from "@/server/log";
 
 export function fileComplaint(workspaceId: WorkspaceId, input: Parameters<typeof parseComplaintInput>[0]): Complaint {
   const parsed = parseComplaintInput(input);
@@ -10,6 +10,7 @@ export function fileComplaint(workspaceId: WorkspaceId, input: Parameters<typeof
     id: nextId("cmp"),
     workspaceId,
     ...parsed,
+    summary: redactIdentifiers(parsed.summary).slice(0, 2000),
     status: "open",
     receivedAt,
     responseDueAt: responseDue(receivedAt),

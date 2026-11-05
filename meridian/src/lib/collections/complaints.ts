@@ -44,9 +44,6 @@ export function parseComplaintInput(input: {
 }): { channel: ComplaintChannel; accountRef: string; summary: string; cfpbId: string | null; rootCause: ComplaintCause } {
   const summary = (input.summary ?? "").trim();
   if (summary.length < 5 || summary.length > 2000) throw new Error("Describe the complaint in 5 to 2000 characters.");
-  if (/\b\d{3}-?\d{2}-?\d{4}\b/.test(summary) || /\b(?:\d[ -]*?){13,19}\b/.test(summary)) {
-    throw new Error("Do not include a Social Security number or a card number.");
-  }
   const channel = CHANNELS.has(input.channel as ComplaintChannel) ? (input.channel as ComplaintChannel) : "other";
   const rootCause = CAUSES.has(input.rootCause as ComplaintCause) ? (input.rootCause as ComplaintCause) : "other";
   const accountRef = (input.accountRef ?? "").trim().slice(0, 40);
