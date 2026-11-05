@@ -116,16 +116,9 @@ export async function deliverEmail(input: { to: string; subject: string; body: s
 
 export async function deliverLetter(input: { toName: string; body: string }, fetchImpl: FetchLike = fetch): Promise<DeliveryResult> {
   if (!liveDeliveryEnabled() || letterProvider() === "sandbox") return sandboxId("letter");
-  const key = process.env.LOB_API_KEY;
-  if (!key) throw new Error("Lob key is missing");
-  const response = await fetchImpl("https://api.lob.com/v1/letters", {
-    method: "POST",
-    headers: { Authorization: `Basic ${Buffer.from(`${key}:`).toString("base64")}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ description: input.toName, file: input.body, color: false }),
-  });
-  if (!response.ok) throw new Error(`Lob send failed (${response.status})`);
-  const payload = (await response.json()) as { id?: string };
-  return { provider: "lob", providerId: payload.id ?? "lob", sandbox: false };
+  void input;
+  void fetchImpl;
+  throw new Error("Live letters stay off. The account file stores state and ZIP only, not a street address, so Lob is not called.");
 }
 
 export async function deliverAllowedChannel(

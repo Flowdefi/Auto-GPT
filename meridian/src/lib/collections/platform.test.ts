@@ -6,7 +6,7 @@ import { mergeContext } from "./template-library";
 import { solFor } from "./sol";
 import { importPortfolio, saveSolRules, setOperatorRole, validationPdfBase64 } from "../../server/collections/service";
 import { enrollSequence, purgeExpiredIdentifiers, runDueJobs, saveSequence } from "../../server/collections/runner";
-import { createStripeCheckout, deliverAllowedChannel, deliverEmail, deliverSms } from "../../server/collections/providers";
+import { createStripeCheckout, deliverAllowedChannel, deliverEmail, deliverLetter, deliverSms } from "../../server/collections/providers";
 import { writeComplianceDigest } from "../../server/collections/observe";
 import { brandFor } from "../../server/brand";
 import { applySmsKeyword, reconcileProviderPayment } from "../../server/collections/webhooks";
@@ -256,6 +256,39 @@ test("live mail refuses an example.test from address", async () => {
     assert.match(body, /compliance@collect\.example/);
     assert.equal(body.includes("example.test"), false);
     assert.equal(sent.summary.includes("@"), false);
+  } finally {
+    restore();
+  }
+});
+
+test("live letters stay off without a street address", async () => {
+  const previous = {
+    deliver: process.env.MERIDIAN_CHANNEL_DELIVER,
+    letter: process.env.MERIDIAN_LETTER_PROVIDER,
+    key: process.env.LOB_API_KEY,
+  };
+  const restore = () => {
+    if (previous.deliver === undefined) delete process.env.MERIDIAN_CHANNEL_DELIVER;
+    else process.env.MERIDIAN_CHANNEL_DELIVER = previous.deliver;
+    if (previous.letter === undefined) delete process.env.MERIDIAN_LETTER_PROVIDER;
+    else process.env.MERIDIAN_LETTER_PROVIDER = previous.letter;
+    if (previous.key === undefined) delete process.env.LOB_API_KEY;
+    else process.env.LOB_API_KEY = previous.key;
+  };
+  let called = false;
+  const fetchImpl = async () => {
+    called = true;
+    return { ok: true, status: 200, json: async () => ({ id: "ltr_example" }), text: async () => "" };
+  };
+  try {
+    const sandbox = await deliverLetter({ toName: "Ada Example", body: "Notice" }, fetchImpl);
+    assert.equal(sandbox.sandbox, true);
+    assert.equal(called, false);
+    process.env.MERIDIAN_CHANNEL_DELIVER = "live";
+    process.env.MERIDIAN_LETTER_PROVIDER = "lob";
+    process.env.LOB_API_KEY = "test_key";
+    await assert.rejects(() => deliverLetter({ toName: "Ada Example", body: "Notice" }, fetchImpl), /street address/);
+    assert.equal(called, false);
   } finally {
     restore();
   }
