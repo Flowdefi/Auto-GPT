@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
 import { clientIp, rateLimited, tooMany } from "@/server/rate-limit";
-import { fileDispute, openPortal, portalAccount, sandboxPayment } from "@/server/collections/service";
+import { ensureValidationNotice, fileDispute, openPortal, portalAccount, sandboxPayment, setupPaymentPlan } from "@/server/collections/service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -30,6 +30,7 @@ export async function POST(request: Request) {
     zip?: string;
     text?: string;
     amountCents?: number;
+    months?: number;
   };
   try {
     if (body.op === "lookup") {
@@ -49,6 +50,14 @@ export async function POST(request: Request) {
       const payment = sandboxPayment(account.workspaceId, account.id, body.amountCents ?? account.balanceCents);
       const paid = portalAccount(tokenFrom(request));
       return NextResponse.json({ payment, account: paid });
+    }
+    if (body.op === "plan") {
+      const updated = setupPaymentPlan(account.workspaceId, account.id, body.months ?? 0, body.amountCents ?? 0);
+      return NextResponse.json({ account: updated });
+    }
+    if (body.op === "notice") {
+      const updated = ensureValidationNotice(account.workspaceId, account.id);
+      return NextResponse.json({ account: updated });
     }
     return NextResponse.json({ error: "Unknown op" }, { status: 400 });
   } catch (error) {

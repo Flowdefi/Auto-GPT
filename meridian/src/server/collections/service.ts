@@ -385,6 +385,16 @@ export function turnVoice(workspaceId: WorkspaceId, callId: string, turn: Consum
         { id: nextId("dnc"), workspaceId, accountId: account.id, phoneLast4: account.phoneLast4, reason: "cease on call", at: new Date().toISOString() },
       ];
     }
+    if (account && (stepped.transferred || stepped.disposition === "hardship")) {
+      const title = stepped.transferred ? "Warm transfer from sandbox voice call" : "Review hardship noted on a call";
+      const already = (state.collectorTasks ?? []).some((task) => task.accountId === account.id && task.title === title && task.status === "open");
+      if (!already) {
+        state.collectorTasks = [
+          { id: nextId("task"), workspaceId, accountId: account.id, title, queue: "collector", status: "open", createdAt: new Date().toISOString() },
+          ...(state.collectorTasks ?? []),
+        ];
+      }
+    }
   });
   return { ...updated, say: stepped.say, transcript: stepped.transcript, paymentUrl: stepped.paymentUrl };
 }
@@ -697,6 +707,47 @@ export function approveDraft(workspaceId: WorkspaceId, draftId: string, approve:
     state.draftReplies = (state.draftReplies ?? []).map((item) => (item.id === draftId ? approved : item));
   });
   return approved;
+}
+
+export function setupPaymentPlan(workspaceId: WorkspaceId, accountId: string, months: number, installmentCents: number): PortfolioAccount {
+  const account = accounts(workspaceId).find((item) => item.id === accountId);
+  if (!account) throw new Error("Account not found");
+  const decision = gateFor(workspaceId, account, "payment_portal");
+  logEvent(workspaceId, "payment_portal", accountId, decision.allowed, decision.reason);
+  if (!decision.allowed) throw new Error(decision.reason);
+  const maxMonths = loadDb().voiceSettings?.maxPlanMonths ?? 12;
+  if (!Number.isInteger(months) || months < 1 || months > maxMonths) {
+    throw new Error(`A plan must be 1 to ${maxMonths} months.`);
+  }
+  if (!Number.isInteger(installmentCents) || installmentCents < 100) {
+    throw new Error("Each installment must be at least $1.00.");
+  }
+  if (installmentCents * months > account.balanceCents) {
+    throw new Error("The plan total cannot exceed the current balance.");
+  }
+  const updated: PortfolioAccount = {
+    ...account,
+    paymentPlan: { months, installmentCents, createdAt: new Date().toISOString(), provider: "sandbox" },
+  };
+  mutate((db) => {
+    db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) => (item.id === accountId ? updated : item));
+  });
+  return publicAccount(updated);
+}
+
+export function ensureValidationNotice(workspaceId: WorkspaceId, accountId: string): PortfolioAccount {
+  const account = accounts(workspaceId).find((item) => item.id === accountId);
+  if (!account) throw new Error("Account not found");
+  if (account.validationNotice) return publicAccount(account);
+  return issueValidation(workspaceId, accountId);
+}
+
+export function completeTask(workspaceId: WorkspaceId, taskId: string): void {
+  mutate((db) => {
+    db.collectorTasks = (db.collectorTasks ?? []).map((task) =>
+      task.workspaceId === workspaceId && task.id === taskId ? { ...task, status: "done" } : task,
+    );
+  });
 }
 
 export function sandboxPayment(workspaceId: WorkspaceId, accountId: string, amountCents: number): ConsumerPayment {

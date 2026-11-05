@@ -8,6 +8,7 @@ import { solFor } from "./sol";
 import { withinCallingWindow } from "./time";
 import type { PortfolioAccount, VoiceSettings } from "./types";
 import { totp, verifyTotp } from "../../server/totp";
+import { importPortfolio, setupPaymentPlan } from "../../server/collections/service";
 import { emptyTranscript, redactSensitive, stepCall } from "./voice";
 
 const settings: VoiceSettings = {
@@ -181,8 +182,38 @@ test("voice flow withholds the debt until two identifiers match and will not sto
     agency: "Triton",
   });
   assert.equal(pay.paymentUrl, "https://example.test/pay");
+  const transfer = stepCall({
+    transcript: verified.transcript,
+    turn: { type: "transfer" },
+    account: account({}),
+    settings,
+    at: "2026-11-05T18:04:00.000Z",
+    paymentUrl: "https://example.test/pay",
+    agency: "Triton",
+  });
+  assert.equal(transfer.transferred, true);
+  assert.equal(transfer.disposition, "warm_transfer");
   assert.equal(JSON.stringify(pay.transcript).includes("4242424242424242"), false);
   assert.equal(redactSensitive("4242424242424242").hadCard, true);
   const code = totp("JBSWY3DPEHPK3PXP", 1_700_000_000_000);
   assert.equal(verifyTotp("JBSWY3DPEHPK3PXP", code, 1_700_000_000_000), true);
+});
+
+test("sandbox payment plan stays inside the balance and the month cap", () => {
+  const imported = importPortfolio({
+    workspaceId: "triton",
+    portfolioId: "pf_plan",
+    csv: "account_ref,consumer_name,consumer_state,zip,last4,portal_code,phone_type,seller,balance\nPLAN-1,Example Planner,OH,44101,1111,PL11,landline,Sample Seller,100.00\nCA-PLAN,Example Planner,CA,90001,2222,CA22,cell,Sample Seller,40\n",
+  });
+  const ohio = imported.accounts.find((item) => item.accountRef === "PLAN-1");
+  const california = imported.accounts.find((item) => item.accountRef === "CA-PLAN");
+  assert.ok(ohio);
+  assert.equal(ohio.status, "workable");
+  assert.equal(california?.status, "quarantined");
+  const plan = setupPaymentPlan("triton", ohio.id, 4, 2000);
+  assert.equal(plan.paymentPlan?.months, 4);
+  assert.equal(plan.paymentPlan?.installmentCents, 2000);
+  assert.throws(() => setupPaymentPlan("triton", ohio.id, 40, 2000), /1 to/);
+  assert.throws(() => setupPaymentPlan("triton", ohio.id, 4, 5000), /cannot exceed/);
+  if (california) assert.throws(() => setupPaymentPlan("triton", california.id, 2, 1000), /not eligible/);
 });

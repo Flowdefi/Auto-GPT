@@ -5,6 +5,7 @@ import type { ConsumerTurn } from "@/lib/collections/voice";
 import { isWorkspaceId } from "@/lib/workspace-id";
 import { requireSeat } from "@/server/api-guard";
 import {
+  completeTask,
   collectionSnapshot,
   approveDraft,
   collectionReport,
@@ -69,6 +70,7 @@ export async function POST(request: Request) {
     turn?: ConsumerTurn;
     body?: string;
     templateId?: string;
+    taskId?: string;
     xlsxBase64?: string;
     fixedWidth?: string;
     widths?: WidthField[];
@@ -187,6 +189,10 @@ export async function POST(request: Request) {
       case "pay":
         if (!body.accountId || !body.amountCents) return NextResponse.json({ error: "accountId and amountCents required" }, { status: 400 });
         return NextResponse.json({ payment: sandboxPayment(body.workspaceId, body.accountId, body.amountCents) });
+      case "complete_task":
+        if (!body.taskId) return NextResponse.json({ error: "taskId required" }, { status: 400 });
+        completeTask(body.workspaceId, body.taskId);
+        return NextResponse.json({ ok: true });
       case "report":
         return NextResponse.json(collectionReport(body.workspaceId));
       case "purge_pii":

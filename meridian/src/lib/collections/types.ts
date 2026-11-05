@@ -71,6 +71,7 @@ export interface PortfolioAccount {
   validationMailedAt?: string | null;
   disputeDeadline?: string | null;
   validationNotice?: string | null;
+  paymentPlan?: { months: number; installmentCents: number; createdAt: string; provider: "sandbox" } | null;
   employerEmail?: boolean;
   hardshipReported?: boolean;
   attorneyName?: string;

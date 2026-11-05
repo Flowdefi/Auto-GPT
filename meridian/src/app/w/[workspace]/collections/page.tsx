@@ -32,6 +32,10 @@ export default function CollectionsDeskPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [live, setLive] = useState<LiveCall | null>(null);
   const [accountId, setAccountId] = useState("");
+  const [partyName, setPartyName] = useState("");
+  const [partyLast4, setPartyLast4] = useState("");
+  const [partyZip, setPartyZip] = useState("");
+  const [consumerLine, setConsumerLine] = useState("");
 
   async function refresh() {
     const response = await fetch(`/api/collections?workspace=${workspaceId}`);
@@ -161,13 +165,22 @@ export default function CollectionsDeskPage() {
                 {account.quarantineReason}
               </p>
             ) : null}
+            <p>{data.accounts.filter((item) => item.status === "quarantined" || item.status === "returned").length} accounts are quarantined or returned and are not worked.</p>
           </Card>
           <Card className="space-y-3 p-5 text-sm">
-            <div className="font-semibold">Call</div>
+            <div className="font-semibold">Sandbox voice call</div>
+            <p className="text-muted-foreground">No audio leaves this server. Outbound dials only after the gate allows them. Cell calls need recorded consent and a reassigned-number result.</p>
             {live ? (
               <>
-                <p>{live.blockedReason ? <Badge tone="bad">Blocked</Badge> : <Badge>{live.phase}</Badge>} {live.say}</p>
-                <div className="max-h-64 space-y-2 overflow-auto">
+                <p>{live.blockedReason ? <Badge tone="bad">Blocked</Badge> : <Badge>{live.phase}</Badge>} {live.direction} · {live.say}</p>
+                <ul className="grid gap-1 text-xs">
+                  <li>AI disclosure: {live.transcript?.aiDisclosed ? "said" : "missing"}</li>
+                  <li>Recording notice: {live.transcript?.recordingAnnounced ? "said" : "missing"}</li>
+                  <li>Recording consent: {live.transcript?.recordingConsent === null ? "waiting" : live.transcript?.recordingConsent ? "yes" : "no"}</li>
+                  <li>Right party: {live.transcript?.verified ? "verified" : "not verified"}</li>
+                  <li>Mini-Miranda: {live.transcript?.debtDisclosed ? "given after verification" : "withheld"}</li>
+                </ul>
+                <div className="max-h-64 space-y-2 overflow-auto rounded-xl bg-muted p-3">
                   {live.transcript?.turns.map((turn, index) => (
                     <p key={`${turn.at}-${index}`}>
                       <span className="font-medium">{turn.role}: </span>
@@ -176,31 +189,53 @@ export default function CollectionsDeskPage() {
                   ))}
                 </div>
                 {live.qaFlags?.length ? <p>QA: {live.qaFlags.map((flag) => flag.code).join(", ")}</p> : null}
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    tone="soft"
-                    onClick={() =>
-                      void post({
-                        op: "voice_turn",
-                        callId: live.id,
-                        turn: { type: "verify", name: account?.consumerName ?? "", checks: [{ kind: "last4", value: account?.last4 ?? "" }, { kind: "zip", value: account?.zip ?? "" }] },
-                      }).then((body) => {
-                        if (body && "id" in body) setLive(body);
-                      })
-                    }
-                  >
-                    Verify right party
-                  </Button>
-                  <Button tone="soft" onClick={() => void post({ op: "voice_turn", callId: live.id, turn: { type: "transfer" } }).then((body) => body && "id" in body && setLive(body))}>
-                    Transfer to person
-                  </Button>
-                  <Button tone="soft" onClick={() => void post({ op: "voice_turn", callId: live.id, turn: { type: "say", text: "Please stop calling" } }).then((body) => body && "id" in body && setLive(body))}>
-                    Cease
-                  </Button>
-                </div>
+                {live.phase === "greeting" ? (
+                  <div className="flex gap-2">
+                    <Button onClick={() => void post({ op: "voice_turn", callId: live.id, turn: { type: "consent", accepted: true } }).then((body) => body && "id" in body && setLive(body))}>Consent to recording</Button>
+                    <Button tone="soft" onClick={() => void post({ op: "voice_turn", callId: live.id, turn: { type: "consent", accepted: false } }).then((body) => body && "id" in body && setLive(body))}>Decline</Button>
+                  </div>
+                ) : null}
+                {live.phase === "identify" ? (
+                  <div className="grid gap-2">
+                    <input className="min-h-11 rounded-xl border bg-transparent px-3" placeholder="Name on the account" value={partyName} onChange={(event) => setPartyName(event.target.value)} aria-label="Name on the account" />
+                    <input className="min-h-11 rounded-xl border bg-transparent px-3" placeholder="Last four" value={partyLast4} onChange={(event) => setPartyLast4(event.target.value)} aria-label="Last four" />
+                    <input className="min-h-11 rounded-xl border bg-transparent px-3" placeholder="ZIP" value={partyZip} onChange={(event) => setPartyZip(event.target.value)} aria-label="ZIP" />
+                    <Button
+                      onClick={() =>
+                        void post({
+                          op: "voice_turn",
+                          callId: live.id,
+                          turn: { type: "verify", name: partyName, checks: [{ kind: "last4", value: partyLast4 }, { kind: "zip", value: partyZip }] },
+                        }).then((body) => {
+                          if (body && "id" in body) setLive(body);
+                        })
+                      }
+                    >
+                      Verify right party
+                    </Button>
+                  </div>
+                ) : null}
+                {live.phase === "assist" || live.phase === "payment" ? (
+                  <div className="grid gap-2">
+                    <textarea className="min-h-20 rounded-xl border bg-transparent p-3" placeholder="What the consumer says" value={consumerLine} onChange={(event) => setConsumerLine(event.target.value)} aria-label="Consumer reply" />
+                    <div className="flex flex-wrap gap-2">
+                      <Button onClick={() => void post({ op: "voice_turn", callId: live.id, turn: { type: "say", text: consumerLine || "I want to pay" } }).then((body) => body && "id" in body && setLive(body))}>Send reply</Button>
+                      <Button tone="soft" onClick={() => void post({ op: "voice_turn", callId: live.id, turn: { type: "transfer" } }).then((body) => body && "id" in body && setLive(body))}>Warm transfer</Button>
+                    </div>
+                  </div>
+                ) : null}
+                {live.paymentUrl ? (
+                  <p>
+                    Hosted payment page:{" "}
+                    <a className="underline" href={live.paymentUrl}>
+                      {live.paymentUrl}
+                    </a>
+                  </p>
+                ) : null}
+                {live.transferred ? <p>Warm transfer opened a collector task. No card number was taken.</p> : null}
               </>
             ) : (
-              <p>Start a sandbox call. The gate result is stored even when the call is blocked.</p>
+              <p>Start a sandbox inbound or outbound call. A blocked outbound attempt is stored with the gate reason.</p>
             )}
           </Card>
           <Card className="space-y-3 p-5 text-sm lg:col-span-2">

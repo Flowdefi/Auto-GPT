@@ -12,6 +12,8 @@ export default function CollectAccountPage() {
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ConsumerPayment | null>(null);
   const [dispute, setDispute] = useState("I dispute this debt.");
+  const [months, setMonths] = useState("4");
+  const [installment, setInstallment] = useState("25");
 
   useEffect(() => {
     void fetch("/api/portal")
@@ -41,6 +43,45 @@ export default function CollectAccountPage() {
     }
     setReceipt(body.payment);
     if (body.account) setAccount(body.account);
+  }
+
+  async function savePlan(event: FormEvent) {
+    event.preventDefault();
+    if (!account) return;
+    setError(null);
+    const response = await fetch("/api/portal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ op: "plan", months: Number(months), amountCents: Math.round(Number(installment) * 100) }),
+    });
+    const body = (await response.json()) as { error?: string; account?: PortfolioAccount };
+    if (!response.ok || !body.account) {
+      setError(body.error ?? "Plan was not saved");
+      return;
+    }
+    setAccount(body.account);
+  }
+
+  async function downloadNotice() {
+    setError(null);
+    const response = await fetch("/api/portal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ op: "notice" }),
+    });
+    const body = (await response.json()) as { error?: string; account?: PortfolioAccount };
+    if (!response.ok || !body.account?.validationNotice) {
+      setError(body.error ?? "Validation notice was not issued");
+      return;
+    }
+    setAccount(body.account);
+    const blob = new Blob([body.account.validationNotice], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "validation-notice.txt";
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   async function sendDispute(event: FormEvent) {
@@ -86,13 +127,30 @@ export default function CollectAccountPage() {
         <p>Chain of title: {account.chainOfTitle || "not supplied"}</p>
         <p>Limitations date on file: {account.solExpiresOn || "not calculated"} {account.solNeedsCounselReview ? "(counsel review)" : ""}</p>
       </section>
-      {account.validationNotice ? (
-        <a className="mt-4 inline-block text-sm underline" href={`data:text/plain,${encodeURIComponent(account.validationNotice)}`} download="validation-notice.txt">
-          Download validation notice
-        </a>
-      ) : (
-        <p className="mt-4 text-sm">A validation notice has not been issued on this account yet.</p>
-      )}
+      <button className="mt-4 min-h-11 underline" type="button" onClick={() => void downloadNotice()}>
+        Download validation notice
+      </button>
+      {account.disputeDeadline ? <p className="text-sm">Validation period ends {account.disputeDeadline}.</p> : null}
+      <form onSubmit={(event) => void savePlan(event)} className="mt-6 grid gap-2">
+        <h2 className="font-semibold">Payment plan</h2>
+        <p className="text-sm">Test mode only. The plan total cannot exceed the balance, and no card is stored.</p>
+        {account.paymentPlan ? (
+          <p className="text-sm">
+            Current plan: {account.paymentPlan.months} payments of {money(account.paymentPlan.installmentCents)}.
+          </p>
+        ) : null}
+        <label className="grid gap-1 text-sm">
+          Months
+          <input className="min-h-11 rounded-xl border px-3" inputMode="numeric" value={months} onChange={(event) => setMonths(event.target.value)} />
+        </label>
+        <label className="grid gap-1 text-sm">
+          Each payment in dollars
+          <input className="min-h-11 rounded-xl border px-3" inputMode="decimal" value={installment} onChange={(event) => setInstallment(event.target.value)} />
+        </label>
+        <button className="min-h-11 rounded-xl border px-4" type="submit">
+          Save test-mode plan
+        </button>
+      </form>
       <button className="mt-6 min-h-11 rounded-xl bg-black px-4 text-white" type="button" onClick={() => void pay()}>
         Pay $25.00 in test mode
       </button>

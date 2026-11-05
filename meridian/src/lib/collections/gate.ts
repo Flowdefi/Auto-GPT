@@ -69,15 +69,14 @@ const DEBT_WORDS = /\b(debt|owe|owing|balance|past due|collection|collector|deli
 
 export function evaluateGate(ctx: GateContext): GateDecision {
   const { channel, settings, account } = ctx;
-  const outbound = OUTBOUND.has(channel) || channel === "payment_portal";
 
-  if (settings.killSwitch && outbound) {
-    return block("Outbound kill switch is on.", "Owner control. Inbound answering stays available unless block-inbound is also on.");
+  if (settings.killSwitch && OUTBOUND.has(channel)) {
+    return block("Outbound kill switch is on.", "Owner control. Inbound answering and a consumer-started payment stay available.");
   }
   if (settings.blockInbound && channel === "voice_inbound") {
     return block("Inbound voice is switched off.", "Owner control.");
   }
-  if (outbound && ctx.campaignSentToday >= settings.dailyOutboundCap) {
+  if (OUTBOUND.has(channel) && ctx.campaignSentToday >= settings.dailyOutboundCap) {
     return block(`Daily outbound cap of ${settings.dailyOutboundCap} is reached.`, "Owner control.");
   }
   if (!account) {
