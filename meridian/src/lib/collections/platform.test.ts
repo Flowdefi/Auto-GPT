@@ -6,7 +6,7 @@ import { mergeContext } from "./template-library";
 import { solFor } from "./sol";
 import { importPortfolio, saveSolRules, validationPdfBase64 } from "../../server/collections/service";
 import { enrollSequence, purgeExpiredIdentifiers, runDueJobs, saveSequence } from "../../server/collections/runner";
-import { deliverAllowedChannel, deliverSms } from "../../server/collections/providers";
+import { createStripeCheckout, deliverAllowedChannel, deliverSms } from "../../server/collections/providers";
 import { brandFor } from "../../server/brand";
 import { applySmsKeyword, reconcileProviderPayment } from "../../server/collections/webhooks";
 import { roleRequiresMfa } from "../../server/mfa-policy";
@@ -131,6 +131,56 @@ test("sandbox providers do not call the network and webhooks record STOP", async
     else process.env.TWILIO_AUTH_TOKEN = previous.token;
     if (previous.from === undefined) delete process.env.TWILIO_FROM;
     else process.env.TWILIO_FROM = previous.from;
+  }
+});
+
+test("live stripe checkout refuses example.test and omits the account reference", async () => {
+  const previous = {
+    deliver: process.env.MERIDIAN_CHANNEL_DELIVER,
+    pay: process.env.MERIDIAN_PAYMENTS_PROVIDER,
+    key: process.env.STRIPE_SECRET_KEY,
+    url: process.env.MERIDIAN_PUBLIC_URL,
+  };
+  const restore = () => {
+    if (previous.deliver === undefined) delete process.env.MERIDIAN_CHANNEL_DELIVER;
+    else process.env.MERIDIAN_CHANNEL_DELIVER = previous.deliver;
+    if (previous.pay === undefined) delete process.env.MERIDIAN_PAYMENTS_PROVIDER;
+    else process.env.MERIDIAN_PAYMENTS_PROVIDER = previous.pay;
+    if (previous.key === undefined) delete process.env.STRIPE_SECRET_KEY;
+    else process.env.STRIPE_SECRET_KEY = previous.key;
+    if (previous.url === undefined) delete process.env.MERIDIAN_PUBLIC_URL;
+    else process.env.MERIDIAN_PUBLIC_URL = previous.url;
+  };
+  process.env.MERIDIAN_CHANNEL_DELIVER = "sandbox";
+  const sandbox = await createStripeCheckout({ amountCents: 100, reference: "ACCT-900" });
+  assert.match(sandbox.url, /^\/pay\/sandbox\//);
+  process.env.MERIDIAN_CHANNEL_DELIVER = "live";
+  process.env.MERIDIAN_PAYMENTS_PROVIDER = "stripe";
+  process.env.STRIPE_SECRET_KEY = "sk_test_example";
+  delete process.env.MERIDIAN_PUBLIC_URL;
+  let called = false;
+  const fetchImpl = async () => {
+    called = true;
+    return { ok: true, status: 200, json: async () => ({ id: "cs_example", url: "https://checkout.stripe.com/c/pay/cs_example" }), text: async () => "" };
+  };
+  try {
+    await assert.rejects(() => createStripeCheckout({ amountCents: 100, reference: "ACCT-900" }, fetchImpl), /MERIDIAN_PUBLIC_URL/);
+    assert.equal(called, false);
+    process.env.MERIDIAN_PUBLIC_URL = "https://example.test";
+    await assert.rejects(() => createStripeCheckout({ amountCents: 100, reference: "ACCT-900" }, fetchImpl), /example\.test/);
+    assert.equal(called, false);
+    process.env.MERIDIAN_PUBLIC_URL = "https://collect.example";
+    let body = "";
+    const result = await createStripeCheckout({ amountCents: 2500, reference: "ACCT-900" }, async (_url, init) => {
+      body = String(init?.body ?? "");
+      return fetchImpl();
+    });
+    assert.match(body, /success_url=https%3A%2F%2Fcollect\.example%2Fcollect%2Faccount/);
+    assert.equal(body.includes("ACCT-900"), false);
+    assert.equal(body.includes("example.test"), false);
+    assert.equal(result.sandbox, false);
+  } finally {
+    restore();
   }
 });
 

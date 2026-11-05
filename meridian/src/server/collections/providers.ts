@@ -131,6 +131,24 @@ export async function deliverAllowedChannel(
   return null;
 }
 
+function stripeReturnOrigin(): string {
+  const raw = process.env.MERIDIAN_PUBLIC_URL?.trim() ?? "";
+  if (!raw) throw new Error("Live Stripe checkout needs MERIDIAN_PUBLIC_URL. example.test is not used.");
+  let origin = "";
+  try {
+    const url = new URL(raw);
+    origin = url.origin;
+    if (url.protocol !== "https:") throw new Error("Live Stripe checkout needs an https MERIDIAN_PUBLIC_URL.");
+    if (!url.host || url.host === "example.test" || url.host.endsWith(".example.test")) {
+      throw new Error("Live Stripe checkout will not use example.test.");
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("example.test")) throw error;
+    throw new Error("Live Stripe checkout needs an https MERIDIAN_PUBLIC_URL.");
+  }
+  return origin;
+}
+
 export async function createStripeCheckout(input: { amountCents: number; reference: string }, fetchImpl: FetchLike = fetch): Promise<DeliveryResult & { url: string }> {
   if (!liveDeliveryEnabled() || paymentsProvider() === "sandbox") {
     const sandbox = sandboxId("pay");
@@ -138,14 +156,15 @@ export async function createStripeCheckout(input: { amountCents: number; referen
   }
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("Stripe key is missing");
+  const origin = stripeReturnOrigin();
   const params = new URLSearchParams({
     mode: "payment",
-    success_url: "https://example.test/collect/account",
-    cancel_url: "https://example.test/collect/account",
+    success_url: `${origin}/collect/account`,
+    cancel_url: `${origin}/collect/account`,
     "line_items[0][quantity]": "1",
     "line_items[0][price_data][currency]": "usd",
     "line_items[0][price_data][unit_amount]": String(input.amountCents),
-    "line_items[0][price_data][product_data][name]": `Account ${input.reference}`,
+    "line_items[0][price_data][product_data][name]": "Payment",
   });
   const response = await fetchImpl("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",

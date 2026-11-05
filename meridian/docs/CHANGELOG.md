@@ -30,6 +30,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - The consumer portal shows not supplied for an omitted itemization amount, interest, payment, credit, or fee. A stored zero still shows as $0.00.
 - Letter merge no longer invents example.test, a collector name, or a $25 plan minimum. A saved agency domain is still used for the portal link.
 - The validation PDF says its Spanish request line is an ASCII draft and is not the CFPB Spanish model form.
+- Live Stripe checkout uses MERIDIAN_PUBLIC_URL for the return page, refuses example.test, and does not send the account reference. Sandbox checkout still stays on the local payment page.
 
 ## Consumer, client, and public surfaces
 
