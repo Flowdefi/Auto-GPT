@@ -270,6 +270,24 @@ test("an email unsubscribe suppresses that workspace and leaves the other alone"
   assert.equal((open.reason ?? "").includes("suppressed"), false);
 });
 
+test("a channel send stores an identifier as redacted", async () => {
+  const stamp = Date.now().toString(36);
+  const imported = importPortfolio({
+    workspaceId: "triton",
+    csv: `account_ref,consumer_name,consumer_state,zip,last4,balance\nCHN-${stamp},Ada Example,OH,44101,4242,40.00\n`,
+  });
+  const account = imported.accounts.find((item) => item.accountRef === `CHN-${stamp}`);
+  assert.ok(account);
+  const email = await sendChannel({
+    workspaceId: "triton",
+    accountId: account.id,
+    channel: "email",
+    body: "Hello from the desk. SSN 123-45-6789.",
+  });
+  assert.match(email.bodyPreview ?? "", /Hello from the desk/);
+  assert.equal((email.bodyPreview ?? "").includes("123-45-6789"), false);
+});
+
 test("an ad-hoc email gets a draft mini-Miranda and voicemail does not", async () => {
   const stamp = Date.now().toString(36);
   const imported = importPortfolio({

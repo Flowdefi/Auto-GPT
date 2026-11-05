@@ -582,7 +582,7 @@ export async function sendChannel(input: {
     }
     rendered = [renderMustache(template.subject, context.values), renderMustache(template.body, context.values)].filter(Boolean).join("\n\n");
   }
-  rendered = draftDisclosure(input.channel, rendered);
+  rendered = draftDisclosure(input.channel, redactIdentifiers(rendered));
   const outgoing = { ...input, body: rendered };
   const decision = gateFor(
     input.workspaceId,
@@ -638,7 +638,7 @@ function storeMessage(
     provider,
     providerId,
     at: new Date().toISOString(),
-    bodyPreview: input.body?.slice(0, 500) ?? null,
+    bodyPreview: input.body ? redactIdentifiers(input.body).slice(0, 500) : null,
   };
   mutate((db) => {
     db.channelMessages = [message, ...(db.channelMessages ?? [])].slice(0, 400);

@@ -39,6 +39,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - The same redaction applies to inbound draft text and to a spoken turn on a call. The other words stay.
 - A Social Security number or card number in a complaint summary is stored as [redacted]. The complaint still opens.
 - After-call notes redact a Social Security number or card number before the note is encrypted. The other words stay.
+- An outbound SMS, email, or letter stores and sends a Social Security number or card number as [redacted]. The other words stay.
 
 ## Consumer, client, and public surfaces
 
