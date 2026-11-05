@@ -12,8 +12,7 @@ export default function AgencyHomePage() {
   const name = currentBrand().name;
   return (
     <article>
-      <p className="text-sm">Draft for counsel review. Not legal advice.</p>
-      <h1 className="mt-3 text-4xl font-semibold leading-tight">{name}</h1>
+      <h1 className="text-4xl font-semibold leading-tight">{name}</h1>
       <p className="mt-4 text-lg leading-7">
         This is a debt collector. We will use any information you give us to help collect a debt. This sentence is the federal mini-Miranda and counsel must approve it before it is published. 15 U.S.C. § 1692e(11); 12 CFR § 1006.18.
       </p>

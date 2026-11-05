@@ -35,7 +35,10 @@ export default function AgencyLayout({ children }: { children: ReactNode }) {
           </nav>
         </details>
       </header>
-      <main id="agency-main" className="mx-auto max-w-3xl px-4 py-8">{children}</main>
+      <main id="agency-main" className="mx-auto max-w-3xl px-4 py-8">
+        <p className="mb-6 text-sm">Draft for counsel review. Not legal advice.</p>
+        {children}
+      </main>
     </div>
   );
 }

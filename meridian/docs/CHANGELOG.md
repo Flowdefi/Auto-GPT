@@ -15,6 +15,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - The access review for one workspace leaves off a login limited to the other workspace. The screen keeps the counsel flag. Counsel still has to adopt the Safeguards program.
 - A reply draft that asks for payment shows a limitations hold on the queue when the limitations date on file is past. The draft stays unsent.
 - Account-page plan, bank-debit, and dispute fields point at the error alert, and a failed account load focuses that alert. This is not a formal accessibility audit.
+- The public counsel banner is on every agency page. Dispute and contact form errors focus an alert, and the form says the response date is operational.
 
 ## Consumer, client, and public surfaces
 
