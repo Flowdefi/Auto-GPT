@@ -83,7 +83,12 @@ export async function postAchPayment(input: {
   return payment;
 }
 
-export function reversePayment(workspaceId: WorkspaceId, paymentId: string, reason: "reversed" | "nsf"): ConsumerPayment {
+function returnNotice(paymentId: string, reason: "reversed" | "nsf"): string {
+  const what = reason === "nsf" ? "The bank returned the debit" : "The posted debit was undone";
+  return `${what} and the balance was restored. Reference ${paymentId}. This is a draft notice for counsel review. No bank account number is stored.`;
+}
+
+export async function reversePayment(workspaceId: WorkspaceId, paymentId: string, reason: "reversed" | "nsf"): Promise<ConsumerPayment> {
   const payment = (loadDb().consumerPayments ?? []).find((item) => item.id === paymentId && item.workspaceId === workspaceId);
   if (!payment) throw new Error("Payment not found");
   if (payment.status === "reversed" || payment.status === "nsf") return payment;
@@ -108,5 +113,14 @@ export function reversePayment(workspaceId: WorkspaceId, paymentId: string, reas
     db.complianceEvents = [event, ...(db.complianceEvents ?? [])].slice(0, 500);
   });
   logEvent("payment_reversed", { workspaceId, paymentId, reason });
+  const notice = await sendChannel({
+    workspaceId,
+    accountId: payment.accountId,
+    channel: "email",
+    body: returnNotice(payment.id, reason),
+  });
+  if (notice.status === "blocked") {
+    logEvent("return_notice_blocked", { accountId: payment.accountId, reason: notice.reason ?? "blocked" });
+  }
   return next;
 }

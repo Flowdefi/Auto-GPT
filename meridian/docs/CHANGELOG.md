@@ -10,6 +10,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - Calling window 8:00 a.m.–9:00 p.m. local, 7-in-7, and the seven-day conversation wait. Unknown ZIP codes are blocked.
 - Limitation years are filled, with citations and `needs_counsel_review`, for TX, GA, MO, MT, NH, OH, SC, SD, VT, and VA. Every other state stays blank. Counsel can edit the table.
 - Reg F validation end date and a one-page Model Form B-1 layout. It is not the CFPB's designed file. When the limitations date on file is past, the PDF says this draft does not include the state time-barred notice. Counsel must add that notice before mailing.
+- An NSF or reversal restores the balance and sends a draft email through the compliance gate. The notice does not ask for another debit, and no bank account number is stored.
 
 ## Consumer, client, and public surfaces
 

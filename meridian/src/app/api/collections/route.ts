@@ -460,7 +460,7 @@ export async function POST(request: Request) {
       case "payment_reverse":
         if (!body.paymentId) return NextResponse.json({ error: "paymentId required" }, { status: 400 });
         if (actor !== "admin" && actor !== "compliance") return NextResponse.json({ error: "Compliance must reverse a payment" }, { status: 403 });
-        return NextResponse.json({ payment: reversePayment(body.workspaceId, body.paymentId, body.reversal === "nsf" ? "nsf" : "reversed") });
+        return NextResponse.json({ payment: await reversePayment(body.workspaceId, body.paymentId, body.reversal === "nsf" ? "nsf" : "reversed") });
       case "notice_pdf":
         if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
         return NextResponse.json({ pdfBase64: validationPdfBase64(body.workspaceId, body.accountId) });
