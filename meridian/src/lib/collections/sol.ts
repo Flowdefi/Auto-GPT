@@ -1,7 +1,10 @@
+import { STATE_ELIGIBILITY_SEED } from "./eligibility";
+
 /**
  * Limitations periods used only where a statute was identified.
  * Accrual is last payment, otherwise charge-off. That choice is fact-specific
- * and marked for counsel review on every account.
+ * and marked for counsel review on every account. Other states stay blank
+ * until counsel enters a period in the limitations table.
  */
 
 export interface SolRule {
@@ -26,12 +29,31 @@ export const SOL_RULES: SolRule[] = [
   },
 ];
 
-export function solFor(state: string, lastPaymentDate: string | null, chargeOffDate: string | null): {
+export function defaultSolTable(): SolRule[] {
+  return STATE_ELIGIBILITY_SEED.map((state) => {
+    const known = SOL_RULES.find((rule) => rule.code === state.code);
+    return (
+      known ?? {
+        code: state.code,
+        years: null,
+        citation: "No reviewed limitations period for this state. Do not calculate a date.",
+        needsCounselReview: true,
+      }
+    );
+  });
+}
+
+export function solFor(
+  state: string,
+  lastPaymentDate: string | null,
+  chargeOffDate: string | null,
+  rules: SolRule[] = SOL_RULES,
+): {
   solExpiresOn: string | null;
   solCitation: string;
   solNeedsCounselReview: boolean;
 } {
-  const rule = SOL_RULES.find((item) => item.code === state.trim().toUpperCase());
+  const rule = rules.find((item) => item.code === state.trim().toUpperCase());
   const accrual = lastPaymentDate || chargeOffDate;
   if (!rule || rule.years == null || !accrual) {
     return {

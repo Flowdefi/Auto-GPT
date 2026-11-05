@@ -200,13 +200,16 @@ test("voice flow withholds the debt until two identifiers match and will not sto
 });
 
 test("sandbox payment plan stays inside the balance and the month cap", () => {
+  const stamp = Date.now().toString(36);
+  const ohioRef = `PLAN-${stamp}`;
+  const californiaRef = `CA-PLAN-${stamp}`;
   const imported = importPortfolio({
     workspaceId: "triton",
     portfolioId: "pf_plan",
-    csv: "account_ref,consumer_name,consumer_state,zip,last4,portal_code,phone_type,seller,balance\nPLAN-1,Example Planner,OH,44101,1111,PL11,landline,Sample Seller,100.00\nCA-PLAN,Example Planner,CA,90001,2222,CA22,cell,Sample Seller,40\n",
+    csv: `account_ref,consumer_name,consumer_state,zip,last4,portal_code,phone_type,seller,balance\n${ohioRef},Example Planner,OH,44101,1111,PL11,landline,Sample Seller,100.00\n${californiaRef},Example Planner,CA,90001,2222,CA22,cell,Sample Seller,40\n`,
   });
-  const ohio = imported.accounts.find((item) => item.accountRef === "PLAN-1");
-  const california = imported.accounts.find((item) => item.accountRef === "CA-PLAN");
+  const ohio = imported.accounts.find((item) => item.accountRef === ohioRef);
+  const california = imported.accounts.find((item) => item.accountRef === californiaRef);
   assert.ok(ohio);
   assert.equal(ohio.status, "workable");
   assert.equal(california?.status, "quarantined");

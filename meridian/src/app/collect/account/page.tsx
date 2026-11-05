@@ -69,17 +69,18 @@ export default function CollectAccountPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ op: "notice" }),
     });
-    const body = (await response.json()) as { error?: string; account?: PortfolioAccount };
-    if (!response.ok || !body.account?.validationNotice) {
+    const body = (await response.json()) as { error?: string; account?: PortfolioAccount; pdfBase64?: string };
+    if (!response.ok || !body.pdfBase64) {
       setError(body.error ?? "Validation notice was not issued");
       return;
     }
-    setAccount(body.account);
-    const blob = new Blob([body.account.validationNotice], { type: "text/plain" });
+    if (body.account) setAccount(body.account);
+    const bytes = Uint8Array.from(atob(body.pdfBase64), (char) => char.charCodeAt(0));
+    const blob = new Blob([bytes], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "validation-notice.txt";
+    link.download = "validation-notice.pdf";
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -128,7 +129,7 @@ export default function CollectAccountPage() {
         <p>Limitations date on file: {account.solExpiresOn || "not calculated"} {account.solNeedsCounselReview ? "(counsel review)" : ""}</p>
       </section>
       <button className="mt-4 min-h-11 underline" type="button" onClick={() => void downloadNotice()}>
-        Download validation notice
+        Download validation notice (PDF)
       </button>
       {account.disputeDeadline ? <p className="text-sm">Validation period ends {account.disputeDeadline}.</p> : null}
       <form onSubmit={(event) => void savePlan(event)} className="mt-6 grid gap-2">

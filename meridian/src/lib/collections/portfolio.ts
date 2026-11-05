@@ -2,7 +2,7 @@ import { normalizeState, parseDate } from "@/lib/debt";
 import { parseCsv, type CsvTable } from "@/server/csv";
 import type { PortfolioAccount, StateEligibility } from "./types";
 import { stateIsEligible } from "./eligibility";
-import { solFor } from "./sol";
+import { solFor, type SolRule } from "./sol";
 import { xlsxToCsv } from "./xlsx";
 
 export interface ColumnMapping {
@@ -58,6 +58,7 @@ export function parsePortfolioCsv(input: {
   existingRefs: Set<string>;
   now: string;
   id: () => string;
+  solRules?: SolRule[];
 }): PortfolioImportResult {
   const table = tableFrom(input);
   const accounts: PortfolioAccount[] = [];
@@ -83,7 +84,7 @@ export function parsePortfolioCsv(input: {
     const chargeOffDate = parseDate(pick("charge_off_date", "charge_off_date", "charge off date"));
     const lastPaymentDate = parseDate(pick("last_payment_date", "last_payment_date", "last payment"));
     const itemizationDate = parseDate(pick("itemization_date", "itemization_date", "itemization date"));
-    const sol = solFor(state, lastPaymentDate, chargeOffDate);
+    const sol = solFor(state, lastPaymentDate, chargeOffDate, input.solRules);
     const ssn = pick("ssn", "ssn", "social security");
     const dob = pick("dob", "dob", "date of birth");
     accounts.push({

@@ -9,6 +9,8 @@ interface Report {
   disputes: Array<{ accountRef: string; state: string; deadline: string | null }>;
   exceptions: Array<{ id: string; channel: string; reason: string }>;
   attempts: Array<{ id: string; channel: string; allowed: boolean; reason: string; at: string }>;
+  remittance?: Array<{ portfolioId: string; clientName: string; collectedCents: number; feeCents: number; remittanceCents: number; paymentCount: number }>;
+  collectors?: Array<{ name: string; tasksCompleted: number; calls: number; paymentsPosted: number }>;
 }
 
 function money(cents: number): string {
@@ -51,7 +53,7 @@ export default function CollectionReportsPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Collections" title="Reports" subtitle="Recovery, quarantines, disputes, and blocked attempts. No consumer identifiers are included." />
+      <PageHeader eyebrow="Collections" title="Reports" subtitle="Recovery, client remittance, collector activity, disputes, and blocked attempts. Statements omit account numbers." />
       {notice ? <Card className="mb-4 p-4 text-sm">{notice}</Card> : null}
       {report ? (
         <div className="grid gap-4">
@@ -63,6 +65,19 @@ export default function CollectionReportsPage() {
               <p>Face {money(row.faceCents)} · collected {money(row.collectedCents)} · recovery {(row.recoveryRate * 100).toFixed(1)}%</p>
             </Card>
           ))}
+          <Card className="p-4 text-sm">
+            <div className="font-semibold">Client remittance statement</div>
+            <p className="text-muted-foreground">Agency fee percent comes from MERIDIAN_AGENCY_FEE_PERCENT and defaults to 0. Counsel should confirm the contract rate.</p>
+            {(report.remittance ?? []).map((row) => (
+              <p key={row.portfolioId}>{row.clientName || row.portfolioId}: collected {money(row.collectedCents)} · fee {money(row.feeCents)} · remit {money(row.remittanceCents)} · {row.paymentCount} payments</p>
+            ))}
+          </Card>
+          <Card className="p-4 text-sm">
+            <div className="font-semibold">Collector performance</div>
+            {(report.collectors ?? []).map((row) => (
+              <p key={row.name}>{row.name}: {row.tasksCompleted} tasks closed · {row.calls} sandbox calls · {row.paymentsPosted} payments posted</p>
+            ))}
+          </Card>
           <Card className="p-4 text-sm">
             <div className="font-semibold">Disputes</div>
             {report.disputes.length === 0 ? <p>None open.</p> : report.disputes.map((row) => <p key={row.accountRef}>{row.accountRef} · {row.state} · deadline {row.deadline ?? "n/a"}</p>)}

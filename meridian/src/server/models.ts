@@ -15,6 +15,8 @@ import type {
   OperatorRole,
   PortalSession,
 } from "@/lib/collections/types";
+import type { CollectionJob, CollectionSequence } from "@/lib/collections/jobs";
+import type { SolRule } from "@/lib/collections/sol";
 import type { SettlementMatrix } from "@/lib/collections/template-library";
 
 export type WorkspaceId = "triton" | "aether";
@@ -541,6 +543,9 @@ export interface DatabaseFile {
   importAudits?: ImportAudit[];
   operatorRoles?: OperatorRole[];
   portalSessions?: PortalSession[];
+  jobs?: CollectionJob[];
+  sequences?: CollectionSequence[];
+  solRules?: SolRule[];
 }
 
 export function emptyDb(): DatabaseFile {

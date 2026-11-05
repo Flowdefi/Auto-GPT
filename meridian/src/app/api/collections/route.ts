@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
+import type { CollectionSequence } from "@/lib/collections/jobs";
+import type { SolRule } from "@/lib/collections/sol";
 import type { SettlementMatrix } from "@/lib/collections/template-library";
 import type { CollectionChannel, ConsumerConsent } from "@/lib/collections/types";
 import type { ConsumerTurn } from "@/lib/collections/voice";
 import { isWorkspaceId } from "@/lib/workspace-id";
 import { requireSeat } from "@/server/api-guard";
+import { assertPrivilegedMfa } from "@/server/mfa-policy";
+import { enrollSequence, listSequences, runDueJobs, saveSequence } from "@/server/collections/runner";
 import {
   completeTask,
   collectionSnapshot,
@@ -20,6 +24,7 @@ import {
   returnQuarantined,
   renderTemplatePreview,
   sandboxPayment,
+  saveSolRules,
   saveSettlementMatrix,
   sendChannel,
   setOperatorRole,
@@ -27,6 +32,7 @@ import {
   startVoice,
   syncCollectionTemplates,
   turnVoice,
+  validationPdfBase64,
   updateEligibility,
   updateVoiceSettings,
 } from "@/server/collections/service";
@@ -84,8 +90,19 @@ export async function POST(request: Request) {
     ownerApproved?: boolean;
     counselReviewed?: boolean;
     matrix?: SettlementMatrix;
+    sequence?: CollectionSequence;
+    sequenceId?: string;
+    solRules?: SolRule[];
   };
   const actor = collectionsRole(gate.account.email, gate.account.role);
+  const privileged = new Set(["reveal", "eligibility", "template_approval", "matrix", "role", "sol_save"]);
+  if (body.op && privileged.has(body.op)) {
+    try {
+      assertPrivilegedMfa(gate.account.id, actor);
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "MFA required", mfaRequired: true }, { status: 403 });
+    }
+  }
   if (actor === "read_only" && body.op && body.op !== "report") {
     return NextResponse.json({ error: "Read-only role" }, { status: 403 });
   }
@@ -150,7 +167,7 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: "accountId and channel required" }, { status: 400 });
         }
         return NextResponse.json({
-          message: sendChannel({
+          message: await sendChannel({
             workspaceId: body.workspaceId,
             accountId: body.accountId,
             channel: body.channel as CollectionChannel,
@@ -185,16 +202,29 @@ export async function POST(request: Request) {
         return NextResponse.json({ draft: proposeDraft(body.workspaceId, body.accountId, body.inbound) });
       case "approve":
         if (!body.draftId) return NextResponse.json({ error: "draftId required" }, { status: 400 });
-        return NextResponse.json({ draft: approveDraft(body.workspaceId, body.draftId, body.approve !== false) });
+        return NextResponse.json({ draft: await approveDraft(body.workspaceId, body.draftId, body.approve !== false) });
       case "pay":
         if (!body.accountId || !body.amountCents) return NextResponse.json({ error: "accountId and amountCents required" }, { status: 400 });
-        return NextResponse.json({ payment: sandboxPayment(body.workspaceId, body.accountId, body.amountCents) });
+        return NextResponse.json({ payment: await sandboxPayment(body.workspaceId, body.accountId, body.amountCents) });
       case "complete_task":
         if (!body.taskId) return NextResponse.json({ error: "taskId required" }, { status: 400 });
-        completeTask(body.workspaceId, body.taskId);
+        completeTask(body.workspaceId, body.taskId, gate.account.email);
         return NextResponse.json({ ok: true });
       case "report":
         return NextResponse.json(collectionReport(body.workspaceId));
+      case "jobs_run":
+        return NextResponse.json({ jobs: await runDueJobs() });
+      case "sequence_save":
+        if (!body.sequence) return NextResponse.json({ error: "sequence required" }, { status: 400 });
+        return NextResponse.json({ sequence: saveSequence({ ...body.sequence, workspaceId: body.workspaceId }), sequences: listSequences(body.workspaceId) });
+      case "sequence_enroll":
+        if (!body.sequenceId || !body.accountId) return NextResponse.json({ error: "sequenceId and accountId required" }, { status: 400 });
+        return NextResponse.json({ enqueued: enrollSequence(body.workspaceId, body.sequenceId, body.accountId) });
+      case "sol_save":
+        return NextResponse.json({ rules: saveSolRules(body.solRules ?? [], actor) });
+      case "notice_pdf":
+        if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
+        return NextResponse.json({ pdfBase64: validationPdfBase64(body.workspaceId, body.accountId) });
       case "purge_pii":
         return NextResponse.json({ purged: purgeReturnedPii(body.workspaceId) });
       case "role":

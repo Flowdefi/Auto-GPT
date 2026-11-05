@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
 import { clientIp, rateLimited, tooMany } from "@/server/rate-limit";
-import { ensureValidationNotice, fileDispute, openPortal, portalAccount, sandboxPayment, setupPaymentPlan } from "@/server/collections/service";
+import { ensureValidationNotice, fileDispute, openPortal, portalAccount, sandboxPayment, setupPaymentPlan, validationPdfBase64 } from "@/server/collections/service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ account: fileDispute(account.workspaceId, account.id, body.text ?? "I dispute this debt") });
     }
     if (body.op === "pay") {
-      const payment = sandboxPayment(account.workspaceId, account.id, body.amountCents ?? account.balanceCents);
+      const payment = await sandboxPayment(account.workspaceId, account.id, body.amountCents ?? account.balanceCents);
       const paid = portalAccount(tokenFrom(request));
       return NextResponse.json({ payment, account: paid });
     }
@@ -57,7 +57,8 @@ export async function POST(request: Request) {
     }
     if (body.op === "notice") {
       const updated = ensureValidationNotice(account.workspaceId, account.id);
-      return NextResponse.json({ account: updated });
+      const pdfBase64 = validationPdfBase64(account.workspaceId, account.id);
+      return NextResponse.json({ account: updated, pdfBase64 });
     }
     return NextResponse.json({ error: "Unknown op" }, { status: 400 });
   } catch (error) {

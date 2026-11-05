@@ -31,10 +31,14 @@ import type {
 } from "@/lib/collections/types";
 import type { WorkspaceId } from "@/lib/types";
 import { workspaceOf } from "@/lib/workspaces";
+import { modelFormPdf } from "@/lib/collections/model-form-pdf";
+import { defaultSolTable, type SolRule } from "@/lib/collections/sol";
+import { validationEndDate } from "@/lib/collections/validation-period";
 import { decryptSecret, encryptSecret, sha256Hex } from "@/server/auth-crypto";
 import { loadDb, mutate, nextId } from "@/server/db";
 import { masterSecret } from "@/server/secrets";
 import { publicBaseUrl } from "@/server/mailer";
+import { createStripeCheckout, deliverAllowedChannel, type FetchLike } from "@/server/collections/providers";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -56,6 +60,9 @@ export function collectionSnapshot(workspaceId: WorkspaceId) {
     templates: syncCollectionTemplates(),
     settlementMatrix: ensureSettlementMatrix(),
     events: (db.complianceEvents ?? []).filter((event) => event.workspaceId === workspaceId).slice(0, 40),
+    sequences: (db.sequences ?? []).filter((item) => item.workspaceId === workspaceId),
+    jobs: (db.jobs ?? []).filter((job) => job.workspaceId === workspaceId).slice(0, 40),
+    solRules: ensureSolTable(),
   };
 }
 
@@ -104,6 +111,7 @@ export function importPortfolio(input: {
     workspaceId: input.workspaceId,
     portfolioId,
     eligibility: db.stateEligibility ?? [],
+    solRules: ensureSolTable(),
     existingRefs: existing,
     now: new Date().toISOString(),
     id: () => nextId("acct"),
@@ -236,7 +244,7 @@ function gateFor(
   }).length;
   const conversations = recent.filter((call) => call.disposition && call.disposition !== "blocked" && !call.blockedReason);
   const lastConversationAt = conversations[0]?.updatedAt ?? null;
-  const sentToday = (db.channelMessages ?? []).filter((message) => message.workspaceId === workspaceId && message.status === "sandbox_queued" && message.at.slice(0, 10) === now.toISOString().slice(0, 10)).length
+  const sentToday = (db.channelMessages ?? []).filter((message) => message.workspaceId === workspaceId && message.status !== "blocked" && message.at.slice(0, 10) === now.toISOString().slice(0, 10)).length
     + recent.filter((call) => call.direction === "outbound" && !call.blockedReason && call.createdAt.slice(0, 10) === now.toISOString().slice(0, 10)).length;
   const settings = db.voiceSettings!;
   const ctx: GateContext = {
@@ -421,13 +429,15 @@ function statusResponseFor(templateId: string | undefined): AccountStatus | null
   }
 }
 
-export function sendChannel(input: {
+export async function sendChannel(input: {
   workspaceId: WorkspaceId;
   accountId: string;
   channel: CollectionChannel;
   body: string;
   templateId?: string;
-}): ChannelMessage {
+  destination?: string;
+  fetchImpl?: FetchLike;
+}): Promise<ChannelMessage> {
   const account = accounts(input.workspaceId).find((item) => item.id === input.accountId) ?? null;
   const template = (loadDb().collectionTemplates ?? []).find((item) => item.id === input.templateId);
   if (template && !template.ownerApproved) {
@@ -458,7 +468,7 @@ export function sendChannel(input: {
       now: new Date(),
       values: { ...context.values, subject_preview: renderMustache(template.subject, context.values) },
       offer: context.offer,
-      priorLetterAt: (loadDb().channelMessages ?? []).find((row) => row.accountId === account.id && row.channel === "letter" && row.status === "sandbox_queued")?.at ?? null,
+      priorLetterAt: (loadDb().channelMessages ?? []).find((row) => row.accountId === account.id && row.channel === "letter" && row.status !== "blocked")?.at ?? null,
       smsConsent: (loadDb().consents ?? []).some((row) => row.accountId === account.id && row.channel === "sms"),
       emailConsent: (loadDb().consents ?? []).some((row) => row.accountId === account.id && row.channel === "email"),
       reassigned: loadDb().voiceSettings?.rndSandboxClear ? "ok" : "unknown",
@@ -479,8 +489,18 @@ export function sendChannel(input: {
   );
   logEvent(input.workspaceId, input.channel, input.accountId, decision.allowed, decision.reason);
   if (!decision.allowed) return storeMessage(input, "blocked", decision.reason, null);
-  if (process.env.MERIDIAN_CHANNEL_DELIVER === "live") {
-    throw new Error("Live email, SMS, voice, and mail delivery is disabled. Use sandbox mode.");
+  const delivered = await deliverAllowedChannel(
+    {
+      channel: input.channel,
+      to: input.destination ?? "",
+      subject: "Account notice",
+      body: rendered,
+      toName: account?.consumerName ?? "Consumer",
+    },
+    input.fetchImpl,
+  );
+  if (delivered) {
+    return storeMessage({ ...input, body: rendered }, "provider_accepted", decision.reason, delivered.providerId, delivered.provider);
   }
   return storeMessage({ ...input, body: rendered }, "sandbox_queued", decision.reason, `sandbox_${nextId("msg")}`);
 }
@@ -490,6 +510,7 @@ function storeMessage(
   status: ChannelMessage["status"],
   reason: string,
   providerId: string | null,
+  provider = "sandbox",
 ): ChannelMessage {
   const message: ChannelMessage = {
     id: nextId("ch"),
@@ -499,7 +520,7 @@ function storeMessage(
     status,
     reason,
     templateId: input.templateId ?? null,
-    provider: "sandbox",
+    provider,
     providerId,
     at: new Date().toISOString(),
     bodyPreview: input.body?.slice(0, 500) ?? null,
@@ -687,7 +708,7 @@ export function proposeDraft(workspaceId: WorkspaceId, accountId: string, inboun
   return row;
 }
 
-export function approveDraft(workspaceId: WorkspaceId, draftId: string, approve: boolean): DraftReply {
+export async function approveDraft(workspaceId: WorkspaceId, draftId: string, approve: boolean): Promise<DraftReply> {
   const db = loadDb();
   const draft = (db.draftReplies ?? []).find((item) => item.id === draftId && item.workspaceId === workspaceId);
   if (!draft) throw new Error("Draft not found");
@@ -701,7 +722,7 @@ export function approveDraft(workspaceId: WorkspaceId, draftId: string, approve:
   const account = accounts(workspaceId).find((item) => item.id === draft.accountId);
   const decision = gateFor(workspaceId, account ?? null, "email");
   if (!decision.allowed) throw new Error(decision.reason);
-  sendChannel({ workspaceId, accountId: draft.accountId, channel: "email", body: draft.draft });
+  await sendChannel({ workspaceId, accountId: draft.accountId, channel: "email", body: draft.draft });
   const approved = { ...draft, status: "approved" as const, gateAllowed: true, gateReason: decision.reason };
   mutate((state) => {
     state.draftReplies = (state.draftReplies ?? []).map((item) => (item.id === draftId ? approved : item));
@@ -742,36 +763,96 @@ export function ensureValidationNotice(workspaceId: WorkspaceId, accountId: stri
   return issueValidation(workspaceId, accountId);
 }
 
-export function completeTask(workspaceId: WorkspaceId, taskId: string): void {
+export function completeTask(workspaceId: WorkspaceId, taskId: string, actor = "collector"): void {
   mutate((db) => {
     db.collectorTasks = (db.collectorTasks ?? []).map((task) =>
-      task.workspaceId === workspaceId && task.id === taskId ? { ...task, status: "done" } : task,
+      task.workspaceId === workspaceId && task.id === taskId ? { ...task, status: "done", completedBy: actor } : task,
     );
   });
 }
 
-export function sandboxPayment(workspaceId: WorkspaceId, accountId: string, amountCents: number): ConsumerPayment {
+export function ensureSolTable(): SolRule[] {
+  const saved = loadDb().solRules ?? [];
+  const byCode = new Map(saved.map((rule) => [rule.code, rule]));
+  const table = defaultSolTable().map((rule) => byCode.get(rule.code) ?? rule);
+  if (saved.length === 0) {
+    mutate((db) => {
+      if (!db.solRules?.length) db.solRules = table;
+    });
+  }
+  return table;
+}
+
+export function saveSolRules(rules: SolRule[], role: CollectionsRole): SolRule[] {
+  if (role !== "admin" && role !== "compliance") throw new Error("Only admin or compliance can edit limitations");
+  const allowed = new Set(defaultSolTable().map((rule) => rule.code));
+  const clean = rules
+    .filter((rule) => allowed.has(rule.code))
+    .map((rule) => ({
+      code: rule.code,
+      years: rule.years == null || Number.isNaN(Number(rule.years)) ? null : Math.max(0, Math.floor(Number(rule.years))),
+      citation: String(rule.citation || "No reviewed limitations period for this state. Do not calculate a date.").slice(0, 500),
+      needsCounselReview: true,
+    }));
+  mutate((db) => {
+    db.solRules = defaultSolTable().map((rule) => clean.find((item) => item.code === rule.code) ?? rule);
+  });
+  return ensureSolTable();
+}
+
+export function validationPdfBase64(workspaceId: WorkspaceId, accountId: string): string {
+  const account = ensureValidationNotice(workspaceId, accountId);
+  const end = account.validationMailedAt ? validationEndDate(account.validationMailedAt) : account.disputeDeadline || "";
+  const pdf = modelFormPdf({
+    agencyName: workspaceOf(workspaceId).legalName,
+    agencyAddress: "PO Box 100, Example City, OH 44101",
+    agencyPhone: "1-800-555-0199",
+    noticeDate: (account.validationMailedAt || new Date().toISOString()).slice(0, 10),
+    consumerName: account.consumerName,
+    consumerAddress: `${account.state} ${account.zip}`,
+    accountRef: account.accountRef,
+    accountType: "credit card",
+    creditorOnItemizationDate: account.originalCreditor || "not supplied",
+    accountLast4: account.last4 || "0000",
+    itemizationDate: account.itemizationDate || "not supplied",
+    amountOnItemizationDate: ((account.itemizationAmountCents ?? 0) / 100).toFixed(2),
+    interestSince: "0.00",
+    feesSince: ((account.feesSinceItemizationCents ?? 0) / 100).toFixed(2),
+    paymentsCreditsSince: (((account.paymentsSinceItemizationCents ?? 0) + (account.creditsSinceItemizationCents ?? 0)) / 100).toFixed(2),
+    currentBalance: (account.balanceCents / 100).toFixed(2),
+    currentCreditor: account.sellerName,
+    validationEndDate: end,
+  });
+  return Buffer.from(pdf).toString("base64");
+}
+
+export async function sandboxPayment(workspaceId: WorkspaceId, accountId: string, amountCents: number): Promise<ConsumerPayment> {
   const account = accounts(workspaceId).find((item) => item.id === accountId);
   if (!account) throw new Error("Account not found");
   const decision = gateFor(workspaceId, account, "payment_portal");
   logEvent(workspaceId, "payment_portal", accountId, decision.allowed, decision.reason);
   if (!decision.allowed) throw new Error(decision.reason);
   if (amountCents < 1 || amountCents > account.balanceCents) throw new Error("Amount must be between one cent and the balance");
+  const stripe = process.env.MERIDIAN_CHANNEL_DELIVER === "live" && process.env.MERIDIAN_PAYMENTS_PROVIDER === "stripe";
+  const checkout = stripe ? await createStripeCheckout({ amountCents, reference: account.accountRef }) : null;
   const payment: ConsumerPayment = {
     id: nextId("pmt"),
     workspaceId,
     accountId,
     amountCents,
-    status: "succeeded",
-    provider: "sandbox",
-    providerId: `sandbox_${nextId("pi")}`,
+    status: checkout ? "pending" : "succeeded",
+    provider: checkout?.provider ?? "sandbox",
+    providerId: checkout?.providerId ?? `sandbox_${nextId("pi")}`,
     at: new Date().toISOString(),
+    checkoutUrl: checkout?.url,
   };
   mutate((db) => {
     db.consumerPayments = [payment, ...(db.consumerPayments ?? [])];
-    db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) =>
-      item.id === accountId ? { ...item, balanceCents: item.balanceCents - amountCents } : item,
-    );
+    if (payment.status === "succeeded") {
+      db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) =>
+        item.id === accountId ? { ...item, balanceCents: item.balanceCents - amountCents } : item,
+      );
+    }
   });
   return payment;
 }
@@ -812,7 +893,34 @@ export function collectionReport(workspaceId: WorkspaceId) {
     })),
     exceptions: (db.complianceEvents ?? []).filter((event) => event.workspaceId === workspaceId && !event.allowed).slice(0, 100),
     attempts: (db.complianceEvents ?? []).filter((event) => event.workspaceId === workspaceId).slice(0, 200),
+    remittance: [...byPortfolio.entries()].map(([portfolioId, bucket]) => {
+      const feePercent = Number(process.env.MERIDIAN_AGENCY_FEE_PERCENT ?? "0");
+      const feeCents = Math.round(bucket.collected * (Number.isFinite(feePercent) ? feePercent : 0) / 100);
+      const seller = rows.find((account) => account.portfolioId === portfolioId)?.sellerName ?? "";
+      return {
+        portfolioId,
+        clientName: seller,
+        collectedCents: bucket.collected,
+        feeCents,
+        remittanceCents: bucket.collected - feeCents,
+        paymentCount: payments.filter((payment) => rows.find((account) => account.id === payment.accountId)?.portfolioId === portfolioId).length,
+      };
+    }),
+    collectors: collectorRows(db, workspaceId),
   };
+}
+
+function collectorRows(db: ReturnType<typeof loadDb>, workspaceId: WorkspaceId) {
+  const names = new Set<string>();
+  for (const task of db.collectorTasks ?? []) if (task.workspaceId === workspaceId && task.completedBy) names.add(task.completedBy);
+  for (const call of db.voiceCalls ?? []) if (call.workspaceId === workspaceId) names.add("sandbox desk");
+  if (names.size === 0) names.add("sandbox desk");
+  return [...names].map((name) => ({
+    name,
+    tasksCompleted: (db.collectorTasks ?? []).filter((task) => task.workspaceId === workspaceId && task.status === "done" && (task.completedBy ?? "sandbox desk") === name).length,
+    calls: name === "sandbox desk" ? (db.voiceCalls ?? []).filter((call) => call.workspaceId === workspaceId && !call.blockedReason).length : 0,
+    paymentsPosted: name === "sandbox desk" ? (db.consumerPayments ?? []).filter((payment) => payment.workspaceId === workspaceId).length : 0,
+  }));
 }
 
 export function openPortal(workspaceId: WorkspaceId, accountRef: string, last4: string, zip: string): { token: string; account: PortfolioAccount } {

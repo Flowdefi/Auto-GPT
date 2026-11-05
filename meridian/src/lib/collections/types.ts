@@ -94,6 +94,7 @@ export interface CollectorTask {
   queue: "collector" | "compliance";
   status: "open" | "done";
   createdAt: string;
+  completedBy?: string;
 }
 
 export interface DraftReply {
@@ -114,10 +115,12 @@ export interface ConsumerPayment {
   workspaceId: WorkspaceId;
   accountId: string;
   amountCents: number;
-  status: "succeeded";
-  provider: "sandbox";
+  status: "succeeded" | "pending";
+  provider: string;
   providerId: string;
   at: string;
+  reconciledAt?: string;
+  checkoutUrl?: string;
 }
 
 export interface ImportAudit {
@@ -266,7 +269,7 @@ export interface ChannelMessage {
   workspaceId: WorkspaceId;
   accountId: string;
   channel: CollectionChannel;
-  status: "sandbox_queued" | "blocked";
+  status: "sandbox_queued" | "provider_accepted" | "blocked";
   reason: string | null;
   templateId: string | null;
   provider: string;
