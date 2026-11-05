@@ -35,6 +35,7 @@ export function navFor(workspaceId: WorkspaceId): NavItem[] {
     { href: `${base}/reporting`, label: "Reporting", hub: "reporting", icon: "BarChart3", group: "Platform" },
     { href: `${base}/service/tickets`, label: "Service", hub: "service", icon: "LifeBuoy", group: "Platform" },
     { href: `${base}/collections`, label: "Collections desk", hub: "compliance", icon: "Phone", group: "Platform" },
+    { href: `${base}/collections/reports`, label: "Collection reports", hub: "reporting", icon: "BarChart3", group: "Platform" },
     { href: `${base}/settings/eligibility`, label: "State eligibility", hub: "compliance", icon: "ShieldCheck", group: "Platform" },
     { href: `${base}/compliance`, label: "Compliance", hub: "compliance", icon: "ShieldCheck", group: "Platform" },
     { href: `${base}/settings/integrations`, label: "Integrations", hub: "automation", icon: "Plug", group: "Platform" },

@@ -1,19 +1,32 @@
-# Collections desk status
+# Collections platform status
 
-This is not a finished collections agency. It is the sandbox gate, state table, and voice flow the later platform work plugs into. The GitHub repo is public. Do not load a real portfolio until the app lives in a private repository.
+Meridian’s collections desk is a sandbox. This GitHub repository is public. Move the app to a private repository before any real portfolio, SSN, or account number is loaded. Sample identifiers in the demo use the 900 range and the name “Example Consumer”.
 
 ## Done
 
-- State eligibility table for all 50 states and D.C., with citations and a counsel-review flag. Eligible set is states where this review found no collector or debt-buyer license, plus Texas. Texas is modeled as a $10,000 Secretary of State surety bond under Tex. Fin. Code § 392.101, not a license, plus § 392.307 time-barred debt rules. Uncertain states stay quarantined. Owners can flip a state in **State eligibility**.
-- Portfolio CSV import tags each account with the consumer's state, quarantines ineligible states, and can mark those rows returned to the seller. SSN-shaped columns and values are rejected and not stored.
-- One compliance gate for outbound AI voice, inbound voice, SMS, email, letters, limited-content voicemail, portal chat, and the payment handoff. It enforces the kill switch, daily cap, state eligibility, cease and similar holds, 8:00 a.m.–9:00 p.m. local time, the 7-in-7 and post-conversation waits, cell-phone consent for AI voice, internal DNC, and a reassigned-number result.
-- Sandbox voice agent: AI disclosure, recording announcement, all-party consent stop, right-party check with two non-SSN identifiers before any debt disclosure, mini-Miranda, payment handoff that never stores a card, plans inside owner authority, dispute / hardship / bankruptcy / attorney / cease updates, warm transfer, encrypted transcript, rules-based summary, and a QA flag pass.
-- Template loader for `templates/collections/*.md`. Files are not sent until `counselReviewed: true`.
+- Portfolio CSV import with a column-map field on the desk, a CSV/xlsx file picker, fixed-width rows, and first-sheet xlsx. Fields include seller, chain of title, original creditor, charge-off, Reg F itemization amounts, and last payment. Duplicate references are skipped. An audit row stores counts only, not row contents. Uploaded files are not written into the repository.
+- SSN, date of birth, and full account number are encrypted at rest and omitted from API lists. The UI shows a mask. Reveal is limited to admin and compliance roles and writes an audit event that does not contain the value. Returned accounts can have that ciphertext purged.
+- State eligibility table (50 states and D.C.) with citations. Ineligible consumer states are quarantined and can be returned to the seller. The compliance gate blocks outreach and the payment portal for those accounts.
+- Reg F-style validation text, a 35-day dispute deadline (mail date plus 35 days, marked for counsel), and dispute status that stops outreach. Call frequency, calling hours, cease, bankruptcy, attorney, deceased, and military holds are on the same gate. Mini-Miranda is on the voice flow and on drafted replies.
+- SMS, email, letter, limited-content voicemail, and portal chat adapters record a sandbox attempt or a block. Live delivery is refused.
+- Inbound text is classified (dispute, cease, hardship, promise, bankruptcy, attorney) and a reply is drafted for human approval. Approval sends only if the gate still allows it.
+- Collector and compliance tasks are opened on import and on dispute.
+- Consumer portal at `/collect`: reference, last four, and ZIP. The SSN is never in the URL. The account page shows itemization, a validation download when one was issued, dispute submission, and a test-mode payment that records a receipt and does not collect a card. `/collect/privacy` is a draft notice marked for counsel, not an approved privacy policy.
+- Reports: recovery by portfolio, disputes, blocked attempts, CSV download.
+- Roles: owner defaults to admin, other seats default to collector, and an admin can assign admin, manager, collector, compliance, or read-only. Read-only cannot change records. Authenticator enrollment is `POST /api/auth/mfa`; once enabled, login requires the code.
+- Tests cover the gate, import quarantine, encryption masking, SOL, voice right-party flow, and TOTP. `npx tsc --noEmit` and `npm run test:collections` are the checks. GitHub workflow `.github/workflows/meridian.yml` runs them.
 
-## Not done
+## Stubbed or not done
 
-Full unmasked-file import, field-level SSN encryption and reveal, Reg F validation-notice generation, workflow builder, human approval queue for every AI draft, a live Stripe or other processor, Metro 2, MFA, and role-separated collector permissions. Provider adapters do not place real Twilio, Telnyx, Vapi, Retell, Lob, or SMS/email traffic.
+- No live Twilio, Telnyx, Vapi, Retell, Lob, SendGrid, or Stripe charge. The payment button is a sandbox ledger entry.
+- The voice “AI” is a scripted compliance flow with a rules summary, not a realtime speech model.
+- Inbound classification is rules, not a model. Drafts still require approval.
+- Workflow is a task queue, not a visual builder.
+- SOL dates are calculated only for Texas (four years, Civ. Prac. & Rem. Code § 16.004) and Georgia (six years written, O.C.G.A. § 9-3-24). Every other state is left blank for counsel. Accrual uses last payment, else charge-off, and is flagged for review.
+- Validation text is not the CFPB’s designed model form.
+- Metro 2, a full GLBA program, and background workers are not built. PII purge is a manual action for returned accounts.
+- MFA is enroll-and-require-at-login. It is not enforced for every existing account until that account enrolls.
 
-## Owner still has to provide
+## Owner still needs to provide
 
-Counsel review of the state table and recording-consent list, the Texas bond filing, FCC Reassigned Numbers Database access, written consent records, and sandbox or production keys only after the repo is private. No live key is required to run the desk.
+Counsel review of the state table, recording-consent states, SOL accrual, and the validation notice. The Texas $10,000 Secretary of State bond before any Texas collection. A private repository. FCC Reassigned Numbers Database access. Written consent records. Sandbox keys only after the repo is private: `TWILIO_*`, `TELNYX_API_KEY`, `VAPI_API_KEY`, `RETELL_API_KEY`, `LOB_API_KEY`, `STRIPE_SECRET_KEY`, `MERIDIAN_RND_API_URL`, and `MERIDIAN_AUTH_SECRET`.

@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { STATE_ELIGIBILITY_SEED, assertSeedCoverage, policyEligible, stateIsEligible } from "./eligibility";
 import { evaluateGate } from "./gate";
-import { parsePortfolioCsv } from "./portfolio";
+import { classifyInbound } from "./inbox";
+import { maskSsn, parsePortfolioCsv, publicAccount } from "./portfolio";
+import { solFor } from "./sol";
 import { withinCallingWindow } from "./time";
 import type { PortfolioAccount, VoiceSettings } from "./types";
+import { totp, verifyTotp } from "../../server/totp";
 import { emptyTranscript, redactSensitive, stepCall } from "./voice";
 
 const settings: VoiceSettings = {
@@ -94,7 +97,7 @@ test("calling window uses the consumer zone", () => {
   assert.equal(early.allowed, false);
 });
 
-test("portfolio import quarantines ineligible states and rejects SSNs", () => {
+test("portfolio import quarantines ineligible states and masks SSNs", () => {
   const csv = [
     "account_ref,consumer_name,consumer_state,zip,last4,portal_code,phone_type,seller,balance",
     "A-1,Example Consumer,Texas,75201,4242,DEMO42,cell,Sample Seller,100.00",
@@ -114,7 +117,7 @@ test("portfolio import quarantines ineligible states and rejects SSNs", () => {
   assert.equal(result.quarantined, 1);
   assert.equal(result.skipped.length, 1);
   const secret = parsePortfolioCsv({
-    csv: "account_ref,ssn,consumer_state\nA,900-00-0000,TX\n",
+    csv: "account_ref,consumer_name,ssn,consumer_state\nA,Example,900-00-0001,TX\n",
     workspaceId: "triton",
     portfolioId: "pf",
     eligibility: STATE_ELIGIBILITY_SEED,
@@ -122,7 +125,27 @@ test("portfolio import quarantines ineligible states and rejects SSNs", () => {
     now: "2026-11-05T00:00:00.000Z",
     id: () => "acct",
   });
-  assert.equal(secret.accounts.length, 0);
+  assert.equal(secret.accounts[0]?.sensitive?.ssn, "900-00-0001");
+  assert.equal(secret.accounts[0]?.ssnMasked, maskSsn("900-00-0001"));
+  assert.equal(JSON.stringify(publicAccount(secret.accounts[0]!)).includes("900-00-0001"), false);
+  const fixed = parsePortfolioCsv({
+    fixedWidth: "B-1Example   TX",
+    widths: [
+      { field: "account_ref", start: 1, length: 3 },
+      { field: "consumer_name", start: 4, length: 10 },
+      { field: "consumer_state", start: 14, length: 2 },
+    ],
+    workspaceId: "triton",
+    portfolioId: "pf",
+    eligibility: STATE_ELIGIBILITY_SEED,
+    existingRefs: new Set(),
+    now: "2026-11-05T00:00:00.000Z",
+    id: () => "acct2",
+  });
+  assert.equal(fixed.accounts[0]?.state, "TX");
+  assert.equal(solFor("TX", "2023-11-01", null).solExpiresOn, "2027-11-01");
+  assert.equal(solFor("CA", "2023-11-01", null).solExpiresOn, null);
+  assert.equal(classifyInbound("please stop calling"), "cease");
 });
 
 test("voice flow withholds the debt until two identifiers match and will not store a card", () => {
@@ -160,4 +183,6 @@ test("voice flow withholds the debt until two identifiers match and will not sto
   assert.equal(pay.paymentUrl, "https://example.test/pay");
   assert.equal(JSON.stringify(pay.transcript).includes("4242424242424242"), false);
   assert.equal(redactSensitive("4242424242424242").hadCard, true);
+  const code = totp("JBSWY3DPEHPK3PXP", 1_700_000_000_000);
+  assert.equal(verifyTotp("JBSWY3DPEHPK3PXP", code, 1_700_000_000_000), true);
 });

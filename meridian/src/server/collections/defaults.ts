@@ -1,4 +1,5 @@
 import { mergeEligibilitySeed } from "@/lib/collections/eligibility";
+import { solFor } from "@/lib/collections/sol";
 import type { PortfolioAccount, VoiceSettings } from "@/lib/collections/types";
 import type { DatabaseFile } from "@/server/models";
 import { demoSeedEnabled } from "@/server/demo-seed";
@@ -23,6 +24,12 @@ export function ensureCollectionDefaults(db: DatabaseFile): void {
   if (!Array.isArray(db.channelMessages)) db.channelMessages = [];
   if (!Array.isArray(db.complianceEvents)) db.complianceEvents = [];
   if (!Array.isArray(db.collectionTemplates)) db.collectionTemplates = [];
+  if (!Array.isArray(db.collectorTasks)) db.collectorTasks = [];
+  if (!Array.isArray(db.draftReplies)) db.draftReplies = [];
+  if (!Array.isArray(db.consumerPayments)) db.consumerPayments = [];
+  if (!Array.isArray(db.importAudits)) db.importAudits = [];
+  if (!Array.isArray(db.operatorRoles)) db.operatorRoles = [];
+  if (!Array.isArray(db.portalSessions)) db.portalSessions = [];
   db.voiceSettings = { ...defaultVoiceSettings(), ...db.voiceSettings };
   if (demoSeedEnabled() && db.portfolioAccounts.length === 0) {
     const now = new Date().toISOString();
@@ -46,6 +53,18 @@ export function ensureCollectionDefaults(db: DatabaseFile): void {
         inconvenientWork: false,
         importedAt: now,
         returnedAt: null,
+        originalCreditor: "Example Bank",
+        chainOfTitle: "Example Bank sold the account to Sample Seller LLC, which placed it here.",
+        chargeOffDate: "2024-01-15",
+        chargeOffBalanceCents: 100000,
+        itemizationDate: "2024-01-15",
+        itemizationAmountCents: 100000,
+        paymentsSinceItemizationCents: 0,
+        creditsSinceItemizationCents: 0,
+        feesSinceItemizationCents: 0,
+        lastPaymentDate: "2023-11-01",
+        ssnMasked: "***-**-0001",
+        ...solFor("TX", "2023-11-01", "2024-01-15"),
       },
       {
         id: "acct_demo_ca",

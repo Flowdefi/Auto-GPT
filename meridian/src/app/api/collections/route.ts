@@ -5,16 +5,27 @@ import { isWorkspaceId } from "@/lib/workspace-id";
 import { requireSeat } from "@/server/api-guard";
 import {
   collectionSnapshot,
+  approveDraft,
+  collectionReport,
+  collectionsRole,
+  fileDispute,
   importPortfolio,
+  issueValidation,
+  proposeDraft,
+  purgeReturnedPii,
   recordConsent,
+  revealAccount,
   returnQuarantined,
+  sandboxPayment,
   sendChannel,
+  setOperatorRole,
   startVoice,
   syncCollectionTemplates,
   turnVoice,
   updateEligibility,
   updateVoiceSettings,
 } from "@/server/collections/service";
+import type { ColumnMapping, WidthField } from "@/lib/collections/portfolio";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -54,14 +65,38 @@ export async function POST(request: Request) {
     turn?: ConsumerTurn;
     body?: string;
     templateId?: string;
+    xlsxBase64?: string;
+    fixedWidth?: string;
+    widths?: WidthField[];
+    mapping?: ColumnMapping;
+    inbound?: string;
+    draftId?: string;
+    approve?: boolean;
+    amountCents?: number;
+    email?: string;
+    role?: "admin" | "manager" | "collector" | "compliance" | "read_only";
   };
+  const actor = collectionsRole(gate.account.email, gate.account.role);
+  if (actor === "read_only" && body.op && body.op !== "report") {
+    return NextResponse.json({ error: "Read-only role" }, { status: 403 });
+  }
   if (!isWorkspaceId(body.workspaceId)) {
     return NextResponse.json({ error: "workspaceId must be triton or aether" }, { status: 400 });
   }
   try {
     switch (body.op) {
       case "import":
-        return NextResponse.json(importPortfolio(body.workspaceId, body.csv ?? "", body.portfolioId ?? ""));
+        return NextResponse.json(
+          importPortfolio({
+            workspaceId: body.workspaceId,
+            csv: body.csv,
+            xlsxBase64: body.xlsxBase64,
+            fixedWidth: body.fixedWidth,
+            widths: body.widths,
+            mapping: body.mapping,
+            portfolioId: body.portfolioId,
+          }),
+        );
       case "return":
         return NextResponse.json({ returned: returnQuarantined(body.workspaceId, body.portfolioId) });
       case "eligibility":
@@ -116,6 +151,35 @@ export async function POST(request: Request) {
         });
       case "templates":
         return NextResponse.json({ templates: syncCollectionTemplates() });
+      case "reveal":
+        if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
+        return NextResponse.json({ pii: revealAccount(body.workspaceId, body.accountId, actor, gate.account.email) });
+      case "validation":
+        if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
+        return NextResponse.json({ account: issueValidation(body.workspaceId, body.accountId) });
+      case "dispute":
+        if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
+        return NextResponse.json({ account: fileDispute(body.workspaceId, body.accountId, body.inbound ?? body.body ?? "Dispute") });
+      case "draft":
+        if (!body.accountId || !body.inbound) return NextResponse.json({ error: "accountId and inbound required" }, { status: 400 });
+        return NextResponse.json({ draft: proposeDraft(body.workspaceId, body.accountId, body.inbound) });
+      case "approve":
+        if (!body.draftId) return NextResponse.json({ error: "draftId required" }, { status: 400 });
+        return NextResponse.json({ draft: approveDraft(body.workspaceId, body.draftId, body.approve !== false) });
+      case "pay":
+        if (!body.accountId || !body.amountCents) return NextResponse.json({ error: "accountId and amountCents required" }, { status: 400 });
+        return NextResponse.json({ payment: sandboxPayment(body.workspaceId, body.accountId, body.amountCents) });
+      case "report":
+        return NextResponse.json(collectionReport(body.workspaceId));
+      case "purge_pii":
+        return NextResponse.json({ purged: purgeReturnedPii(body.workspaceId) });
+      case "role":
+        if (actor !== "admin" || !body.email || !body.role) {
+          return NextResponse.json({ error: "Admin email and role required" }, { status: 403 });
+        }
+        return NextResponse.json({
+          roles: setOperatorRole(body.email, body.role),
+        });
       default:
         return NextResponse.json({ error: "Unknown op" }, { status: 400 });
     }

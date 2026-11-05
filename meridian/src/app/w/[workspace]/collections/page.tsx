@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
 import type { CallTranscript, PortfolioAccount, VoiceCall, VoiceSettings } from "@/lib/collections/types";
+
+type ColumnMap = Record<string, string>;
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 interface Snapshot {
@@ -25,6 +27,8 @@ export default function CollectionsDeskPage() {
   const [csv, setCsv] = useState(
     "account_ref,consumer_name,consumer_state,zip,last4,portal_code,phone_type,seller,balance\nDEMO-OH-1,Example Ohioan,OH,44101,3333,OH33,landline,Sample Seller,80",
   );
+  const [mappingText, setMappingText] = useState("");
+  const [xlsxBase64, setXlsxBase64] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [live, setLive] = useState<LiveCall | null>(null);
   const [accountId, setAccountId] = useState("");
@@ -62,6 +66,31 @@ export default function CollectionsDeskPage() {
   }
 
   const account = data?.accounts.find((item) => item.id === accountId);
+
+  async function readPortfolioFile(file: File) {
+    if (file.name.toLowerCase().endsWith(".xlsx")) {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = "";
+      for (const byte of bytes) binary += String.fromCharCode(byte);
+      setXlsxBase64(btoa(binary));
+      setCsv("");
+      setNotice(`Ready to import ${file.name}. The first sheet is read. The file stays in the browser until you import.`);
+      return;
+    }
+    setXlsxBase64(null);
+    setCsv(await file.text());
+    setNotice(`Ready to import ${file.name}.`);
+  }
+
+  function columnMap(): ColumnMap | undefined {
+    const trimmed = mappingText.trim();
+    if (!trimmed) return undefined;
+    const parsed = JSON.parse(trimmed) as ColumnMap;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Column map must be a JSON object");
+    }
+    return parsed;
+  }
 
   return (
     <div>
@@ -176,9 +205,35 @@ export default function CollectionsDeskPage() {
           </Card>
           <Card className="space-y-3 p-5 text-sm lg:col-span-2">
             <div className="font-semibold">Portfolio import</div>
-            <textarea className="min-h-28 w-full rounded-xl border bg-transparent p-3" value={csv} onChange={(event) => setCsv(event.target.value)} />
-            <div className="flex gap-2">
-              <Button onClick={() => void post({ op: "import", csv, portfolioId: "pf_upload" }).then((body) => setNotice(`Imported ${body.workable ?? 0} workable, ${body.quarantined ?? 0} quarantined.`))}>
+            <p>Paste a CSV, or choose a CSV or xlsx. Files are not written into the repository. Use fake 900-range SSNs only in this public repo.</p>
+            <input
+              className="block text-sm"
+              type="file"
+              accept=".csv,.txt,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void readPortfolioFile(file);
+              }}
+            />
+            <textarea className="min-h-28 w-full rounded-xl border bg-transparent p-3" value={csv} onChange={(event) => { setXlsxBase64(null); setCsv(event.target.value); }} aria-label="Portfolio CSV" />
+            <label className="grid gap-1">
+              Column map
+              <textarea
+                className="min-h-16 w-full rounded-xl border bg-transparent p-3"
+                placeholder='{"consumer_state":"State","ssn":"Social"}'
+                value={mappingText}
+                onChange={(event) => setMappingText(event.target.value)}
+                aria-label="Column map"
+              />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => {
+                try {
+                  void post({ op: "import", csv: xlsxBase64 ? undefined : csv, xlsxBase64: xlsxBase64 ?? undefined, mapping: columnMap(), portfolioId: "pf_upload" }).then((body) => setNotice(`Imported ${body.workable ?? 0} workable, ${body.quarantined ?? 0} quarantined.`));
+                } catch (error) {
+                  setNotice(error instanceof Error ? error.message : "Column map is not valid JSON");
+                }
+              }}>
                 Import
               </Button>
               <Button tone="soft" onClick={() => void post({ op: "return", portfolioId: "pf_upload" }).then((body) => setNotice(`Returned ${body.returned ?? 0} quarantined accounts.`))}>

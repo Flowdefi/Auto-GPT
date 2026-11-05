@@ -8,6 +8,12 @@ import type {
   StateEligibility,
   VoiceCall,
   VoiceSettings,
+  CollectorTask,
+  DraftReply,
+  ConsumerPayment,
+  ImportAudit,
+  OperatorRole,
+  PortalSession,
 } from "@/lib/collections/types";
 
 export type WorkspaceId = "triton" | "aether";
@@ -527,6 +533,12 @@ export interface DatabaseFile {
   complianceEvents?: ComplianceEvent[];
   collectionTemplates?: CollectionTemplate[];
   voiceSettings?: VoiceSettings;
+  collectorTasks?: CollectorTask[];
+  draftReplies?: DraftReply[];
+  consumerPayments?: ConsumerPayment[];
+  importAudits?: ImportAudit[];
+  operatorRoles?: OperatorRole[];
+  portalSessions?: PortalSession[];
 }
 
 export function emptyDb(): DatabaseFile {
@@ -568,5 +580,11 @@ export function emptyDb(): DatabaseFile {
     channelMessages: [],
     complianceEvents: [],
     collectionTemplates: [],
+    collectorTasks: [],
+    draftReplies: [],
+    consumerPayments: [],
+    importAudits: [],
+    operatorRoles: [],
+    portalSessions: [],
   };
 }

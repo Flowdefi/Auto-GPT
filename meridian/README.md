@@ -166,6 +166,8 @@ Outbound AI calls, SMS, email, Lob-style letters, limited-content voicemail, por
 npm run test:collections
 ```
 
+The consumer portal is public at `/collect`. Lookup uses a reference number, the last four of the original account, and ZIP. Do not put an SSN in a URL. Test-mode payment records a receipt and does not collect a card. Collection reports are at `/w/triton/collections/reports` after a seat is signed in. Portfolio import on the desk accepts a column map, a first-sheet xlsx upload, or fixed-width rows. Full SSNs are encrypted and masked. This repository is public: do not load a real portfolio here. Move the app to a private repository first. What is done, stubbed, and still waiting on the owner is in `docs/COLLECTIONS-STATUS.md`.
+
 Put counsel-reviewed Markdown templates in `templates/collections/` and use **Sync templates**. Nothing in that folder is sent until `counselReviewed: true`. The public repo must stay free of real debtor files.
 
 ## Environment

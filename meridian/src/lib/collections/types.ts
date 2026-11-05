@@ -50,6 +50,87 @@ export interface PortfolioAccount {
   inconvenientWork: boolean;
   importedAt: string;
   returnedAt: string | null;
+  originalCreditor?: string;
+  chainOfTitle?: string;
+  placementDate?: string | null;
+  chargeOffDate?: string | null;
+  chargeOffBalanceCents?: number;
+  itemizationDate?: string | null;
+  itemizationAmountCents?: number;
+  paymentsSinceItemizationCents?: number;
+  creditsSinceItemizationCents?: number;
+  feesSinceItemizationCents?: number;
+  lastPaymentDate?: string | null;
+  solExpiresOn?: string | null;
+  solCitation?: string;
+  solNeedsCounselReview?: boolean;
+  ssnCiphertext?: string | null;
+  dobCiphertext?: string | null;
+  accountNumberCiphertext?: string | null;
+  ssnMasked?: string;
+  validationMailedAt?: string | null;
+  disputeDeadline?: string | null;
+  validationNotice?: string | null;
+  /** Removed before the account is stored or returned. */
+  sensitive?: { ssn?: string; dob?: string; accountNumber?: string };
+}
+
+export type CollectionsRole = "admin" | "manager" | "collector" | "compliance" | "read_only";
+
+export interface OperatorRole {
+  email: string;
+  role: CollectionsRole;
+}
+
+export interface CollectorTask {
+  id: string;
+  workspaceId: WorkspaceId;
+  accountId: string;
+  title: string;
+  queue: "collector" | "compliance";
+  status: "open" | "done";
+  createdAt: string;
+}
+
+export interface DraftReply {
+  id: string;
+  workspaceId: WorkspaceId;
+  accountId: string;
+  inbound: string;
+  classification: "dispute" | "cease" | "hardship" | "promise" | "bankruptcy" | "attorney" | "other";
+  draft: string;
+  status: "pending_approval" | "approved" | "rejected";
+  gateAllowed: boolean;
+  gateReason: string;
+  createdAt: string;
+}
+
+export interface ConsumerPayment {
+  id: string;
+  workspaceId: WorkspaceId;
+  accountId: string;
+  amountCents: number;
+  status: "succeeded";
+  provider: "sandbox";
+  providerId: string;
+  at: string;
+}
+
+export interface ImportAudit {
+  id: string;
+  workspaceId: WorkspaceId;
+  portfolioId: string;
+  at: string;
+  created: number;
+  quarantined: number;
+  skipped: number;
+}
+
+export interface PortalSession {
+  tokenHash: string;
+  workspaceId: WorkspaceId;
+  accountId: string;
+  expiresAt: string;
 }
 
 export interface ConsumerConsent {
