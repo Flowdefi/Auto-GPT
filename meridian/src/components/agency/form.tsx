@@ -37,7 +37,7 @@ export function AgencyForm({ kind }: { kind: "contact" | "dispute" }) {
         <textarea id="agency-message" className="min-h-28 rounded-xl border border-[#1c2430] bg-white p-3" required value={summary} onChange={(event) => setSummary(event.target.value)} />
       </label>
       <button className="min-h-11 rounded-full bg-[#1c2430] px-5 text-white" type="submit">Send</button>
-      {notice ? <p role="status" className="text-sm">{notice}</p> : null}
+      {notice ? <p role={notice.startsWith("Received") ? "status" : "alert"} className="text-sm">{notice}</p> : null}
     </form>
   );
 }

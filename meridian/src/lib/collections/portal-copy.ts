@@ -15,6 +15,15 @@ export interface PortalCopy {
   continue: string;
   disclosure: string;
   privacy: string;
+  agencySite: string;
+  privacyLead: string;
+  privacyPayment: string;
+  privacyDispute: string;
+  bankTitle: string;
+  bankBody: string;
+  bankConsent: string;
+  bankSubmit: string;
+  bankProof: string;
   accountTitle: string;
   loading: string;
   back: string;
@@ -72,6 +81,15 @@ export const portalCopy: Record<PortalLang, PortalCopy> = {
     continue: "Continue",
     disclosure: disclosureEn,
     privacy: "Privacy",
+    agencySite: "Agency site",
+    privacyLead: "This portal looks up an account with a reference number, the last four digits of the original account, and a ZIP code. Do not type a Social Security number into the page or the address bar.",
+    privacyPayment: "Test-mode payment records the amount and a sandbox receipt id. It does not ask for a card number, and no card data is stored on this server. A live deployment must use a hosted payment page from a PCI-compliant processor.",
+    privacyDispute: "Dispute text is stored on the account and stops further collection contact until the dispute is reviewed. Full Social Security numbers, dates of birth, and full account numbers, when present on a portfolio file, are encrypted and are not shown on this portal.",
+    bankTitle: "Bank debit authorization",
+    bankBody: "Draft for counsel review under 12 CFR § 1005.10(b). No bank account number is collected on this page.",
+    bankConsent: "I authorize a one-time debit of $25.00 and I have received this copy of the authorization.",
+    bankSubmit: "Authorize test debit",
+    bankProof: "Authorization proof is stored. The copy is the text above.",
     accountTitle: "Account",
     loading: "Loading…",
     back: "Back to lookup",
@@ -122,6 +140,15 @@ export const portalCopy: Record<PortalLang, PortalCopy> = {
     continue: "Continuar",
     disclosure: disclosureEs,
     privacy: "Privacidad",
+    agencySite: "Sitio de la agencia",
+    privacyLead: "Este portal busca una cuenta con un número de referencia, los últimos cuatro dígitos de la cuenta original y un código postal. No escriba un número de Seguro Social.",
+    privacyPayment: "El pago de prueba guarda el monto y un recibo de prueba. No pide un número de tarjeta. Un sitio en vivo debe usar una página de pago alojada por un procesador que cumpla con PCI.",
+    privacyDispute: "El texto de una disputa se guarda en la cuenta y detiene el contacto de cobro hasta que se revise. Los números de Seguro Social, las fechas de nacimiento y los números de cuenta completos, si vienen en un archivo, se cifran y no se muestran aquí.",
+    bankTitle: "Autorización de débito bancario",
+    bankBody: "Borrador para revisión de un abogado bajo 12 CFR § 1005.10(b). Esta página no pide un número de cuenta bancaria.",
+    bankConsent: "Autorizo un débito único de $25.00 y he recibido esta copia de la autorización.",
+    bankSubmit: "Autorizar el débito de prueba",
+    bankProof: "La prueba de autorización está guardada. La copia es el texto de arriba.",
     accountTitle: "Cuenta",
     loading: "Cargando…",
     back: "Volver a la búsqueda",

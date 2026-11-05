@@ -49,7 +49,7 @@ export function PortalFrame({ children }: { children: ReactNode }) {
           {copy.skip}
         </a>
         <div className="mx-auto flex max-w-lg items-center justify-between gap-3 px-6 pt-6 text-sm">
-          <p><span style={{ color: brandColor }}>{brandName}</span>. {copy.counsel} <a className="underline" href="/agency">Agency site</a></p>
+          <p><span style={{ color: brandColor }}>{brandName}</span>. {copy.counsel} <a className="inline-flex min-h-11 items-center underline" href="/agency">{copy.agencySite}</a></p>
           <div role="group" aria-label={copy.language} className="flex shrink-0 gap-2">
             <button type="button" className="min-h-11 underline" aria-pressed={lang === "en"} onClick={() => setLang("en")}>{copy.english}</button>
             <button type="button" className="min-h-11 underline" aria-pressed={lang === "es"} onClick={() => setLang("es")}>{copy.spanish}</button>

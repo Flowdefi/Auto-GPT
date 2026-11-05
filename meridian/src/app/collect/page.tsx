@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { usePortalCopy } from "@/components/collect/portal-frame";
 
 export default function CollectLookupPage() {
@@ -9,6 +9,11 @@ export default function CollectLookupPage() {
   const [last4, setLast4] = useState("");
   const [zip, setZip] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
 
   async function lookup(event: FormEvent) {
     event.preventDefault();
@@ -31,20 +36,20 @@ export default function CollectLookupPage() {
       <p className="text-xs font-semibold uppercase tracking-wide">{copy.lookupEyebrow}</p>
       <h1 className="mt-2 text-3xl font-semibold">{copy.lookupTitle}</h1>
       <p className="mt-3 text-sm leading-6">{copy.lookupBody}</p>
-      <form onSubmit={(event) => void lookup(event)} className="mt-8 grid gap-4" aria-describedby="portal-disclosure">
+      <form onSubmit={(event) => void lookup(event)} className="mt-8 grid gap-4" aria-describedby={error ? "portal-disclosure lookup-error" : "portal-disclosure"}>
         <label className="grid gap-1 text-sm" htmlFor="account-ref">
           {copy.reference}
-          <input id="account-ref" className="min-h-11 rounded-xl border border-[#1c2430] px-3" autoComplete="off" value={accountRef} onChange={(event) => setAccountRef(event.target.value)} required aria-invalid={error ? true : undefined} />
+          <input id="account-ref" className="min-h-11 rounded-xl border border-[#1c2430] px-3" autoComplete="off" value={accountRef} onChange={(event) => setAccountRef(event.target.value)} required aria-invalid={error ? true : undefined} aria-describedby={error ? "lookup-error" : undefined} />
         </label>
         <label className="grid gap-1 text-sm" htmlFor="last-four">
           {copy.last4}
-          <input id="last-four" className="min-h-11 rounded-xl border border-[#1c2430] px-3" inputMode="numeric" autoComplete="off" value={last4} onChange={(event) => setLast4(event.target.value)} required />
+          <input id="last-four" className="min-h-11 rounded-xl border border-[#1c2430] px-3" inputMode="numeric" autoComplete="off" value={last4} onChange={(event) => setLast4(event.target.value)} required aria-invalid={error ? true : undefined} aria-describedby={error ? "lookup-error" : undefined} />
         </label>
         <label className="grid gap-1 text-sm" htmlFor="zip-code">
           {copy.zip}
-          <input id="zip-code" className="min-h-11 rounded-xl border border-[#1c2430] px-3" inputMode="numeric" autoComplete="postal-code" value={zip} onChange={(event) => setZip(event.target.value)} required />
+          <input id="zip-code" className="min-h-11 rounded-xl border border-[#1c2430] px-3" inputMode="numeric" autoComplete="postal-code" value={zip} onChange={(event) => setZip(event.target.value)} required aria-invalid={error ? true : undefined} aria-describedby={error ? "lookup-error" : undefined} />
         </label>
-        {error ? <p className="text-sm text-[#7f1d1d]" role="alert">{copy.error}: {error}</p> : null}
+        {error ? <p id="lookup-error" ref={errorRef} tabIndex={-1} className="text-sm text-[#7f1d1d]" role="alert">{copy.error}: {error}</p> : null}
         <button className="min-h-11 rounded-xl bg-[#1c2430] px-4 text-white" type="submit">
           {copy.continue}
         </button>

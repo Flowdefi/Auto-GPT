@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { usePortalCopy } from "@/components/collect/portal-frame";
 import { limitationsDatePassed } from "@/lib/collections/sol";
 import type { ConsumerPayment, PortfolioAccount } from "@/lib/collections/types";
@@ -19,6 +19,11 @@ export default function CollectAccountPage() {
   const [installment, setInstallment] = useState("25");
   const [authorized, setAuthorized] = useState(false);
   const [proof, setProof] = useState<string | null>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
 
   useEffect(() => {
     void fetch("/api/portal")
@@ -183,14 +188,14 @@ export default function CollectAccountPage() {
         {copy.pay}
       </button>
       <form className="mt-6 grid gap-2 text-sm" onSubmit={(event) => { event.preventDefault(); void payAch(); }}>
-        <h2 className="font-semibold">Bank debit authorization</h2>
-        <p>Draft for counsel review under 12 CFR § 1005.10(b). No bank account number is collected on this page.</p>
+        <h2 className="font-semibold">{copy.bankTitle}</h2>
+        <p>{copy.bankBody}</p>
         <label className="flex min-h-11 items-start gap-2" htmlFor="ach-auth">
           <input id="ach-auth" type="checkbox" checked={authorized} onChange={(event) => setAuthorized(event.target.checked)} />
-          <span>I authorize a one-time debit of $25.00 and I have received this copy of the authorization.</span>
+          <span>{copy.bankConsent}</span>
         </label>
-        <button className="min-h-11 rounded-xl border border-[#1c2430] px-4" type="submit" disabled={!authorized}>Authorize test debit</button>
-        {proof ? <p role="status">Authorization proof {proof} is stored. The copy is the text above.</p> : null}
+        <button className="min-h-11 rounded-xl border border-[#1c2430] px-4" type="submit" disabled={!authorized}>{copy.bankSubmit}</button>
+        {proof ? <p role="status">{copy.bankProof} {proof}</p> : null}
       </form>
       </>
       )}
@@ -204,7 +209,7 @@ export default function CollectAccountPage() {
           {copy.submitDispute}
         </button>
       </form>
-      {error ? <p className="mt-3 text-sm text-[#7f1d1d]" role="alert">{copy.error}: {error}</p> : null}
+      {error ? <p id="account-error" ref={errorRef} tabIndex={-1} className="mt-3 text-sm text-[#7f1d1d]" role="alert">{copy.error}: {error}</p> : null}
       <p className="mt-8 text-sm leading-6">
         {copy.disclosure} {copy.status}: {account.status}.
       </p>

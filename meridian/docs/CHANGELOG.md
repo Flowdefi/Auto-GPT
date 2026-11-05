@@ -18,7 +18,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - Client portal bound to one seller. A client cannot see or recall another seller's accounts.
 - Complaint intake with a 15-day operational date marked for counsel.
 - ACH sandbox authorization under 12 CFR § 1005.10(b), NSF reversal, and receipts that still pass the gate.
-- English and Spanish portal copy and templates, marked for counsel. Skip link, labels, and visible focus on the portal.
+- English and Spanish portal copy and templates, marked for counsel. Skip link, labels, and visible focus on the portal. Lookup and account errors are announced and moved into keyboard focus. Spanish drafts cover privacy, the bank debit, and the limitations hold. This is not a formal accessibility audit.
 
 ## Voice, campaigns, and the collector floor
 
