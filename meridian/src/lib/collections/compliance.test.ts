@@ -97,6 +97,21 @@ test("cell without consent, DNC, cap, kill switch, and 7-in-7 block", () => {
   assert.equal(gate({ reassigned: "unknown" }).allowed, false);
 });
 
+test("sms uses the local window and does not guess a ZIP", () => {
+  const smsConsent = [{ id: "s", workspaceId: "triton" as const, accountId: "acct_test", channel: "sms" as const, source: "written", at: "2026-11-01T00:00:00.000Z" }];
+  const night = gate({ channel: "sms", consents: smsConsent, now: new Date("2026-11-05T04:00:00.000Z") });
+  assert.equal(night.allowed, false);
+  assert.match(night.reason, /8:00 a.m/);
+  const day = gate({ channel: "sms", consents: smsConsent, now: new Date("2026-11-05T18:00:00.000Z") });
+  assert.equal(day.allowed, true);
+  const unknown = gate({ channel: "sms", consents: smsConsent, account: account({ state: "TX", zip: "" }) });
+  assert.equal(unknown.allowed, false);
+  assert.match(unknown.reason, /ZIP/);
+  const emailConsent = [{ id: "e", workspaceId: "triton" as const, accountId: "acct_test", channel: "email" as const, source: "written", at: "2026-11-01T00:00:00.000Z" }];
+  const nightEmail = gate({ channel: "email", consents: emailConsent, now: new Date("2026-11-05T04:00:00.000Z") });
+  assert.equal(nightEmail.allowed, true);
+});
+
 test("calling window uses the consumer zone", () => {
   assert.equal(withinCallingWindow(new Date("2026-11-05T14:00:00.000Z"), "America/Chicago"), true);
   assert.equal(withinCallingWindow(new Date("2026-11-05T13:30:00.000Z"), "America/Chicago"), false);

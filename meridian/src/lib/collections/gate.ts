@@ -219,6 +219,17 @@ export function evaluateGate(ctx: GateContext): GateDecision {
   if (channel === "sms" && !hasConsent(ctx, "sms")) {
     return block("SMS needs stored prior express consent.", "47 U.S.C. § 227. Confirm the campaign's consent standard with counsel.", true);
   }
+  if (channel === "sms") {
+    const zone = consumerTimeZone(account.state, account.zip);
+    if ("error" in zone) return block(zone.error, "12 CFR § 1006.6. Local time is not guessed.", true);
+    if (!withinCallingWindow(ctx.now, zone.zone)) {
+      return block(
+        `Outside 8:00 a.m.–9:00 p.m. in ${zone.zone}.`,
+        "12 CFR § 1006.6. The call window is also applied to SMS. Counsel should confirm that reading. The 9:00 p.m. boundary is enforced as blocked at 9:00 p.m. local.",
+        true,
+      );
+    }
+  }
   if (channel === "email" && ctx.emailSuppressed) {
     return block(
       "This email is suppressed after a bounce or unsubscribe.",
