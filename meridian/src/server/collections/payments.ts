@@ -7,6 +7,13 @@ import { gateFor, refusePastLimitations, sendChannel } from "./service";
 
 const ACCOUNT_NUMBER = /\d{8,}/;
 
+const DRAFT_DISCLOSURE =
+  "This is an attempt to collect a debt and any information obtained will be used for that purpose. This communication is from a debt collector. This sentence is a draft for counsel review.";
+
+function withDisclosure(body: string): string {
+  return `${DRAFT_DISCLOSURE} ${body}`;
+}
+
 export function achProvider(): "sandbox" | "stripe" {
   return process.env.MERIDIAN_ACH_PROVIDER === "stripe" ? "stripe" : "sandbox";
 }
@@ -75,7 +82,7 @@ export async function postAchPayment(input: {
     workspaceId: input.workspaceId,
     accountId: input.accountId,
     channel: "email",
-    body: `Receipt ${payment.id} for ${(input.amountCents / 100).toFixed(2)} USD. ${text}`,
+    body: withDisclosure(`Receipt ${payment.id} for ${(input.amountCents / 100).toFixed(2)} USD. ${text}`),
   });
   if (receipt.status === "blocked") {
     logEvent("receipt_blocked", { accountId: input.accountId, reason: receipt.reason ?? "blocked" });
@@ -117,7 +124,7 @@ export async function reversePayment(workspaceId: WorkspaceId, paymentId: string
     workspaceId,
     accountId: payment.accountId,
     channel: "email",
-    body: returnNotice(payment.id, reason),
+    body: withDisclosure(returnNotice(payment.id, reason)),
   });
   if (notice.status === "blocked") {
     logEvent("return_notice_blocked", { accountId: payment.accountId, reason: notice.reason ?? "blocked" });

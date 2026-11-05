@@ -101,8 +101,13 @@ test("ACH stores authorization proof, posts the balance, and NSF restores it", a
   assert.equal(reversed.status, "nsf");
   const restored = (loadDb().portfolioAccounts ?? []).find((item) => item.id === account.id);
   assert.equal(restored?.balanceCents, 3000);
-  const notice = (loadDb().channelMessages ?? []).find((message) => message.accountId === account.id && message.bodyPreview?.includes("draft notice for counsel review"));
+  const messages = (loadDb().channelMessages ?? []).filter((message) => message.accountId === account.id);
+  const receipt = messages.find((message) => message.bodyPreview?.includes(`Receipt ${payment.id}`));
+  assert.match(receipt?.bodyPreview ?? "", /debt collector/);
+  assert.match(receipt?.bodyPreview ?? "", /draft for counsel review/);
+  const notice = messages.find((message) => message.bodyPreview?.includes("draft notice for counsel review"));
   assert.equal(notice?.status, "sandbox_queued");
+  assert.match(notice?.bodyPreview ?? "", /debt collector/);
   assert.equal(notice?.bodyPreview?.includes("00000000"), false);
   assert.equal(/\b(pay|payment|settle|settlement)\b/i.test(notice?.bodyPreview ?? ""), false);
   const complaint = fileComplaint("triton", { channel: "cfpb", summary: "Example complaint about a letter.", cfpbId: "CFPB-EXAMPLE", rootCause: "communication" });

@@ -18,6 +18,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - The public counsel banner is on every agency page. Dispute and contact form errors focus an alert, and the form says the response date is operational.
 - The sandbox payment page shows a draft mini-Miranda in English and Spanish, with a skip link. It does not take a payment. Counsel must approve that sentence before use outside sandbox.
 - Metro 2 leaves out a past limitations date and any status other than workable. The status field stays blank. Counsel must decide before those accounts are furnished.
+- The ACH receipt and the NSF or reversal email include a draft mini-Miranda. Counsel must approve that sentence. The return email does not ask for another debit.
 
 ## Consumer, client, and public surfaces
 
