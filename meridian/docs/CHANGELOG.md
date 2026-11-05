@@ -19,6 +19,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - The sandbox payment page shows a draft mini-Miranda in English and Spanish, with a skip link. It does not take a payment. Counsel must approve that sentence before use outside sandbox.
 - Metro 2 leaves out a past limitations date and any status other than workable. The status field stays blank. Counsel must decide before those accounts are furnished.
 - The ACH receipt and the NSF or reversal email include a draft mini-Miranda. Counsel must approve that sentence. The return email does not ask for another debit.
+- The account test-payment button points at the error alert. The public accessibility page lists the skip links and form alerts. This is not a formal WCAG audit.
 
 ## Consumer, client, and public surfaces
 

@@ -184,7 +184,7 @@ export default function CollectAccountPage() {
           {copy.savePlan}
         </button>
       </form>
-      <button className="mt-6 min-h-11 rounded-xl bg-[#1c2430] px-4 text-white" type="button" onClick={() => void pay()}>
+      <button className="mt-6 min-h-11 rounded-xl bg-[#1c2430] px-4 text-white" type="button" aria-describedby={error ? "account-error" : undefined} onClick={() => void pay()}>
         {copy.pay}
       </button>
       <form className="mt-6 grid gap-2 text-sm" aria-describedby={error ? "account-error" : undefined} onSubmit={(event) => { event.preventDefault(); void payAch(); }}>

@@ -104,8 +104,9 @@ export function agencyPages(name = agencyName()): AgencyPage[] {
       description: "Accessibility statement for the public pages and the consumer portal.",
       paragraphs: [
         COUNSEL,
-        "These pages use text, labels, and buttons that work with a keyboard. Focus is visible. The consumer portal has a skip link and English and Spanish drafts.",
-        "This is not a formal WCAG audit. Report a barrier through the contact form and include the page name, not an account number.",
+        "The public pages, the consumer portal, and the sandbox payment notice use text, labels, and buttons that work with a keyboard. Focus is visible. Each of those surfaces has a skip link.",
+        "Lookup, account, dispute, and contact errors use an alert. On the account page, the plan, bank debit, dispute fields, and the test-payment button point at that alert.",
+        "English and Spanish drafts cover the portal privacy page, the bank debit, the limitations hold, and the sandbox payment notice. This is not a formal WCAG audit. Report a barrier through the contact form and include the page name, not an account number.",
       ],
     },
   ];

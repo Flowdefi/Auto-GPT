@@ -2,6 +2,16 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { pageBySlug } from "../agency/site";
+
+test("the public accessibility page matches the keyboard paths", () => {
+  const page = pageBySlug("accessibility");
+  assert.ok(page);
+  const text = page.paragraphs.join(" ");
+  assert.match(text, /skip link/);
+  assert.match(text, /test-payment button/);
+  assert.match(text, /not a formal WCAG audit/);
+});
 
 test("the sandbox payment page flags the mini-Miranda as a draft", () => {
   const source = readFileSync(fileURLToPath(new URL("../../app/pay/sandbox/[token]/page.tsx", import.meta.url)), "utf8");
@@ -30,4 +40,5 @@ test("account portal fields point at the error alert", () => {
   for (const id of ["plan-months", "plan-amount", "ach-auth", "dispute-text"]) {
     assert.match(source, new RegExp(`id="${id}"[\\s\\S]*aria-describedby=\\{error \\? "account-error" : undefined\\}`));
   }
+  assert.match(source, /aria-describedby=\{error \? "account-error" : undefined\} onClick=\{\(\) => void pay\(\)\}/);
 });
