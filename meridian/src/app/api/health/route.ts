@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { NextResponse } from "next/server";
 import { llmStatus } from "@/server/ai/cto";
 import { embedStatus } from "@/server/ai/embeddings";
@@ -10,14 +12,28 @@ import { sqliteStats } from "@/server/sqlite";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+let version = "";
+
+function appVersion(): string {
+  if (version) return version;
+  try {
+    const parsed = JSON.parse(readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as { version?: string };
+    version = parsed.version || "0.0.0";
+  } catch {
+    version = "0.0.0";
+  }
+  return version;
+}
+
 export function GET(request: Request) {
   const seat = seatFromRequest(request);
   if (!seat?.licensed) {
-    return NextResponse.json({ ok: true, app: "meridian" });
+    return NextResponse.json({ ok: true, version: appVersion(), app: "meridian" });
   }
   const db = loadDb();
   return NextResponse.json({
     ok: true,
+    version: appVersion(),
     app: "meridian",
     mail: providerStatus(),
     outlook: outlookStatus(),

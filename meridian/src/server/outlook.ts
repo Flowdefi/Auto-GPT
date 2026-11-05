@@ -39,10 +39,14 @@ export function outlookStatus(): {
   return {
     configured: Boolean(config),
     mailboxes: config?.mailboxes ?? ["portfolios@debtmarket.net"],
-    scopesNeeded: ["Mail.ReadBasic.All or Mail.Read (application)", "User.Read.All (optional, for names)"],
+    scopesNeeded: [
+      "Mail.Read (application)",
+      "Contacts.Read (application)",
+      "Files.Read.All (application)",
+    ],
     hint: config
-      ? "App-only credentials present. Run a sync to pull the mailbox delta."
-      : "Set MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, and MS_MAILBOXES. Grant admin consent for Mail.Read (application) and scope it with an application access policy.",
+      ? "App-only credentials present. npm run sync:graph pulls Inbox, Sent, Drafts, and mailbox contacts."
+      : "Set MS_TENANT_ID, MS_CLIENT_ID, and MS_CLIENT_SECRET. Sync no-ops until those are set. Grant admin consent and an application access policy for the mailbox.",
   };
 }
 

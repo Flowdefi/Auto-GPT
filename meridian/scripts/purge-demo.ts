@@ -1,3 +1,4 @@
+import "./load-env";
 import { parsePurgeArgs, purgeDemoRecords } from "../src/server/purge-demo";
 
 try {

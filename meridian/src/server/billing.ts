@@ -113,6 +113,29 @@ export function claimReservedLicense(account: Account): LicenseRecord | null {
   return updated ? asLicense(updated) : null;
 }
 
+export function attachSeatToEmail(email: string): {
+  email: string;
+  accountId: string;
+  status: "attached" | "already";
+} {
+  const account = accountByEmail(email);
+  if (!account) {
+    throw new Error(`No account for ${email}. Create the owner at /signup, then rerun seat:attach.`);
+  }
+  const existing = sqliteGet(
+    "SELECT id FROM licenses WHERE account_id = ? AND redeemed_at IS NOT NULL LIMIT 1",
+    account.id,
+  );
+  if (existing?.id) return { email: account.email, accountId: account.id, status: "already" };
+  createLicense({
+    kind: "minted",
+    email: account.email,
+    accountId: account.id,
+    notes: "Attached with npm run seat:attach",
+  });
+  return { email: account.email, accountId: account.id, status: "attached" };
+}
+
 export function unusedLicenseForEmail(email: string): LicenseRecord | null {
   const row = sqliteGet(
     "SELECT * FROM licenses WHERE email = ? AND account_id IS NULL ORDER BY created_at DESC LIMIT 1",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ContactForm } from "@/components/crm/contact-form";
 import { saveRemoteContact, useCrmDirectory } from "@/components/crm/use-crm";
@@ -9,7 +9,7 @@ import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
 import { contactName, money, when } from "@/lib/format";
 import { safeHttpUrl } from "@/lib/debt";
 import { useMeridian } from "@/lib/store";
-import type { Contact } from "@/lib/types";
+import type { Activity, Contact } from "@/lib/types";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 function closedLabel(value: Contact["closedDeal"]): string {
@@ -37,7 +37,21 @@ export default function ContactRecordPage() {
   const [note, setNote] = useState("");
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [serverActivities, setServerActivities] = useState<Activity[]>([]);
   const contact = directory.contacts.find((item) => item.id === params.id);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`/api/activities?workspace=${workspaceId}&contactId=${params.id}`)
+      .then(async (response) => (response.ok ? ((await response.json()) as { activities?: Activity[] }) : { activities: [] }))
+      .then((body) => {
+        if (!cancelled) setServerActivities(body.activities ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id, workspaceId]);
 
   if (!directory.ready) return <PageHeader title="Loading contact…" />;
   if (!contact) return <PageHeader title="Contact not found" />;
@@ -45,7 +59,11 @@ export default function ContactRecordPage() {
 
   const company = directory.companies.find((item) => item.id === record.companyId);
   const deals = data.deals.filter((deal) => deal.contactId === contact.id);
-  const activities = data.activities.filter((activity) => activity.contactId === contact.id);
+  const localActivities = data.activities.filter((activity) => activity.contactId === contact.id);
+  const seen = new Set(serverActivities.map((activity) => activity.id));
+  const activities = [...serverActivities, ...localActivities.filter((activity) => !seen.has(activity.id))].sort((left, right) =>
+    right.at.localeCompare(left.at),
+  );
   const linkedin = safeHttpUrl(contact.linkedin);
   const owner = data.users.find((user) => user.id === contact.ownerId);
 
@@ -133,14 +151,35 @@ export default function ContactRecordPage() {
               <Button
                 onClick={() => {
                   if (!note.trim()) return;
-                  addActivity({
-                    type: "note",
-                    subject: "Note",
-                    body: note,
-                    contactId: contact.id,
-                    companyId: contact.companyId,
-                  });
+                  const text = note;
                   setNote("");
+                  if (!directory.remote) {
+                    addActivity({
+                      type: "note",
+                      subject: "Note",
+                      body: text,
+                      contactId: contact.id,
+                      companyId: contact.companyId,
+                    });
+                    return;
+                  }
+                  void fetch("/api/activities", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      workspaceId,
+                      kind: "note",
+                      subject: "Note",
+                      body: text,
+                      contactId: contact.id,
+                      companyId: contact.companyId,
+                      source: "ui",
+                    }),
+                  }).then(() =>
+                    fetch(`/api/activities?workspace=${workspaceId}&contactId=${contact.id}`)
+                      .then((response) => response.json())
+                      .then((body: { activities?: Activity[] }) => setServerActivities(body.activities ?? [])),
+                  );
                 }}
               >
                 Log
@@ -152,7 +191,7 @@ export default function ContactRecordPage() {
             <Timeline
               items={activities.map((activity) => ({
                 id: activity.id,
-                title: `${activity.type} · ${activity.subject}`,
+                title: `${activity.channel ?? activity.type} · ${activity.subject}`,
                 body: activity.body,
                 meta: when(activity.at),
               }))}

@@ -3,7 +3,7 @@
   "short_name": "Meridian",
   "description": "CRM, sales, marketing, SEO, service, and AI for Triton Financial Solutions and Aether Digital Markets.",
   "id": "/",
-  "start_url": "/",
+  "start_url": "/w/triton/crm/contacts",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
@@ -39,24 +39,29 @@
   ],
   "shortcuts": [
     {
-      "name": "Leads",
-      "short_name": "Leads",
-      "url": "/w/triton/leads"
+      "name": "Contacts",
+      "short_name": "Contacts",
+      "url": "/w/triton/crm/contacts"
     },
     {
-      "name": "Email blast",
-      "short_name": "Blast",
-      "url": "/w/triton/marketing/bulk"
+      "name": "Companies",
+      "short_name": "Companies",
+      "url": "/w/triton/crm/companies"
     },
     {
-      "name": "AI CTO",
-      "short_name": "AI",
-      "url": "/w/triton/ai"
+      "name": "Deals",
+      "short_name": "Deals",
+      "url": "/w/triton/sales/deals"
     },
     {
-      "name": "SEO",
-      "short_name": "SEO",
-      "url": "/w/triton/seo"
+      "name": "Inventory",
+      "short_name": "Inventory",
+      "url": "/w/triton/inventory"
+    },
+    {
+      "name": "Activities",
+      "short_name": "Activities",
+      "url": "/w/triton/activities"
     }
   ]
 }

@@ -1,11 +1,13 @@
 "use client";
 
 import {
+  Activity,
   BarChart3,
   Bot,
   Briefcase,
   Building2,
   FileText,
+  HardDrive,
   Home,
   Inbox,
   KeyRound,
@@ -28,11 +30,13 @@ import {
 } from "lucide-react";
 
 const ICONS: Record<string, LucideIcon> = {
+  Activity,
   BarChart3,
   Bot,
   Briefcase,
   Building2,
   FileText,
+  HardDrive,
   Home,
   Inbox,
   KeyRound,

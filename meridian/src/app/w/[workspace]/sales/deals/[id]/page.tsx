@@ -1,22 +1,38 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Timeline } from "@/components/tables";
 import { Badge, Button, Card, Field, PageHeader } from "@/components/meridian/legacy";
 import { meridianReply } from "@/lib/ai";
+import { safeHttpUrl } from "@/lib/debt";
 import { centsOnDollar, money, when } from "@/lib/format";
 import { useMeridian } from "@/lib/store";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 export default function DealRecordPage() {
   const params = useParams<{ id: string }>();
-  const { config, data } = useActiveWorkspace();
+  const { workspaceId, config, data } = useActiveWorkspace();
   const addActivity = useMeridian((state) => state.addActivity);
   const moveDeal = useMeridian((state) => state.moveDeal);
   const pushAi = useMeridian((state) => state.pushAi);
   const [note, setNote] = useState("");
+  const [fileUrl, setFileUrl] = useState("");
   const deal = data.deals.find((item) => item.id === params.id);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`/api/crm/deals?workspace=${workspaceId}`)
+      .then(async (response) => (response.ok ? ((await response.json()) as { deals?: Array<{ id: string; fileUrl?: string }> }) : { deals: [] }))
+      .then((body) => {
+        if (cancelled) return;
+        setFileUrl(body.deals?.find((row) => row.id === params.id)?.fileUrl ?? "");
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id, workspaceId]);
   if (!deal) return <PageHeader title="Deal not found" />;
   const company = data.companies.find((item) => item.id === deal.companyId);
   const contact = data.contacts.find((item) => item.id === deal.contactId);
@@ -122,6 +138,11 @@ export default function DealRecordPage() {
               {contact?.firstName} {contact?.lastName}
             </div>
             <div>Close {deal.closeDate}</div>
+            {safeHttpUrl(fileUrl) ? (
+              <a href={safeHttpUrl(fileUrl) ?? undefined} target="_blank" rel="noreferrer" className="text-[var(--brand-text)]">
+                OneDrive file
+              </a>
+            ) : null}
             {quote ? (
               <div>
                 Quote {quote.name} · <Badge>{quote.status}</Badge>

@@ -2,7 +2,7 @@ import { blankCompany, blankContact, isCompanyKind, normalizeCompany, normalizeC
 import type { Company, Contact, WorkspaceId } from "@/lib/types";
 import { loadDb, mutate, nextId } from "./db";
 import type { CrmCompany, CrmContact, DatabaseFile, SuppressionReason } from "./models";
-import { sqliteAll, sqliteExec, sqliteRun } from "./sqlite";
+import { sqliteAll, sqliteExec, sqliteGet, sqliteRun } from "./sqlite";
 
 export interface SuppressionEdit {
   add: SuppressionReason[];
@@ -12,6 +12,7 @@ export interface SuppressionEdit {
 export function suppressionEdits(
   existing: Array<{ email: string; reason: SuppressionReason }>,
   contact: Contact,
+  options?: { retainExisting?: boolean },
 ): SuppressionEdit {
   const email = contact.email.trim().toLowerCase();
   const add: SuppressionReason[] = [];
@@ -20,9 +21,11 @@ export function suppressionEdits(
   const has = (reason: SuppressionReason) =>
     existing.some((row) => row.email.toLowerCase() === email && row.reason === reason);
   if (contact.doNotEmail && !has("do_not_email")) add.push("do_not_email");
-  if (!contact.doNotEmail && has("do_not_email")) remove.push("do_not_email");
+  if (!options?.retainExisting && !contact.doNotEmail && has("do_not_email")) remove.push("do_not_email");
   if (contact.emailStatus === "invalid" && !has("invalid_email")) add.push("invalid_email");
-  if (contact.emailStatus !== "invalid" && has("invalid_email")) remove.push("invalid_email");
+  if (!options?.retainExisting && contact.emailStatus !== "invalid" && has("invalid_email")) {
+    remove.push("invalid_email");
+  }
   if (contact.emailStatus === "bounced" && !has("bounce")) add.push("bounce");
   return { add, remove };
 }
@@ -32,10 +35,11 @@ export function reconcileContactSuppression(
   workspaceId: WorkspaceId,
   contact: Contact,
   at = new Date().toISOString(),
+  options?: { retainExisting?: boolean },
 ): void {
   const email = contact.email.trim().toLowerCase();
   if (!email) return;
-  const edits = suppressionEdits(db.suppressions, contact);
+  const edits = suppressionEdits(db.suppressions, contact, options);
   for (const reason of edits.remove) {
     const index = db.suppressions.findIndex(
       (row) => row.workspaceId === workspaceId && row.email.toLowerCase() === email && row.reason === reason,
@@ -209,9 +213,58 @@ function contactLabel(contact: Contact): string {
   return name || contact.email || contact.id;
 }
 
+export function readCrmJson(workspaceId: WorkspaceId, kind: string): Array<Record<string, unknown>> {
+  try {
+    return sqliteAll(
+      "SELECT json FROM crm_records WHERE workspace_id = ? AND kind = ? ORDER BY updated_at DESC",
+      workspaceId,
+      kind,
+    ).flatMap((row) => {
+      try {
+        const parsed = JSON.parse(String(row.json)) as Record<string, unknown>;
+        return parsed && typeof parsed === "object" ? [parsed] : [];
+      } catch {
+        return [];
+      }
+    });
+  } catch (error) {
+    console.warn(`crm_records ${kind} read failed:`, error instanceof Error ? error.message : error);
+    return [];
+  }
+}
+
+export function readCrmOne(workspaceId: WorkspaceId, kind: string, id: string): Record<string, unknown> | null {
+  try {
+    const row = sqliteGet(
+      "SELECT json FROM crm_records WHERE workspace_id = ? AND kind = ? AND id = ?",
+      workspaceId,
+      kind,
+      id,
+    );
+    if (!row?.json) return null;
+    const parsed = JSON.parse(String(row.json)) as Record<string, unknown>;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function patchCrmJson(
+  workspaceId: WorkspaceId,
+  kind: string,
+  id: string,
+  label: string,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  const current = readCrmOne(workspaceId, kind, id) ?? { id };
+  const next = { ...current, ...patch, id };
+  writeCrmBlobs(workspaceId, kind, [{ id, label, json: JSON.stringify(next) }]);
+  return next;
+}
+
 export function writeCrmBlobs(
   workspaceId: WorkspaceId,
-  kind: "contacts" | "companies",
+  kind: string,
   records: Array<{ id: string; label: string; json: string }>,
 ): void {
   if (records.length === 0) return;
@@ -279,14 +332,24 @@ export function markDemoPurged(workspaceId: WorkspaceId): void {
   );
 }
 
-export function saveContact(workspaceId: WorkspaceId, input: Partial<Contact> & { id?: string }): Contact {
+export function saveContact(
+  workspaceId: WorkspaceId,
+  input: Partial<Contact> & { id?: string },
+  options?: { retainSuppressions?: boolean },
+): Contact {
   const contact = normalizeContact({ ...blankContact(), ...input, id: input.id?.trim() || nextId("ct") });
   if (!contact.firstName && !contact.lastName && !contact.email) {
     throw new Error("A name or email is required");
   }
   mutate((db) => {
     mergeContact(db, workspaceId, contact);
-    reconcileContactSuppression(db, workspaceId, contact);
+    reconcileContactSuppression(
+      db,
+      workspaceId,
+      contact,
+      new Date().toISOString(),
+      options?.retainSuppressions ? { retainExisting: true } : undefined,
+    );
   });
   writeCrmBlobs(workspaceId, "contacts", [
     { id: contact.id, label: contactLabel(contact), json: JSON.stringify(contact) },

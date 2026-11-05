@@ -7,29 +7,32 @@ export interface NavItem {
   icon: string;
   group: "Workspace" | "Revenue" | "Marketing" | "Platform";
   mobile?: boolean;
+  short?: string;
 }
 
 export function navFor(workspaceId: WorkspaceId): NavItem[] {
   const base = `/w/${workspaceId}`;
   const inventory = workspaceId === "triton" ? "Portfolios" : "Inventory";
   return [
-    { href: `${base}/home`, label: "Home", hub: "home", icon: "Home", group: "Workspace", mobile: true },
-    { href: `${base}/crm/contacts`, label: "Contacts", hub: "crm", icon: "Users", group: "Workspace", mobile: true },
+    { href: `${base}/home`, label: "Home", hub: "home", icon: "Home", group: "Workspace" },
+    { href: `${base}/crm/contacts`, label: "Contacts", hub: "crm", icon: "Users", group: "Workspace" },
     { href: `${base}/crm/companies`, label: "Companies", hub: "crm", icon: "Building2", group: "Workspace" },
-    { href: `${base}/conversations`, label: "Inbox", hub: "conversations", icon: "Inbox", group: "Workspace", mobile: true },
+    { href: `${base}/activities`, label: "Activities", hub: "crm", icon: "Activity", group: "Workspace" },
+    { href: `${base}/conversations`, label: "Inbox", hub: "conversations", icon: "Inbox", group: "Workspace" },
 
     { href: `${base}/leads`, label: "Leads", hub: "sales", icon: "Target", group: "Revenue" },
-    { href: `${base}/sales/deals`, label: "Deals", hub: "sales", icon: "Briefcase", group: "Revenue", mobile: true },
+    { href: `${base}/sales/deals`, label: "Deals", hub: "sales", icon: "Briefcase", group: "Revenue" },
     { href: `${base}/sales/forecast`, label: "Forecast", hub: "sales", icon: "TrendingUp", group: "Revenue" },
     { href: `${base}/sales/sequences`, label: "Sequences", hub: "sales", icon: "ListChecks", group: "Revenue" },
-    { href: `${base}/marketplace`, label: inventory, hub: "marketplace", icon: "Layers", group: "Revenue" },
+    { href: `${base}/inventory`, label: inventory, hub: "marketplace", icon: "Layers", group: "Revenue" },
 
     { href: `${base}/marketing/bulk`, label: "Email blast", hub: "marketing", icon: "Send", group: "Marketing" },
     { href: `${base}/marketing/campaigns`, label: "Campaigns", hub: "marketing", icon: "Megaphone", group: "Marketing" },
     { href: `${base}/seo`, label: "SEO", hub: "seo", icon: "Search", group: "Marketing" },
     { href: `${base}/content/pages`, label: "Content", hub: "content", icon: "FileText", group: "Marketing" },
 
-    { href: `${base}/ai`, label: "AI CTO", hub: "ai", icon: "Sparkles", group: "Platform", mobile: true },
+    { href: `${base}/ai`, label: "AI CTO", hub: "ai", icon: "Sparkles", group: "Platform" },
+    { href: `${base}/files`, label: "OneDrive", hub: "automation", icon: "HardDrive", group: "Platform" },
     { href: `${base}/automation`, label: "Automation", hub: "automation", icon: "Workflow", group: "Platform" },
     { href: `${base}/data/graph`, label: "Graph / RAG", hub: "automation", icon: "Network", group: "Platform" },
     { href: `${base}/reporting`, label: "Reporting", hub: "reporting", icon: "BarChart3", group: "Platform" },
@@ -47,8 +50,22 @@ export function navFor(workspaceId: WorkspaceId): NavItem[] {
   ];
 }
 
+export function mobileNav(workspaceId: WorkspaceId): NavItem[] {
+  const base = `/w/${workspaceId}`;
+  return [
+    { href: `${base}/crm/contacts`, label: "Contacts", short: "Contacts", hub: "crm", icon: "Users", group: "Workspace" },
+    { href: `${base}/crm/companies`, label: "Companies", short: "Companies", hub: "crm", icon: "Building2", group: "Workspace" },
+    { href: `${base}/sales/deals`, label: "Deals", short: "Deals", hub: "sales", icon: "Briefcase", group: "Revenue" },
+    { href: `${base}/inventory`, label: "Inventory", short: "Inventory", hub: "marketplace", icon: "Layers", group: "Revenue" },
+    { href: `${base}/activities`, label: "Activities", short: "Activity", hub: "crm", icon: "Activity", group: "Workspace" },
+  ];
+}
+
 export function hubFromPath(pathname: string): HubId {
   if (pathname.includes("/conversations")) return "conversations";
+  if (pathname.includes("/activities")) return "crm";
+  if (pathname.includes("/inventory")) return "marketplace";
+  if (pathname.includes("/files")) return "automation";
   if (pathname.includes("/crm")) return "crm";
   if (pathname.includes("/leads")) return "sales";
   if (pathname.includes("/sales")) return "sales";

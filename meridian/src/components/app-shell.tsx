@@ -18,7 +18,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { haptic, isIos } from "@/lib/ios";
-import { hubFromPath, navFor, type NavItem } from "@/lib/nav";
+import { hubFromPath, mobileNav, navFor, type NavItem } from "@/lib/nav";
 import { useMeridian } from "@/lib/store";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 import { cn } from "@/lib/utils";
@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const hub = hubFromPath(pathname);
   const nav = navFor(workspaceId);
-  const mobileTabs = nav.filter((item) => item.mobile).slice(0, 5);
+  const mobileTabs = mobileNav(workspaceId);
 
   useEffect(() => setIos(isIos()), []);
 
@@ -297,12 +297,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* iOS-style bottom tab bar */}
       <nav
-        className="ios-blur fixed inset-x-0 bottom-0 z-30 border-t bg-background/90 pb-[var(--safe-b)] lg:hidden"
+        className="ios-blur fixed inset-x-0 bottom-0 z-30 border-t bg-background/90 pb-[var(--safe-b)] pl-[var(--safe-l)] pr-[var(--safe-r)] lg:hidden"
         aria-label="Primary"
       >
         <div className="grid grid-cols-5">
           {mobileTabs.map((item) => {
-            const active = pathname.startsWith(item.href) || hub === item.hub;
+            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link
                 key={item.href}
@@ -315,7 +315,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 )}
               >
                 <NavIcon name={item.icon} className="size-5" />
-                {item.label}
+                <span className="max-w-full truncate px-1">{item.short ?? item.label}</span>
               </Link>
             );
           })}
