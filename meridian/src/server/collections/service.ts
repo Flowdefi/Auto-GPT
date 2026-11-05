@@ -463,6 +463,11 @@ export async function sendChannel(input: {
   fetchImpl?: FetchLike;
 }): Promise<ChannelMessage> {
   const account = accounts(input.workspaceId).find((item) => item.id === input.accountId) ?? null;
+  if (account?.addressStatus === "returned" && input.channel === "letter") {
+    const blocked = storeMessage(input, "blocked", "Returned mail is on file. Letter sequences stay paused until the address is reviewed.", null);
+    logEvent(input.workspaceId, input.channel, input.accountId, false, blocked.reason ?? "returned mail");
+    return blocked;
+  }
   const template = (loadDb().collectionTemplates ?? []).find((item) => item.id === input.templateId);
   if (template && !template.ownerApproved) {
     const blocked = storeMessage(input, "blocked", "Template stays disabled until an owner approves it for sending.", null);

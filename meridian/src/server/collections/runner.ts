@@ -2,7 +2,10 @@ import type { ComplianceEvent } from "@/lib/collections/types";
 import { accountsReadyToPurge, retentionDays, scheduleSteps, type CollectionJob, type CollectionSequence, type SequenceStep } from "@/lib/collections/jobs";
 import type { WorkspaceId } from "@/lib/types";
 import { loadDb, mutate, nextId } from "@/server/db";
+import { tickCampaign } from "./dialer";
 import { sweepBrokenPromises } from "./floor";
+import { runMailQueue } from "./letters";
+import { emitDeskMetrics, ensureDigestJobs, writeComplianceDigest } from "./observe";
 import { sendChannel } from "./service";
 
 function workspaces(): WorkspaceId[] {
@@ -106,45 +109,83 @@ function finish(job: CollectionJob, status: CollectionJob["status"], result: str
   });
 }
 
+function scheduleNext(job: CollectionJob, kind: CollectionJob["kind"], runAt: string, payload: Record<string, string>): void {
+  mutate((db) => {
+    db.jobs = [
+      ...(db.jobs ?? []),
+      { id: nextId("job"), workspaceId: job.workspaceId, kind, runAt, status: "pending", payload, createdAt: new Date().toISOString() },
+    ];
+  });
+}
+
 export async function runDueJobs(now = new Date()): Promise<Array<{ id: string; status: string; result: string }>> {
   sweepBrokenPromises(now);
   ensureRetentionJobs(now);
+  ensureDigestJobs(now);
+  await runMailQueue();
   const due = (loadDb().jobs ?? []).filter((job) => job.status === "pending" && job.runAt <= now.toISOString());
   const results: Array<{ id: string; status: string; result: string }> = [];
+  const seen = new Set<string>();
+  for (const job of due) {
+    if (seen.has(job.workspaceId)) continue;
+    seen.add(job.workspaceId);
+    await emitDeskMetrics(job.workspaceId);
+  }
   for (const job of due) {
     try {
       let result = "done";
-      if (job.kind === "retention_purge") {
-        const count = purgeExpiredIdentifiers(job.workspaceId, now);
-        result = `purged ${count}`;
-        const next = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-        mutate((db) => {
-          db.jobs = [
-            ...(db.jobs ?? []),
-            { id: nextId("job"), workspaceId: job.workspaceId, kind: "retention_purge", runAt: next, status: "pending", payload: {}, createdAt: now.toISOString() },
-          ];
-        });
-      } else {
-        const channel = job.payload.channel;
-        const accountId = job.payload.accountId;
-        const templateId = job.payload.templateId;
-        if (!accountId || (channel !== "email" && channel !== "sms" && channel !== "letter" && channel !== "voice_outbound")) {
-          throw new Error("Job payload is incomplete");
+      switch (job.kind) {
+        case "retention_purge": {
+          const count = purgeExpiredIdentifiers(job.workspaceId, now);
+          result = `purged ${count}`;
+          scheduleNext(job, "retention_purge", new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(), {});
+          break;
         }
-        const message = await sendChannel({
-          workspaceId: job.workspaceId,
-          accountId,
-          channel,
-          body: "",
-          templateId,
-          destination: job.payload.destination,
-        });
-        if (message.status === "blocked") {
-          finish(job, "blocked", message.reason ?? "blocked");
-          results.push({ id: job.id, status: "blocked", result: message.reason ?? "blocked" });
-          continue;
+        case "campaign_tick": {
+          const campaignId = job.payload.campaignId;
+          if (!campaignId) throw new Error("Campaign tick is missing an id");
+          const placed = await tickCampaign(job.workspaceId, campaignId);
+          result = `placed ${placed}`;
+          const campaign = (loadDb().dialCampaigns ?? []).find((item) => item.id === campaignId);
+          if (campaign?.status === "running") {
+            scheduleNext(job, "campaign_tick", new Date(now.getTime() + 60 * 1000).toISOString(), { campaignId });
+          }
+          break;
         }
-        result = message.providerId ?? "queued";
+        case "compliance_digest": {
+          const digest = await writeComplianceDigest(job.workspaceId, now);
+          result = digest.delivery;
+          scheduleNext(job, "compliance_digest", new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(), {});
+          break;
+        }
+        case "sequence_step":
+        case "scheduled_send": {
+          const channel = job.payload.channel;
+          const accountId = job.payload.accountId;
+          const templateId = job.payload.templateId;
+          if (!accountId || (channel !== "email" && channel !== "sms" && channel !== "letter" && channel !== "voice_outbound")) {
+            throw new Error("Job payload is incomplete");
+          }
+          const message = await sendChannel({
+            workspaceId: job.workspaceId,
+            accountId,
+            channel,
+            body: "",
+            templateId,
+            destination: job.payload.destination,
+          });
+          if (message.status === "blocked") {
+            finish(job, "blocked", message.reason ?? "blocked");
+            results.push({ id: job.id, status: "blocked", result: message.reason ?? "blocked" });
+            continue;
+          }
+          result = message.providerId ?? "queued";
+          break;
+        }
+        default: {
+          const neverKind: never = job.kind;
+          throw new Error(`Unknown job kind ${neverKind}`);
+        }
       }
       finish(job, "done", result);
       results.push({ id: job.id, status: "done", result });

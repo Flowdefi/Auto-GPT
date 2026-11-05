@@ -52,6 +52,8 @@ export interface PortfolioAccount {
   phoneCiphertext?: string | null;
   emailCiphertext?: string | null;
   addressCiphertext?: string | null;
+  /** Returned mail pauses letter sequences until someone reviews the address. */
+  addressStatus?: "ok" | "returned";
   importedAt: string;
   returnedAt: string | null;
   originalCreditor?: string;
@@ -289,6 +291,9 @@ export interface VoiceCall {
   providerId: string | null;
   transferred: boolean;
   recordingCiphertext?: string | null;
+  operatorEmail?: string | null;
+  callbackAt?: string | null;
+  notesCiphertext?: string | null;
 }
 
 export interface ChannelMessage {

@@ -22,6 +22,11 @@ export default function Account360Page() {
   const [channel, setChannel] = useState("email");
   const [dueOn, setDueOn] = useState("2026-12-01");
   const [notice, setNotice] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ allowed: boolean; reason: string; citation: string; mode: string; attemptsIn7Days: number; liveWillDial: boolean } | null>(null);
+  const [callId, setCallId] = useState<string | null>(null);
+  const [disposition, setDisposition] = useState("no_answer");
+  const [notes, setNotes] = useState("");
+  const [callbackAt, setCallbackAt] = useState("");
 
   async function refresh() {
     const response = await fetch("/api/collections", {
@@ -49,8 +54,36 @@ export default function Account360Page() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ workspaceId, accountId: params.id, ...payload }),
     });
-    const body = (await response.json()) as { error?: string; message?: { status?: string; reason?: string } };
-    setNotice(body.error ?? body.message?.reason ?? "Recorded. The compliance gate still decides whether a message can leave.");
+    const body = (await response.json()) as {
+      error?: string;
+      message?: { status?: string; reason?: string };
+      allowed?: boolean;
+      reason?: string;
+      citation?: string;
+      mode?: string;
+      attemptsIn7Days?: number;
+      liveWillDial?: boolean;
+      id?: string;
+      live?: { sandbox?: boolean; held?: string | null };
+      say?: string;
+    };
+    if (payload.op === "dial_preview" && typeof body.allowed === "boolean") {
+      setPreview({
+        allowed: body.allowed,
+        reason: body.reason ?? "",
+        citation: body.citation ?? "",
+        mode: body.mode ?? "sandbox",
+        attemptsIn7Days: body.attemptsIn7Days ?? 0,
+        liveWillDial: Boolean(body.liveWillDial),
+      });
+    }
+    if (payload.op === "voice_start" && body.id) {
+      setCallId(body.id);
+      const mode = body.live?.held === "training" ? "Training seat. The sandbox walkthrough is open and the live adapter stayed off." : body.live?.sandbox === false ? "Live adapter accepted the call." : "Sandbox walkthrough. Nothing was dialed.";
+      setNotice(body.error ?? `${mode} ${body.say ?? ""}`.trim());
+    } else {
+      setNotice(body.error ?? body.message?.reason ?? body.reason ?? "Recorded. The compliance gate still decides whether a message can leave.");
+    }
     await refresh();
   }
 
@@ -76,7 +109,7 @@ export default function Account360Page() {
           <input className="min-h-11 rounded-xl border bg-transparent px-3" value={templateId} onChange={(event) => setTemplateId(event.target.value)} aria-label="Template" />
         </label>
         <Button onClick={() => void post({ op: "channel", channel, templateId })}>Send from template</Button>
-        <Button tone="soft" onClick={() => void post({ op: "voice_start", direction: "outbound" })}>Open sandbox call</Button>
+        <Button tone="soft" onClick={() => void post({ op: "dial_preview" })}>Check before dial</Button>
         <label className="grid gap-1">Promise date
           <input className="min-h-11 rounded-xl border bg-transparent px-3" type="date" value={dueOn} onChange={(event) => setDueOn(event.target.value)} aria-label="Promise date" />
         </label>
@@ -86,6 +119,35 @@ export default function Account360Page() {
           <Button tone="soft" onClick={() => void post({ op: "skip_trace" })}>Skip-trace</Button>
         </div>
       </Card>
+      {preview ? (
+        <Card className="mb-4 p-4 text-sm">
+          <div className="flex flex-wrap gap-2">
+            <Badge tone={preview.allowed ? "good" : "warn"}>{preview.allowed ? "Gate allows the call" : "Gate blocks the call"}</Badge>
+            <Badge>{preview.mode === "live" && preview.liveWillDial ? "Live adapter" : "Sandbox walkthrough"}</Badge>
+          </div>
+          <p className="mt-2">{preview.reason}</p>
+          <p className="mt-1 text-muted-foreground">{preview.citation}</p>
+          <p className="mt-1">{preview.attemptsIn7Days} telephone attempts already counted in seven days.</p>
+          <Button className="mt-3" disabled={!preview.allowed} onClick={() => void post({ op: "voice_start", direction: "outbound" })}>Connect</Button>
+        </Card>
+      ) : null}
+      {callId ? (
+        <Card className="mb-4 grid gap-3 p-4 text-sm">
+          <p>After-call work for this attempt. Notes stay encrypted on the call.</p>
+          <label className="grid gap-1">Disposition
+            <select className="min-h-11 rounded-xl border bg-transparent px-2" value={disposition} onChange={(event) => setDisposition(event.target.value)} aria-label="Disposition">
+              {["connected", "no_answer", "busy", "wrong_party", "promise", "callback", "dispute", "cease", "refused"].map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1">Notes
+            <input className="min-h-11 rounded-xl border bg-transparent px-3" value={notes} onChange={(event) => setNotes(event.target.value)} aria-label="Call notes" />
+          </label>
+          <label className="grid gap-1">Callback date
+            <input className="min-h-11 rounded-xl border bg-transparent px-3" type="date" value={callbackAt} onChange={(event) => setCallbackAt(event.target.value)} aria-label="Callback date" />
+          </label>
+          <Button onClick={() => void post({ op: "call_wrap", callId, disposition, notes, callbackAt, amountCents: disposition === "promise" ? 2500 : undefined, promiseDue: disposition === "promise" ? dueOn : undefined })}>Save wrap-up</Button>
+        </Card>
+      ) : null}
       <ol className="grid gap-2">
         {timeline.map((item, index) => (
           <li key={`${item.at}-${index}`}>

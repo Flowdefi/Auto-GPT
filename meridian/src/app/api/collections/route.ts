@@ -12,7 +12,11 @@ import { assertSameOrigin } from "@/server/security";
 import { bindClient, clientHome, placeForClient, recallForClient } from "@/server/collections/client-portal";
 import { complaintReport, fileComplaint, setComplaintStatus } from "@/server/collections/complaint-store";
 import { postAchPayment, reversePayment } from "@/server/collections/payments";
+import { campaignAttempts, createDialCampaign, listDialCampaigns, previewOutbound, presenceBoard, setCampaignRunning, setPresence, wrapCall } from "@/server/collections/dialer";
 import { account360, dailyScorecard, markPromiseKept, setPromise } from "@/server/collections/floor";
+import { listMailJobs, mailPdf, markMailReturned, queueLetter } from "@/server/collections/letters";
+import { deskMetrics, listDigests } from "@/server/collections/observe";
+import { quizPrompts, scoreAndStore, seedTrainingDesk, TRAINING_SCENARIOS, trainingCleared, trainingStatus } from "@/server/collections/training";
 import { applySkipTrace } from "@/server/collections/skip-trace";
 import { attachLiveDial, hangupActiveCalls } from "@/server/collections/voice-live";
 import { currentBrand, saveBrand } from "@/server/brand";
@@ -130,6 +134,15 @@ export async function POST(request: Request) {
     sequenceId?: string;
     solRules?: SolRule[];
     recordingRules?: RecordingRule[];
+    disposition?: string;
+    callbackAt?: string;
+    promiseDue?: string;
+    presence?: string;
+    campaignName?: string;
+    maxConcurrent?: number;
+    answers?: number[];
+    mailJobId?: string;
+    running?: boolean;
   };
   const actor = collectionsRole(gate.account.email, gate.account.role);
   const privileged = new Set(["reveal", "eligibility", "template_approval", "matrix", "role", "sol_save", "recording_save", "metro2_approve"]);
@@ -143,7 +156,7 @@ export async function POST(request: Request) {
   if (actor === "client" && body.op && !["client_home", "client_place", "client_recall"].includes(body.op)) {
     return NextResponse.json({ error: "Clients can only see their own placements" }, { status: 403 });
   }
-  if (actor === "read_only" && body.op && body.op !== "report" && body.op !== "access_review" && body.op !== "complaint_report") {
+  if (actor === "read_only" && body.op && !["report", "access_review", "complaint_report", "ops", "presence"].includes(body.op)) {
     return NextResponse.json({ error: "Read-only role" }, { status: 403 });
   }
   if (!isWorkspaceId(body.workspaceId)) {
@@ -197,9 +210,67 @@ export async function POST(request: Request) {
           accountId: body.accountId,
           campaignId: body.campaignId,
         });
-        const live = await attachLiveDial(started.id);
+        const holdForTraining = started.direction === "outbound" && !started.blockedReason && (actor === "collector" || actor === "manager") && !trainingCleared(gate.account.email, body.workspaceId);
+        const live = holdForTraining
+          ? { sandbox: true, provider: "sandbox", held: "training" }
+          : { ...(await attachLiveDial(started.id)), held: null };
+        if (!started.blockedReason) setPresence(body.workspaceId, gate.account.email, "on_call");
         return NextResponse.json({ ...started, live });
       }
+      case "dial_preview":
+        if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
+        return NextResponse.json(previewOutbound(body.workspaceId, body.accountId));
+      case "call_wrap":
+        if (!body.callId || !body.disposition) return NextResponse.json({ error: "callId and disposition required" }, { status: 400 });
+        return NextResponse.json(wrapCall({
+          workspaceId: body.workspaceId,
+          callId: body.callId,
+          disposition: body.disposition,
+          notes: body.notes ?? "",
+          operator: gate.account.email,
+          callbackAt: body.callbackAt,
+          promiseCents: body.amountCents,
+          promiseDue: body.promiseDue,
+        }));
+      case "presence":
+        if (body.presence) setPresence(body.workspaceId, gate.account.email, body.presence);
+        return NextResponse.json({ board: presenceBoard(body.workspaceId) });
+      case "campaign_create":
+        if (actor !== "admin" && actor !== "manager") return NextResponse.json({ error: "A manager builds a campaign" }, { status: 403 });
+        return NextResponse.json({ campaign: createDialCampaign(body.workspaceId, body.campaignName ?? "Campaign", body.maxConcurrent ?? 1) });
+      case "campaign_list":
+        return NextResponse.json({ campaigns: listDialCampaigns(body.workspaceId) });
+      case "campaign_attempts":
+        if (!body.campaignId) return NextResponse.json({ error: "campaignId required" }, { status: 400 });
+        return NextResponse.json({ attempts: campaignAttempts(body.workspaceId, body.campaignId) });
+      case "campaign_start":
+        if (!body.campaignId) return NextResponse.json({ error: "campaignId required" }, { status: 400 });
+        if (actor !== "admin" && actor !== "manager") return NextResponse.json({ error: "A manager starts a campaign" }, { status: 403 });
+        return NextResponse.json({ campaign: setCampaignRunning(body.workspaceId, body.campaignId, body.running !== false) });
+      case "letter_queue":
+        if (!body.accountId || !body.templateId) return NextResponse.json({ error: "accountId and templateId required" }, { status: 400 });
+        const queued = queueLetter(body.workspaceId, body.accountId, body.templateId);
+        return NextResponse.json({
+          job: { id: queued.id, status: queued.status, reason: queued.reason, templateId: queued.templateId },
+          jobs: listMailJobs(body.workspaceId),
+        });
+      case "letter_list":
+        return NextResponse.json({ jobs: listMailJobs(body.workspaceId) });
+      case "letter_pdf":
+        if (!body.mailJobId) return NextResponse.json({ error: "mailJobId required" }, { status: 400 });
+        return NextResponse.json({ pdfBase64: mailPdf(body.workspaceId, body.mailJobId) });
+      case "letter_returned":
+        if (!body.mailJobId) return NextResponse.json({ error: "mailJobId required" }, { status: 400 });
+        return NextResponse.json({ paused: markMailReturned(body.workspaceId, body.mailJobId) });
+      case "training_seed":
+        return NextResponse.json(seedTrainingDesk(body.workspaceId));
+      case "training_home":
+        return NextResponse.json({ scenarios: TRAINING_SCENARIOS, quiz: quizPrompts(), progress: trainingStatus(body.workspaceId, gate.account.email) });
+      case "training_score":
+        if (!body.answers) return NextResponse.json({ error: "answers required" }, { status: 400 });
+        return NextResponse.json(scoreAndStore(body.workspaceId, gate.account.email, body.answers));
+      case "ops":
+        return NextResponse.json({ metrics: deskMetrics(body.workspaceId), digests: listDigests(body.workspaceId) });
       case "voice_turn":
         if (!body.callId || !body.turn) return NextResponse.json({ error: "callId and turn required" }, { status: 400 });
         return NextResponse.json(turnVoice(body.workspaceId, body.callId, body.turn));

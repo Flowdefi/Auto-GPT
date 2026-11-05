@@ -1,7 +1,7 @@
 import type { WorkspaceId } from "@/lib/types";
 import type { PortfolioAccount } from "./types";
 
-export type JobKind = "sequence_step" | "scheduled_send" | "retention_purge";
+export type JobKind = "sequence_step" | "scheduled_send" | "retention_purge" | "campaign_tick" | "compliance_digest";
 
 export interface CollectionJob {
   id: string;
