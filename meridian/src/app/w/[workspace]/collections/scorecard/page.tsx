@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, PageHeader } from "@/components/meridian/legacy";
+import { CollectorChrome } from "@/components/collections/collector-chrome";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 interface Scorecard {
@@ -30,6 +31,7 @@ export default function ScorecardPage() {
 
   return (
     <div>
+      <CollectorChrome shortcuts={[]} />
       <PageHeader eyebrow="Collector" title="Daily scorecard" subtitle="Today's calls, payments, and promises for the desk. Closed tasks are counted for the collector who finished them. A promise past its date becomes a broken-promise task the next time jobs run." />
       {card ? (
         <div className="grid gap-3">

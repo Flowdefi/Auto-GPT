@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
+import { CollectorChrome } from "@/components/collections/collector-chrome";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 interface Campaign {
@@ -47,6 +48,7 @@ export default function CampaignsPage() {
 
   return (
     <div>
+      <CollectorChrome shortcuts={[{ key: "b", label: "Build the campaign", run: () => void post({ op: "campaign_create", campaignName: name, maxConcurrent: concurrent }) }]} />
       <PageHeader eyebrow="Collector" title="Campaign dialer" subtitle="Builds a list from workable accounts, runs each one through the compliance gate, and paces live or sandbox calls by the concurrent cap. Every attempt is logged with a reason code. The 7-in-7 cap is the gate, not a separate counter." />
       {notice ? <Card className="mb-4 p-4 text-sm">{notice}</Card> : null}
       <Card className="mb-4 grid gap-3 p-4 text-sm sm:grid-cols-2">

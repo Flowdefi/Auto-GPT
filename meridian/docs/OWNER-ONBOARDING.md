@@ -2,7 +2,7 @@
 
 This is an operating checklist for a sandbox desk. It is not legal advice. Counsel reviews every citation before a live flag is turned on. Keep this repository private before a real portfolio, SSN, or account number is loaded.
 
-The demo command is `docker compose up --build` in `meridian/`. It seeds Example accounts and does not dial or mail.
+The demo command is `docker compose up --build` in `meridian/`. It seeds Example accounts in two workspaces and does not dial or mail. A 15-minute walkthrough script is at the bottom of this file. The capability list for this pull request is [CHANGELOG.md](CHANGELOG.md).
 
 ## 1. Agency name
 
@@ -50,3 +50,26 @@ Use a file of fake rows first. Names should be Example. Do not use a real SSN; t
 - `MERIDIAN_LETTER_PROVIDER=lob` plus live delivery is the only Lob path.
 - `MERIDIAN_COMPLIANCE_DIGEST=enabled` plus live delivery and `RESEND_API_KEY` is the only digest email. Otherwise the weekly text is stored on `/w/triton/collections/ops`.
 - Metro 2 stays disabled until the env flag is on and owner and compliance have both approved.
+- Bankruptcy and deceased vendors stay `sandbox`. A sandbox result is unknown, which is not a clearance. A hit is the only automatic hold.
+
+## First hour (15-minute walkthrough script)
+
+Read this aloud while clicking. It is a demo script, not a recording and not legal advice. Use the Example accounts only.
+
+**0:00–1:00 — Open the desk.** From `meridian/`, run `docker compose up --build`. Open `http://localhost:3000`, sign in, and land on `/w/triton/collections`. Say: "This repository is public. These people are named Example. Nothing dials or mails unless two flags are on."
+
+**1:00–3:00 — Two agencies.** Open Triton and show `DEMO-OH-1`. Switch to Aether and show `HBR-OH-1`, Example Harbor Seller. Say: "An account id from Triton is not readable in Aether. Freeze on one workspace does not freeze the other."
+
+**3:00–5:00 — Brand and MFA.** Open `/w/triton/settings/brand`. The name is `{{agency_name}}` until the owner sets it. Enroll MFA from `POST /api/auth/mfa`, then confirm it on Access review.
+
+**5:00–7:00 — Import and the gate.** Paste the sample CSV on the collections desk. Point at a quarantined California row. Say: "Ineligible states are quarantined. Outreach and the payment portal stay closed."
+
+**7:00–9:00 — Pre-check and shortcuts.** Open account 360. Press `c` or click Check before dial. If the local time is outside 8:00 a.m. to 9:00 p.m., Connect stays disabled. Press `?` for the shortcut list. The header stays put while the timeline scrolls. Mention that dark mode follows the system unless someone picks Light or Dark.
+
+**9:00–11:00 — Promise, queue, campaign.** Set a promise, then show the collector queue and complete two tasks with the checkboxes. Build a campaign. The attempt log shows reason codes such as `calling_window`, not phone numbers.
+
+**11:00–13:00 — Settlement, scrubs, mail.** Open the settlement desk and say the matrix defaults block offers until an owner saves them. Amounts at or above $500 need two different approvers, then a hold before the settling letter. Run a bankruptcy scrub and say the sandbox result is unknown. A hit would mark the account and stop outreach. Queue a letter and say returned mail pauses later letter steps.
+
+**13:00–14:00 — Economics and incident.** On Portfolio economics, enter a cost and show cash-on-cash and the model IRR. Say: "These are model estimates, not a forecast and not advice." Open Incident response, read one tabletop line, and point at Freeze all outbound without clicking it on a shared demo unless you mean to stop the workspace.
+
+**14:00–15:00 — What stays off.** Read the leave-off list: live delivery, Lob, voice, skip-trace, digest email, Metro 2, and the scrub vendors. Close with the Texas bond: Tex. Fin. Code § 392.101, $10,000, Secretary of State, before any Texas account is worked. Counsel still reviews the limitations table.

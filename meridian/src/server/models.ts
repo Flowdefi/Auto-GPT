@@ -22,6 +22,7 @@ import type { RecordingRule } from "@/lib/collections/recording";
 import type { SolRule } from "@/lib/collections/sol";
 import type { AgencyBrand } from "@/lib/brand";
 import type { AgentPresence, ComplianceDigest, DialAttempt, DialCampaign, MailJob, TrainingPass } from "@/lib/collections/desk";
+import type { PortfolioBook, ScrubEvent, SettlementCase, TabletopRun } from "@/lib/collections/launch";
 import type { SettlementMatrix } from "@/lib/collections/template-library";
 
 export type WorkspaceId = "triton" | "aether";
@@ -558,6 +559,11 @@ export interface DatabaseFile {
   mailJobs?: MailJob[];
   trainingPasses?: TrainingPass[];
   complianceDigests?: ComplianceDigest[];
+  portfolioBooks?: PortfolioBook[];
+  scrubEvents?: ScrubEvent[];
+  settlementCases?: SettlementCase[];
+  frozenWorkspaces?: WorkspaceId[];
+  tabletopRuns?: TabletopRun[];
   clientGrants?: ClientGrant[];
   complaints?: Complaint[];
   recordingRules?: RecordingRule[];

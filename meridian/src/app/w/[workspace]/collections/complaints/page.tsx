@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
 import type { Complaint } from "@/lib/collections/complaints";
+import { CollectorChrome } from "@/components/collections/collector-chrome";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 interface Report {
@@ -50,6 +51,7 @@ export default function ComplaintsPage() {
 
   return (
     <div>
+      <CollectorChrome shortcuts={[]} />
       <PageHeader
         eyebrow="Compliance"
         title="Complaints"

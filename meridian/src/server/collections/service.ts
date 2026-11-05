@@ -269,7 +269,10 @@ export function gateFor(
   const lastConversationAt = conversations[0]?.updatedAt ?? null;
   const sentToday = (db.channelMessages ?? []).filter((message) => message.workspaceId === workspaceId && message.status !== "blocked" && message.at.slice(0, 10) === now.toISOString().slice(0, 10)).length
     + recent.filter((call) => call.direction === "outbound" && !call.blockedReason && call.createdAt.slice(0, 10) === now.toISOString().slice(0, 10)).length;
-  const settings = db.voiceSettings!;
+  const settings = {
+    ...db.voiceSettings!,
+    killSwitch: Boolean(db.voiceSettings?.killSwitch) || (db.frozenWorkspaces ?? []).includes(workspaceId),
+  };
   const ctx: GateContext = {
     now,
     settings,

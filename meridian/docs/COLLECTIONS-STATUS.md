@@ -46,7 +46,13 @@ Audit against the original collections brief and the two owner updates (collect 
 | Campaign dialer | Done | A manager builds a campaign from workable accounts. Each account is gated, paced by a concurrent cap of 1–5, and logged with a reason code. The 7-in-7 rule is the gate. |
 | Training | Done | `DEMO-OH-1`, `DEMO-TX-1`, and `DEMO-CA-1` are Example accounts. Scripted scenarios cover the mini-Miranda, the calling window, and cease or dispute. Four of five quiz answers are required before a collector or manager can live-dial. |
 | Observability | Done | `/w/triton/collections/ops` shows blocked sends by reason code, call connect rate, recovery by portfolio id, job lag, and error rate. OpenTelemetry exports only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. The weekly digest is stored for the compliance role and is emailed only when the digest flag, live delivery, and a mail key are set. |
-| Packaging | Done | `docker compose up --build` seeds the demo. `docs/OWNER-ONBOARDING.md` covers the agency name, MFA, settlement matrix, template approval, the Texas bond, and the first import. |
+| Packaging | Done | `docker compose up --build` seeds Triton and Example Harbor. `docs/OWNER-ONBOARDING.md` covers the agency name, MFA, settlement matrix, template approval, the Texas bond, the first import, and a 15-minute first-hour script. `docs/CHANGELOG.md` lists the collections capabilities in this pull request. |
+| Portfolio economics | Done | Cost, an illustrative recovery curve, cash-on-cash, and IRR are labeled model estimates. Seller scorecards and a final remittance statement are on `/w/triton/collections/economics`. |
+| Bankruptcy and deceased scrubs | Done | Sandbox returns unknown and does not call a vendor. A hit sets bankruptcy or deceased and the gate holds outreach. History is stored without a consumer name. |
+| Settlement desk | Done | Counter-offers, dual approval at or above `MERIDIAN_SETTLEMENT_DUAL_CENTS` (default $500), and a hold (`MERIDIAN_SETTLEMENT_HOLD_DAYS`, default 3) before the settling letter can be released. |
+| Workspace isolation | Done | Triton and Aether are separate. Aether is seeded as Example Harbor. An account id from one workspace is not readable from the other. Freeze does not cross. |
+| Incident response | Done | `/w/triton/collections/incident` is linked from `docs/GLBA-SAFEGUARDS.md`. Tabletop checklist. Freeze all outbound uses the kill switch for that workspace. |
+| Collector speed | Done | The desk, account 360, queue, dialer, campaigns, payments, scorecard, and complaints share shortcuts (`?`). The queue can complete a selection. Account 360 keeps a sticky header. Dark mode follows the system unless Light or Dark is chosen. |
 | Ops runbooks | Done | `docs/DEPLOY.md`, `docs/BACKUP-RESTORE.md`, and `docs/OWNER-ONBOARDING.md`. JSON logs redact identifiers. `/api/metrics` requires a seat and names alerts. |
 
 ## Owner still needs to provide

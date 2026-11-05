@@ -101,8 +101,16 @@ const DEMO_CSV = [
   "DEMO-CA-1,Example Quarantine,CA,90001,2222,10.00,cell,Example Seller",
 ].join("\n");
 
+const HARBOR_CSV = [
+  "account_ref,consumer_name,consumer_state,zip,last4,balance,phone_type,seller",
+  "HBR-OH-1,Example Harbor,OH,44101,4242,18.00,landline,Example Harbor Seller",
+  "HBR-TX-1,Example Harbor Texan,TX,75201,1111,12.00,cell,Example Harbor Seller",
+  "HBR-CA-1,Example Harbor Quarantine,CA,90001,2222,9.00,cell,Example Harbor Seller",
+].join("\n");
+
 export function seedTrainingDesk(workspaceId: WorkspaceId): { created: number; quarantined: number } {
-  const imported = importPortfolio({ workspaceId, csv: `${DEMO_CSV}\n`, portfolioId: "pf_training" });
+  const csv = workspaceId === "aether" ? HARBOR_CSV : DEMO_CSV;
+  const imported = importPortfolio({ workspaceId, csv: `${csv}\n`, portfolioId: workspaceId === "aether" ? "pf_harbor" : "pf_training" });
   return { created: imported.created, quarantined: imported.quarantined };
 }
 

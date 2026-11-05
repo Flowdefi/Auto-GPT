@@ -6,6 +6,7 @@ import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
 import type { CallTranscript, PortfolioAccount, VoiceCall, VoiceSettings } from "@/lib/collections/types";
 
 type ColumnMap = Record<string, string>;
+import { CollectorChrome } from "@/components/collections/collector-chrome";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 interface Snapshot {
@@ -72,6 +73,12 @@ export default function CollectionsDeskPage() {
   }
 
   const account = data?.accounts.find((item) => item.id === accountId);
+  function stepAccount(direction: 1 | -1) {
+    const rows = data?.accounts ?? [];
+    const index = rows.findIndex((item) => item.id === accountId);
+    const next = rows[index + direction];
+    if (next) setAccountId(next.id);
+  }
 
   async function readPortfolioFile(file: File) {
     if (file.name.toLowerCase().endsWith(".xlsx")) {
@@ -100,6 +107,10 @@ export default function CollectionsDeskPage() {
 
   return (
     <div>
+      <CollectorChrome shortcuts={[
+        { key: "n", label: "Next account", run: () => stepAccount(1) },
+        { key: "p", label: "Previous account", run: () => stepAccount(-1) },
+      ]} />
       <PageHeader
         eyebrow="Collections"
         title="Voice and channels"

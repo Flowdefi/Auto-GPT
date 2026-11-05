@@ -112,11 +112,12 @@ export function storeCallRecording(providerId: string, audio: Uint8Array): boole
   return found;
 }
 
-export async function hangupActiveCalls(fetchImpl: FetchLike = fetch): Promise<number> {
-  const active = (loadDb().voiceCalls ?? []).filter((call) => call.phase !== "ended" && !call.blockedReason);
+export async function hangupActiveCalls(fetchImpl: FetchLike = fetch, workspaceId?: WorkspaceId): Promise<number> {
+  const active = (loadDb().voiceCalls ?? []).filter((call) => call.phase !== "ended" && !call.blockedReason && (!workspaceId || call.workspaceId === workspaceId));
   const now = new Date().toISOString();
+  const ending = new Set(active.map((call) => call.id));
   mutate((db) => {
-    db.voiceCalls = (db.voiceCalls ?? []).map((call) => (call.phase === "ended" || call.blockedReason ? call : { ...call, phase: "ended", disposition: "kill_switch", updatedAt: now }));
+    db.voiceCalls = (db.voiceCalls ?? []).map((call) => (ending.has(call.id) ? { ...call, phase: "ended", disposition: "kill_switch", updatedAt: now } : call));
   });
   if (voiceLiveEnabled()) {
     for (const call of active) {

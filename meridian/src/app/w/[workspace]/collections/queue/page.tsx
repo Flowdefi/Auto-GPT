@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
 import type { CollectorTask, DraftReply, PortfolioAccount } from "@/lib/collections/types";
+import { CollectorChrome } from "@/components/collections/collector-chrome";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 export default function CollectorQueuePage() {
@@ -13,6 +14,7 @@ export default function CollectorQueuePage() {
   const [accountId, setAccountId] = useState("");
   const [inbound, setInbound] = useState("I dispute this debt.");
   const [notice, setNotice] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
 
   async function refresh() {
     const response = await fetch(`/api/collections?workspace=${workspaceId}`);
@@ -47,6 +49,7 @@ export default function CollectorQueuePage() {
 
   return (
     <div>
+      <CollectorChrome shortcuts={[{ key: "x", label: "Complete selected tasks", run: () => void post({ op: "bulk_tasks", taskIds: picked }) }]} />
       <PageHeader
         eyebrow="Collections"
         title="Collector queue"
@@ -57,12 +60,14 @@ export default function CollectorQueuePage() {
         <Card className="space-y-3 p-5 text-sm">
           <div className="font-semibold">Open tasks</div>
           {tasks.length === 0 ? <p className="text-muted-foreground">No open tasks.</p> : null}
+          {picked.length > 0 ? <Button onClick={() => void post({ op: "bulk_tasks", taskIds: picked })}>Complete {picked.length} selected</Button> : null}
           {tasks.map((task) => (
             <div key={task.id} className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
-              <div className="min-w-0">
+              <label className="flex min-w-0 items-center gap-2">
+                <input type="checkbox" checked={picked.includes(task.id)} aria-label={`Select ${task.title}`} onChange={() => setPicked((current) => current.includes(task.id) ? current.filter((id) => id !== task.id) : [...current, task.id])} />
                 <div className="font-medium">{task.title}</div>
                 <div className="text-muted-foreground">{accountName(task.accountId)} · {task.queue}</div>
-              </div>
+              </label>
               <Button tone="soft" onClick={() => void post({ op: "complete_task", taskId: task.id })}>Done</Button>
             </div>
           ))}

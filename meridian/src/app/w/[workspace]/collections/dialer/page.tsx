@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
+import { CollectorChrome } from "@/components/collections/collector-chrome";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 interface Presence {
@@ -31,6 +32,7 @@ export default function DialerPage() {
 
   return (
     <div>
+      <CollectorChrome shortcuts={[{ key: "a", label: "Mark available", run: () => void load("available") }]} />
       <PageHeader eyebrow="Collector" title="Softphone" subtitle="Click-to-call stays on the account. This board shows who is available. A collector without a passing quiz can walk the sandbox call and cannot place a live dial." />
       <div className="mb-4 flex flex-wrap gap-2">
         {["available", "away", "wrap"].map((status) => (

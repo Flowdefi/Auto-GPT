@@ -1,7 +1,8 @@
 async function main(): Promise<void> {
   const { seedTrainingDesk } = await import("../src/server/collections/training");
-  const result = seedTrainingDesk("triton");
-  console.log(JSON.stringify({ demo: "collections", ...result }));
+  const triton = seedTrainingDesk("triton");
+  const harbor = seedTrainingDesk("aether");
+  console.log(JSON.stringify({ demo: "collections", triton, harbor }));
 }
 
 main().catch((error: unknown) => {

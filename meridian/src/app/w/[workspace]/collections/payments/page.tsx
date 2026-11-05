@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
 import type { ConsumerPayment } from "@/lib/collections/types";
+import { CollectorChrome } from "@/components/collections/collector-chrome";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 export default function PaymentsPage() {
@@ -35,6 +36,7 @@ export default function PaymentsPage() {
 
   return (
     <div>
+      <CollectorChrome shortcuts={[{ key: "r", label: "Reload payments", run: () => void refresh() }]} />
       <PageHeader
         eyebrow="Collections"
         title="Payments"

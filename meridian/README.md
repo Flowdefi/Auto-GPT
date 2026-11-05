@@ -2,13 +2,13 @@
 
 ## Collections agency demo
 
-One command, from this directory, starts the desk with sandbox delivery and three clearly fake accounts (`DEMO-OH-1`, `DEMO-TX-1`, `DEMO-CA-1`, all named Example):
+One command, from this directory, starts the desk with sandbox delivery and two agencies of clearly fake accounts. Triton gets `DEMO-OH-1`, `DEMO-TX-1`, and `DEMO-CA-1`. The second workspace, Aether, gets `HBR-OH-1`, `HBR-TX-1`, and `HBR-CA-1` under Example Harbor Seller. The workspaces cannot read each other's accounts.
 
 ```bash
 docker compose up --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Nothing is dialed, mailed, or charged. Live voice, skip-trace, letters, and the compliance digest stay off until `MERIDIAN_CHANNEL_DELIVER=live` and that feature's own flag are both set. Replace the demo `MERIDIAN_AUTH_SECRET` before any real portfolio. The owner checklist is [docs/OWNER-ONBOARDING.md](docs/OWNER-ONBOARDING.md).
+Open [http://localhost:3000](http://localhost:3000). Nothing is dialed, mailed, or charged. Live voice, skip-trace, letters, and the compliance digest stay off until `MERIDIAN_CHANNEL_DELIVER=live` and that feature's own flag are both set. Replace the demo `MERIDIAN_AUTH_SECRET` before any real portfolio. The owner checklist and the 15-minute first-hour script are in [docs/OWNER-ONBOARDING.md](docs/OWNER-ONBOARDING.md). The capability list is [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 Enterprise customer platform — a HubSpot-class suite (Smart CRM, Sales, Marketing, Service, Content/CMS, SEO, Automation, Reporting, Compliance, and integrated AI) with a native-feeling **iOS + web** client.
 

@@ -17,6 +17,10 @@ import { account360, dailyScorecard, markPromiseKept, setPromise } from "@/serve
 import { listMailJobs, mailPdf, markMailReturned, queueLetter } from "@/server/collections/letters";
 import { deskMetrics, listDigests } from "@/server/collections/observe";
 import { quizPrompts, scoreAndStore, seedTrainingDesk, TRAINING_SCENARIOS, trainingCleared, trainingStatus } from "@/server/collections/training";
+import { closePortfolio, portfolioEconomics, savePortfolioCost, sellerScorecards } from "@/server/collections/economics";
+import { freezeOutbound, incidentHome, liftOutboundFreeze, recordTabletop } from "@/server/collections/incident";
+import { runScrub, scrubHistory } from "@/server/collections/scrubs";
+import { approveSettlement, counterSettlement, listSettlements, openSettlement, releaseSettlementLetter } from "@/server/collections/settlement-desk";
 import { applySkipTrace } from "@/server/collections/skip-trace";
 import { attachLiveDial, hangupActiveCalls } from "@/server/collections/voice-live";
 import { currentBrand, saveBrand } from "@/server/brand";
@@ -143,9 +147,15 @@ export async function POST(request: Request) {
     answers?: number[];
     mailJobId?: string;
     running?: boolean;
+    costCents?: number;
+    counterCents?: number;
+    caseId?: string;
+    scrubKind?: "bankruptcy" | "deceased";
+    checked?: string[];
+    taskIds?: string[];
   };
   const actor = collectionsRole(gate.account.email, gate.account.role);
-  const privileged = new Set(["reveal", "eligibility", "template_approval", "matrix", "role", "sol_save", "recording_save", "metro2_approve"]);
+  const privileged = new Set(["reveal", "eligibility", "template_approval", "matrix", "role", "sol_save", "recording_save", "metro2_approve", "settlement_approve", "freeze_outbound"]);
   if (body.op && privileged.has(body.op)) {
     try {
       assertPrivilegedMfa(gate.account.id, actor);
@@ -156,7 +166,7 @@ export async function POST(request: Request) {
   if (actor === "client" && body.op && !["client_home", "client_place", "client_recall"].includes(body.op)) {
     return NextResponse.json({ error: "Clients can only see their own placements" }, { status: 403 });
   }
-  if (actor === "read_only" && body.op && !["report", "access_review", "complaint_report", "ops", "presence"].includes(body.op)) {
+  if (actor === "read_only" && body.op && !["report", "access_review", "complaint_report", "ops", "presence", "economics", "incident_home", "scrub_log"].includes(body.op)) {
     return NextResponse.json({ error: "Read-only role" }, { status: 403 });
   }
   if (!isWorkspaceId(body.workspaceId)) {
@@ -271,6 +281,49 @@ export async function POST(request: Request) {
         return NextResponse.json(scoreAndStore(body.workspaceId, gate.account.email, body.answers));
       case "ops":
         return NextResponse.json({ metrics: deskMetrics(body.workspaceId), digests: listDigests(body.workspaceId) });
+      case "economics":
+        return NextResponse.json({ rows: portfolioEconomics(body.workspaceId), sellers: sellerScorecards(body.workspaceId) });
+      case "cost_save":
+        if (!body.portfolioId || body.costCents === undefined) return NextResponse.json({ error: "portfolioId and costCents required" }, { status: 400 });
+        if (actor !== "admin" && actor !== "manager") return NextResponse.json({ error: "A manager records portfolio cost" }, { status: 403 });
+        return NextResponse.json({ book: savePortfolioCost(body.workspaceId, body.portfolioId, body.costCents, body.sellerName ?? "") });
+      case "portfolio_close":
+        if (!body.portfolioId) return NextResponse.json({ error: "portfolioId required" }, { status: 400 });
+        if (actor !== "admin" && actor !== "compliance") return NextResponse.json({ error: "Compliance closes a portfolio" }, { status: 403 });
+        return NextResponse.json({ statement: closePortfolio(body.workspaceId, body.portfolioId) });
+      case "scrub":
+        if (!body.accountId || (body.scrubKind !== "bankruptcy" && body.scrubKind !== "deceased")) {
+          return NextResponse.json({ error: "accountId and scrubKind required" }, { status: 400 });
+        }
+        return NextResponse.json({ event: await runScrub(body.workspaceId, body.accountId, body.scrubKind), history: scrubHistory(body.workspaceId, body.accountId) });
+      case "scrub_log":
+        return NextResponse.json({ history: scrubHistory(body.workspaceId, body.accountId) });
+      case "settlement_open":
+        if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
+        return NextResponse.json({ settlement: openSettlement(body.workspaceId, body.accountId), cases: listSettlements(body.workspaceId) });
+      case "settlement_counter":
+        if (!body.caseId || body.counterCents === undefined) return NextResponse.json({ error: "caseId and counterCents required" }, { status: 400 });
+        return NextResponse.json({ settlement: counterSettlement(body.workspaceId, body.caseId, body.counterCents) });
+      case "settlement_approve":
+        if (!body.caseId) return NextResponse.json({ error: "caseId required" }, { status: 400 });
+        return NextResponse.json({ settlement: approveSettlement(body.workspaceId, body.caseId, gate.account.email, actor) });
+      case "settlement_release":
+        if (!body.caseId) return NextResponse.json({ error: "caseId required" }, { status: 400 });
+        return NextResponse.json(releaseSettlementLetter(body.workspaceId, body.caseId));
+      case "settlement_list":
+        return NextResponse.json({ cases: listSettlements(body.workspaceId) });
+      case "freeze_outbound":
+        if (actor !== "admin" && actor !== "compliance") return NextResponse.json({ error: "Compliance freezes outbound" }, { status: 403 });
+        if (body.running === false) return NextResponse.json(liftOutboundFreeze(body.workspaceId));
+        return NextResponse.json(await freezeOutbound(body.workspaceId));
+      case "incident_home":
+        return NextResponse.json(incidentHome(body.workspaceId));
+      case "tabletop_save":
+        return NextResponse.json({ run: recordTabletop(body.workspaceId, body.checked ?? []) });
+      case "bulk_tasks":
+        if (!body.taskIds?.length) return NextResponse.json({ error: "taskIds required" }, { status: 400 });
+        for (const taskId of body.taskIds.slice(0, 50)) completeTask(body.workspaceId, taskId, gate.account.email);
+        return NextResponse.json({ completed: Math.min(body.taskIds.length, 50) });
       case "voice_turn":
         if (!body.callId || !body.turn) return NextResponse.json({ error: "callId and turn required" }, { status: 400 });
         return NextResponse.json(turnVoice(body.workspaceId, body.callId, body.turn));

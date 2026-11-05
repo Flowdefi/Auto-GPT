@@ -67,11 +67,14 @@ Re-read this pack when a provider is turned on, when a state rule changes, or af
 
 ## 314.4(h) Incident response
 
+The in-app playbook and tabletop checklist are at `/w/triton/collections/incident`. **Freeze all outbound** engages the kill switch for that workspace only: voice, SMS, email, and letters stop, and active calls on that workspace are ended. The other workspace is left alone. Inbound calls and a consumer-started payment stay available. A live hangup is sent only when the live voice flags are on.
+
 1. The Qualified Individual is told the same day.
-2. Stop the affected access. Turn the outbound kill switch on. Set `MERIDIAN_METRO2_EXPORT` back to disabled.
+2. Stop the affected access. Use the freeze button, or turn the outbound kill switch on. Set `MERIDIAN_METRO2_EXPORT` back to disabled.
 3. Preserve logs. Do not copy Social Security numbers into the ticket.
 4. Decide notice to consumers and regulators with counsel. This draft does not decide that.
 5. Write what changed in the risk assessment.
+6. Record the tabletop on the incident page. The saved list is the checklist items, not a consumer file.
 
 ## 314.4(i) Report to the board
 

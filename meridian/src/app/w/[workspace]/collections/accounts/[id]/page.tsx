@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
 import type { PortfolioAccount } from "@/lib/collections/types";
+import { CollectorChrome } from "@/components/collections/collector-chrome";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 interface TimelineItem {
@@ -66,7 +67,13 @@ export default function Account360Page() {
       id?: string;
       live?: { sandbox?: boolean; held?: string | null };
       say?: string;
+      event?: { status?: string; kind?: string };
     };
+    if (payload.op === "scrub" && body.event?.status) {
+      setNotice(`Scrub ${body.event.kind ?? ""}: ${body.event.status}. A hit places a hold. Unknown is not a clearance.`.trim());
+      await refresh();
+      return;
+    }
     if (payload.op === "dial_preview" && typeof body.allowed === "boolean") {
       setPreview({
         allowed: body.allowed,
@@ -89,6 +96,15 @@ export default function Account360Page() {
 
   return (
     <div>
+      <CollectorChrome shortcuts={[{ key: "c", label: "Check before dial", run: () => void post({ op: "dial_preview" }) }]} />
+      <div className="sticky top-0 z-10 mb-4 border-b bg-background/95 py-3 backdrop-blur">
+        <div className="text-xs text-muted-foreground">Account</div>
+        <div className="flex flex-wrap items-center gap-2 text-lg font-semibold">
+          <span>{account ? `${account.accountRef} · ${account.state}` : "Account"}</span>
+          {account ? <Badge>{account.status}</Badge> : null}
+          {account ? <span className="text-sm font-normal">${(account.balanceCents / 100).toFixed(2)}</span> : null}
+        </div>
+      </div>
       <PageHeader
         eyebrow="Collector"
         title={account ? `${account.accountRef} · ${account.state}` : "Account"}
@@ -117,6 +133,8 @@ export default function Account360Page() {
           <Button tone="soft" onClick={() => void post({ op: "promise_set", amountCents: 2500, dueOn })}>Promise $25</Button>
           <Button tone="soft" onClick={() => void post({ op: "promise_kept" })}>Mark kept</Button>
           <Button tone="soft" onClick={() => void post({ op: "skip_trace" })}>Skip-trace</Button>
+          <Button tone="soft" onClick={() => void post({ op: "scrub", scrubKind: "bankruptcy" })}>Bankruptcy scrub</Button>
+          <Button tone="soft" onClick={() => void post({ op: "scrub", scrubKind: "deceased" })}>Deceased scrub</Button>
         </div>
       </Card>
       {preview ? (
