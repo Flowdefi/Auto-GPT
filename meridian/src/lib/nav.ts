@@ -38,6 +38,8 @@ export function navFor(workspaceId: WorkspaceId): NavItem[] {
     { href: `${base}/client`, label: "Client portal", hub: "compliance", icon: "Briefcase", group: "Platform" },
     { href: `${base}/collections/complaints`, label: "Complaints", hub: "compliance", icon: "LifeBuoy", group: "Platform" },
     { href: `${base}/collections/payments`, label: "Payments", hub: "compliance", icon: "BarChart3", group: "Platform" },
+    { href: `${base}/collections/scorecard`, label: "Scorecard", hub: "compliance", icon: "BarChart3", group: "Platform" },
+    { href: `${base}/settings/brand`, label: "Agency brand", hub: "compliance", icon: "Sparkles", group: "Platform" },
     { href: `${base}/collections/queue`, label: "Collector queue", hub: "compliance", icon: "ListChecks", group: "Platform" },
     { href: `${base}/collections/workflows`, label: "Sequence builder", hub: "compliance", icon: "Workflow", group: "Platform" },
     { href: `${base}/settings/sol`, label: "Limitations table", hub: "compliance", icon: "FileText", group: "Platform" },

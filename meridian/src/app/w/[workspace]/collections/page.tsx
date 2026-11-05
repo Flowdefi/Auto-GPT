@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
 import type { CallTranscript, PortfolioAccount, VoiceCall, VoiceSettings } from "@/lib/collections/types";
@@ -136,6 +137,7 @@ export default function CollectionsDeskPage() {
                 ))}
               </select>
             </label>
+            {accountId ? <Link className="inline-flex min-h-11 items-center underline" href={`/w/${workspaceId}/collections/accounts/${accountId}`}>Open account 360</Link> : null}
             <div className="flex flex-wrap gap-2">
               <Button tone="soft" onClick={() => void post({ op: "consent", accountId, channel: "voice_cell", source: "sandbox written consent" })}>
                 Record cell consent

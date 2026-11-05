@@ -31,14 +31,25 @@ export function PortalFrame({ children }: { children: ReactNode }) {
   }, [lang]);
 
   const copy = portalCopy[lang];
+  const [brandName, setBrandName] = useState("{{agency_name}}");
+  const [brandColor, setBrandColor] = useState("#1c2430");
+  useEffect(() => {
+    void fetch("/api/brand")
+      .then((response) => response.json())
+      .then((body: { brand?: { name?: string; color?: string } }) => {
+        if (body.brand?.name) setBrandName(body.brand.name);
+        if (body.brand?.color) setBrandColor(body.brand.color);
+      })
+      .catch(() => undefined);
+  }, []);
   return (
     <PortalLangContext.Provider value={{ lang, copy, setLang }}>
-      <div className="portal-shell bg-white text-[#1c2430]">
+      <div className="portal-shell bg-white text-[#1c2430]" style={{ ["--agency" as string]: brandColor }}>
         <a className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-white focus:px-3 focus:py-2" href="#portal-main">
           {copy.skip}
         </a>
         <div className="mx-auto flex max-w-lg items-center justify-between gap-3 px-6 pt-6 text-sm">
-          <p>{copy.counsel} <a className="underline" href="/agency">Agency site</a></p>
+          <p><span style={{ color: brandColor }}>{brandName}</span>. {copy.counsel} <a className="underline" href="/agency">Agency site</a></p>
           <div role="group" aria-label={copy.language} className="flex shrink-0 gap-2">
             <button type="button" className="min-h-11 underline" aria-pressed={lang === "en"} onClick={() => setLang("en")}>{copy.english}</button>
             <button type="button" className="min-h-11 underline" aria-pressed={lang === "es"} onClick={() => setLang("es")}>{copy.spanish}</button>

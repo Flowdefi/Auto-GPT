@@ -3,6 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AgencyForm } from "@/components/agency/form";
 import { agencyPages, pageBySlug } from "@/lib/agency/site";
+import { currentBrand } from "@/server/brand";
+
+export const dynamic = "force-dynamic";
 
 export function generateStaticParams() {
   return agencyPages().map((page) => ({ slug: page.slug }));
@@ -10,14 +13,14 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const page = pageBySlug(slug);
+  const page = pageBySlug(slug, currentBrand().name);
   if (!page) return {};
   return { title: page.title, description: page.description, robots: { index: true, follow: true } };
 }
 
 export default async function AgencySectionPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const page = pageBySlug(slug);
+  const page = pageBySlug(slug, currentBrand().name);
   if (!page) notFound();
   return (
     <article>

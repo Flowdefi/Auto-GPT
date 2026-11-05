@@ -32,11 +32,11 @@ import type {
   VoiceSettings,
 } from "@/lib/collections/types";
 import type { WorkspaceId } from "@/lib/types";
-import { workspaceOf } from "@/lib/workspaces";
 import { modelFormPdf } from "@/lib/collections/model-form-pdf";
 import { defaultSolTable, type SolRule } from "@/lib/collections/sol";
 import { validationEndDate } from "@/lib/collections/validation-period";
 import { decryptSecret, encryptSecret, sha256Hex } from "@/server/auth-crypto";
+import { currentBrand } from "@/server/brand";
 import { loadDb, mutate, nextId } from "@/server/db";
 import { logEvent as logLine } from "@/server/log";
 import { scanUpload, scanXlsx } from "@/server/security";
@@ -308,7 +308,7 @@ export function startVoice(input: {
   const decision = gateFor(input.workspaceId, account, channel);
   logEvent(input.workspaceId, channel, account?.id ?? null, decision.allowed, decision.reason);
   const now = new Date().toISOString();
-  const agency = workspaceOf(input.workspaceId).legalName;
+  const agency = currentBrand().name;
   const allParty = account ? requiresAllPartyRecording(account.state, ensureRecordingTable()) : true;
   const transcript = emptyTranscript(agency, allParty, now);
   if (!decision.allowed) {
@@ -377,7 +377,7 @@ export function turnVoice(workspaceId: WorkspaceId, callId: string, turn: Consum
     settings: db.voiceSettings!,
     at: new Date().toISOString(),
     paymentUrl,
-    agency: workspaceOf(workspaceId).legalName,
+    agency: currentBrand().name,
   });
   const guardrail = filterVoiceUtterance(stepped.say, loadVoiceGuardrails());
   if (guardrail.blocked) {
@@ -477,7 +477,7 @@ export async function sendChannel(input: {
   let rendered = input.body;
   if (template && account) {
     const matrix = ensureSettlementMatrix();
-    const context = mergeContext({ account, agencyName: workspaceOf(input.workspaceId).legalName, matrix });
+    const context = mergeContext({ account, agencyName: currentBrand().name, domain: currentBrand().domain, matrix });
     const missing = missingInterpolations(`${template.subject}\n${template.body}`, context.values);
     if (missing.length > 0) {
       const blocked = storeMessage(input, "blocked", `Required merge fields are empty: ${missing.join(", ")}.`, null);
@@ -601,7 +601,7 @@ export function renderTemplatePreview(workspaceId: WorkspaceId, templateId: stri
   const template = (loadDb().collectionTemplates ?? []).find((item) => item.id === templateId);
   const account = accounts(workspaceId).find((item) => item.id === accountId);
   if (!template || !account) throw new Error("Template and account are required");
-  const context = mergeContext({ account, agencyName: workspaceOf(workspaceId).legalName, matrix: ensureSettlementMatrix() });
+  const context = mergeContext({ account, agencyName: currentBrand().name, domain: currentBrand().domain, matrix: ensureSettlementMatrix() });
   return {
     subject: renderMustache(template.subject, context.values),
     body: renderMustache(template.body, context.values),
@@ -661,7 +661,7 @@ export function issueValidation(workspaceId: WorkspaceId, accountId: string): Po
   logEvent(workspaceId, "letter", accountId, decision.allowed, decision.reason);
   if (!decision.allowed) throw new Error(decision.reason);
   const mailedAt = new Date().toISOString();
-  const notice = validationNotice(account, workspaceOf(workspaceId).legalName);
+  const notice = validationNotice(account, currentBrand().name);
   const updated: PortfolioAccount = {
     ...account,
     validationMailedAt: mailedAt,
@@ -707,7 +707,7 @@ export function fileDispute(workspaceId: WorkspaceId, accountId: string, text: s
 export async function proposeDraft(workspaceId: WorkspaceId, accountId: string, inbound: string): Promise<DraftReply> {
   const account = accounts(workspaceId).find((item) => item.id === accountId);
   if (!account) throw new Error("Account not found");
-  const agency = workspaceOf(workspaceId).legalName;
+  const agency = currentBrand().name;
   const firstName = account.consumerName.split(" ")[0] ?? "";
   let modelText: string | null = null;
   let model: string | null = null;
@@ -814,10 +814,15 @@ export function completeTask(workspaceId: WorkspaceId, taskId: string, actor = "
 export function ensureSolTable(): SolRule[] {
   const saved = loadDb().solRules ?? [];
   const byCode = new Map(saved.map((rule) => [rule.code, rule]));
-  const table = defaultSolTable().map((rule) => byCode.get(rule.code) ?? rule);
-  if (saved.length === 0) {
+  const placeholder = (rule: SolRule | undefined) => !rule || (rule.years == null && rule.citation.startsWith("No reviewed limitations period"));
+  const table = defaultSolTable().map((rule) => (placeholder(byCode.get(rule.code)) ? rule : byCode.get(rule.code)!));
+  const changed = table.some((rule) => {
+    const prior = byCode.get(rule.code);
+    return !prior || prior.years !== rule.years || prior.citation !== rule.citation;
+  });
+  if (saved.length === 0 || changed) {
     mutate((db) => {
-      if (!db.solRules?.length) db.solRules = table;
+      db.solRules = table;
     });
   }
   return table;
@@ -957,7 +962,7 @@ export function validationPdfBase64(workspaceId: WorkspaceId, accountId: string)
   const account = ensureValidationNotice(workspaceId, accountId);
   const end = account.validationMailedAt ? validationEndDate(account.validationMailedAt) : account.disputeDeadline || "";
   const pdf = modelFormPdf({
-    agencyName: workspaceOf(workspaceId).legalName,
+    agencyName: currentBrand().name,
     agencyAddress: "PO Box 100, Example City, OH 44101",
     agencyPhone: "1-800-555-0199",
     noticeDate: (account.validationMailedAt || new Date().toISOString()).slice(0, 10),

@@ -20,6 +20,7 @@ import type { Complaint } from "@/lib/collections/complaints";
 import type { CollectionJob, CollectionSequence } from "@/lib/collections/jobs";
 import type { RecordingRule } from "@/lib/collections/recording";
 import type { SolRule } from "@/lib/collections/sol";
+import type { AgencyBrand } from "@/lib/brand";
 import type { SettlementMatrix } from "@/lib/collections/template-library";
 
 export type WorkspaceId = "triton" | "aether";
@@ -549,6 +550,7 @@ export interface DatabaseFile {
   jobs?: CollectionJob[];
   sequences?: CollectionSequence[];
   solRules?: SolRule[];
+  agencyBrand?: AgencyBrand;
   clientGrants?: ClientGrant[];
   complaints?: Complaint[];
   recordingRules?: RecordingRule[];

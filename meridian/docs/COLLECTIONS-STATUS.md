@@ -7,7 +7,7 @@ Audit against the original collections brief and the two owner updates (collect 
 | Item | Status | What is in the app |
 | --- | --- | --- |
 | Portfolio import: CSV, xlsx, fixed-width, column map, validation, dedupe, chain of title, original creditor, charge-off, Reg F itemization, last payment, import audit | Done | 100,000 synthetic rows imported in 1.7s (5,000 quarantined). The response returns counts plus the first 100 accounts. Tasks are built in one pass. Uploads are size-capped and scanned. |
-| SOL by state | Partial | Editable table at `/w/triton/settings/sol`. Texas and Georgia start filled. Every other state stays blank until counsel enters a period. Accrual is last payment, else charge-off. |
+| SOL by state | Partial | Editable table at `/w/triton/settings/sol`. Years are filled, with citations and `needs_counsel_review`, for the no-license set plus Texas: TX 4, GA 6, MO 5, MT 6, NH 3, OH 6, SC 3, SD 6, VT 6, VA 5. Every other state stays blank. Counsel can override any row. Accrual is last payment, else charge-off. |
 | SSN, DOB, and account number encryption, mask, role-gated reveal, purge | Done | AES-256-GCM. Reveal is admin or compliance and is audit-logged without the value. Returned accounts can be purged. |
 | Retention schedule for debtor files | Done | `npm run jobs:run` purges stored identifiers after MERIDIAN_PII_RETENTION_DAYS (default 1095, 12 CFR § 1006.100, counsel review). The audit counts accounts and does not log values. |
 | State eligibility limited to no-license states plus Texas, with citations | Done | 50 states and D.C. Uncertain license rows stay ineligible. Texas is the § 392.101 bond, not a license. |
@@ -25,7 +25,7 @@ Audit against the original collections brief and the two owner updates (collect 
 | Visual workflow builder | Done | `/w/triton/collections/workflows` builds email, SMS, letter, and voice steps. The job runner sends each step only through the compliance gate. |
 | Collector task queue | Done | `/w/triton/collections/queue` lists import, dispute, hardship, and warm-transfer tasks. |
 | AI agents: triage, classify, draft for approval, payment plans, risk flags | Done | The fast model on the existing router (Qwen, Llama, or a remote OpenAI-compatible URL) drafts a reply. The rules engine overrides a hard classification and any threat. No endpoint means the rules draft is used. Every draft is gated and stays unsent until a person approves it. |
-| Voice AI inbound and outbound in sandbox | Done | Desk call console: AI disclosure, recording notice and consent, right-party check, mini-Miranda, Reg F caps, warm transfer onto the queue, payment handoff to `/pay/sandbox/…`. No audio provider is dialed. |
+| Voice AI inbound and outbound in sandbox | Done | Desk call console remains the default. An outbound start dials Twilio or Telnyx only when `MERIDIAN_VOICE_LIVE=enabled` and live delivery are both set, and only if an encrypted number is already stored. Webhooks check signatures. Recordings are encrypted. The kill switch marks every active call ended and, when live, sends hangup. |
 | TCPA consent for AI voice on cells and reassigned-number hook | Done | Cell outbound blocks without stored consent. The FCC RND adapter is behind MERIDIAN_RND_PROVIDER=fcc. Sandbox returns unknown and the gate blocks the cell call. The sandbox clear switch is still not the FCC database. |
 | Call recording, encrypted transcript, QA flags, kill switch, daily cap | Done | Editable all-party / one-party table at `/w/triton/settings/recording`, wired into the voice consent step. Transcripts are encrypted. Guardrails replace banned lines. Kill switch blocks outbound campaigns. |
 | Consumer portal: lookup, itemization, validation download, dispute, plan, test payment | Done | `/collect`. Reference, last four, and ZIP. No SSN in the URL. Plan total cannot exceed the balance. Payment is a sandbox ledger entry. |
@@ -38,7 +38,10 @@ Audit against the original collections brief and the two owner updates (collect 
 | Public agency website | Done | `/agency` with home, about, pay, options, FAQ, dispute, privacy, rights, contact, and accessibility. `{{agency_name}}` unless `MERIDIAN_AGENCY_NAME` is set. Counsel banner. No analytics. Account lookup stays on `/collect`. |
 | Client portal | Done | `/w/triton/client`. A client login is bound to one seller and cannot see or place another seller's accounts. Admins see each seller separately. |
 | Complaint management | Done | Intake from the public form, portal, and desk. CFPB id, 15-day operational due date marked for counsel, root-cause tags, and a compliance count. |
-| Security checks | Partial | Authz allowlist test, origin check, upload scan, secret scan, and `npm audit` are recorded in `docs/SECURITY-AUDIT.md`. The Next finding needs a stable upgrade. |
+| Security checks | Done | Next.js is 15.5.29. sharp 0.35.5, postcss 8.5.32, brace-expansion 1.1.21, and source-map-js 1.2.2 are pinned. `npm audit` reports 0 critical and 0 high. CI fails on a new critical. Eight moderate dev-tool findings remain and are written down in `docs/SECURITY-AUDIT.md`. |
+| Skip-trace | Done | Sandbox returns no phone, email, or address and does not call a vendor. A live phone clears cell and SMS consent and sets the reassigned-number result back to unknown. A new email clears email consent. Values are stored encrypted. |
+| Collector floor | Done | Account 360 timeline, template send, promise-to-pay with a broken-promise task, and a daily scorecard. |
+| Branding | Done | Name, logo URL, color, and domain come from env or `/w/triton/settings/brand`. Env wins when it is set. Unset name stays `{{agency_name}}`. |
 | Ops runbooks | Done | `docs/DEPLOY.md` and `docs/BACKUP-RESTORE.md`. JSON logs redact identifiers. `/api/metrics` requires a seat and names alerts. |
 
 ## Owner still needs to provide

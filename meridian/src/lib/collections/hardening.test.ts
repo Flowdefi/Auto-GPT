@@ -20,6 +20,8 @@ const PUBLIC_ROUTES = [
   "/api/portal/route.ts",
   "/api/webhooks/channels/route.ts",
   "/api/agency/route.ts",
+  "/api/brand/route.ts",
+  "/api/webhooks/voice/route.ts",
 ];
 
 function walk(dir: string): string[] {
@@ -61,28 +63,30 @@ test("logs redact identifiers", () => {
 });
 
 test("a client cannot see or recall another seller", () => {
+  const stamp = Date.now().toString(36);
   bindClient("client.a@example.test", "Client Seller A", "admin");
   bindClient("client.b@example.test", "Client Seller B", "admin");
-  const placed = placeForClient("triton", "client", "client.a@example.test", "account_ref,consumer_name,consumer_state,zip,last4,balance\nCL-A,Example A,OH,44101,3333,20.00\n");
+  const placed = placeForClient("triton", "client", "client.a@example.test", `account_ref,consumer_name,consumer_state,zip,last4,balance\nCL-A-${stamp},Example A,OH,44101,3333,20.00\n`);
   assert.equal(placed.created, 1);
   assert.throws(
-    () => placeForClient("triton", "client", "client.a@example.test", "account_ref,consumer_name,consumer_state,zip,last4,seller,balance\nCL-X,Example X,OH,44101,3333,Client Seller B,20.00\n"),
+    () => placeForClient("triton", "client", "client.a@example.test", `account_ref,consumer_name,consumer_state,zip,last4,seller,balance\nCL-X-${stamp},Example X,OH,44101,3333,Client Seller B,20.00\n`),
     /only its own/,
   );
   const home = clientHome("triton", "client", "client.a@example.test");
   assert.equal(home.seller, "Client Seller A");
   assert.equal(home.clients.every((row) => row.sellerName === "Client Seller A"), true);
-  placeForClient("triton", "client", "client.b@example.test", "account_ref,consumer_name,consumer_state,zip,last4,balance\nCL-B,Example B,CA,90001,2222,20.00\n");
+  placeForClient("triton", "client", "client.b@example.test", `account_ref,consumer_name,consumer_state,zip,last4,balance\nCL-B-${stamp},Example B,CA,90001,2222,20.00\n`);
   const recalled = recallForClient("triton", "client", "client.a@example.test");
   assert.equal(recalled, 0);
-  const other = (loadDb().portfolioAccounts ?? []).find((account) => account.accountRef === "CL-B");
+  const other = (loadDb().portfolioAccounts ?? []).find((account) => account.accountRef === `CL-B-${stamp}`);
   assert.equal(other?.status, "quarantined");
   assert.equal(other?.sellerName, "Client Seller B");
 });
 
 test("ACH stores authorization proof, posts the balance, and NSF restores it", async () => {
-  const placed = placeForClient("triton", "admin", "desk@example.test", "account_ref,consumer_name,consumer_state,zip,last4,balance\nACH-1,Example Payer,OH,44101,4444,30.00\n");
-  const account = placed.accounts.find((item) => item.accountRef === "ACH-1");
+  const stamp = Date.now().toString(36);
+  const placed = placeForClient("triton", "admin", "desk@example.test", `account_ref,consumer_name,consumer_state,zip,last4,balance\nACH-${stamp},Example Payer,OH,44101,4444,30.00\n`);
+  const account = placed.accounts.find((item) => item.accountRef === `ACH-${stamp}`);
   assert.ok(account);
   await assert.rejects(() => postAchPayment({ workspaceId: "triton", accountId: account.id, amountCents: 1000, recurring: true, accepted: false }), /authorization/);
   const payment = await postAchPayment({ workspaceId: "triton", accountId: account.id, amountCents: 1000, recurring: false, accepted: true });

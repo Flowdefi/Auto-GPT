@@ -2,6 +2,7 @@ import type { ComplianceEvent } from "@/lib/collections/types";
 import { accountsReadyToPurge, retentionDays, scheduleSteps, type CollectionJob, type CollectionSequence, type SequenceStep } from "@/lib/collections/jobs";
 import type { WorkspaceId } from "@/lib/types";
 import { loadDb, mutate, nextId } from "@/server/db";
+import { sweepBrokenPromises } from "./floor";
 import { sendChannel } from "./service";
 
 function workspaces(): WorkspaceId[] {
@@ -106,6 +107,7 @@ function finish(job: CollectionJob, status: CollectionJob["status"], result: str
 }
 
 export async function runDueJobs(now = new Date()): Promise<Array<{ id: string; status: string; result: string }>> {
+  sweepBrokenPromises(now);
   ensureRetentionJobs(now);
   const due = (loadDb().jobs ?? []).filter((job) => job.status === "pending" && job.runAt <= now.toISOString());
   const results: Array<{ id: string; status: string; result: string }> = [];

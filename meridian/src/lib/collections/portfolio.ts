@@ -143,6 +143,9 @@ export function publicAccount(account: PortfolioAccount): PortfolioAccount {
   delete copy.ssnCiphertext;
   delete copy.dobCiphertext;
   delete copy.accountNumberCiphertext;
+  delete copy.phoneCiphertext;
+  delete copy.emailCiphertext;
+  delete copy.addressCiphertext;
   return copy;
 }
 

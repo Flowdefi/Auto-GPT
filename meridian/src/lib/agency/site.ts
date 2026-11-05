@@ -11,8 +11,7 @@ export interface AgencyPage {
 
 const COUNSEL = "Draft for counsel review. Not legal advice. Replace {{agency_name}} before publication.";
 
-export function agencyPages(): AgencyPage[] {
-  const name = agencyName();
+export function agencyPages(name = agencyName()): AgencyPage[] {
   return [
     {
       slug: "about",
@@ -112,6 +111,6 @@ export function agencyPages(): AgencyPage[] {
   ];
 }
 
-export function pageBySlug(slug: string): AgencyPage | undefined {
-  return agencyPages().find((page) => page.slug === slug);
+export function pageBySlug(slug: string, name = agencyName()): AgencyPage | undefined {
+  return agencyPages(name).find((page) => page.slug === slug);
 }

@@ -48,6 +48,10 @@ export interface PortfolioAccount {
   status: AccountStatus;
   quarantineReason: string | null;
   inconvenientWork: boolean;
+  promise?: { amountCents: number; dueOn: string; status: "open" | "kept" | "broken"; createdAt: string } | null;
+  phoneCiphertext?: string | null;
+  emailCiphertext?: string | null;
+  addressCiphertext?: string | null;
   importedAt: string;
   returnedAt: string | null;
   originalCreditor?: string;
@@ -284,6 +288,7 @@ export interface VoiceCall {
   provider: string;
   providerId: string | null;
   transferred: boolean;
+  recordingCiphertext?: string | null;
 }
 
 export interface ChannelMessage {

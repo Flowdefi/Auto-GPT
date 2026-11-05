@@ -40,7 +40,7 @@ export default function SolTablePage() {
       <PageHeader
         eyebrow="Settings"
         title="Limitations table"
-        subtitle="Only Texas and Georgia start with a reviewed period. Leave every other state blank until counsel enters one. Accrual is last payment, otherwise charge-off, and that choice needs counsel review."
+        subtitle="Texas, Georgia, Missouri, Montana, New Hampshire, Ohio, South Carolina, South Dakota, Vermont, and Virginia start with a cited period and a counsel-review flag. Every other state stays blank. Accrual is last payment, otherwise charge-off, and that choice needs counsel review."
       />
       {notice ? <Card className="mb-4 p-4 text-sm">{notice}</Card> : null}
       <Button className="mb-4" onClick={() => void save()}>Save table</Button>

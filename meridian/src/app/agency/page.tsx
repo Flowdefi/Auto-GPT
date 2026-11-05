@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { agencyName } from "@/lib/agency/site";
+import { currentBrand } from "@/server/brand";
 
 export const metadata: Metadata = {
   title: "Collections",
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default function AgencyHomePage() {
-  const name = agencyName();
+  const name = currentBrand().name;
   return (
     <article>
       <p className="text-sm">Draft for counsel review. Not legal advice.</p>

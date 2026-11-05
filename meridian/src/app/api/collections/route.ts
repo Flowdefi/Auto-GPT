@@ -12,6 +12,10 @@ import { assertSameOrigin } from "@/server/security";
 import { bindClient, clientHome, placeForClient, recallForClient } from "@/server/collections/client-portal";
 import { complaintReport, fileComplaint, setComplaintStatus } from "@/server/collections/complaint-store";
 import { postAchPayment, reversePayment } from "@/server/collections/payments";
+import { account360, dailyScorecard, markPromiseKept, setPromise } from "@/server/collections/floor";
+import { applySkipTrace } from "@/server/collections/skip-trace";
+import { attachLiveDial, hangupActiveCalls } from "@/server/collections/voice-live";
+import { currentBrand, saveBrand } from "@/server/brand";
 import { enrollSequence, listSequences, runDueJobs, saveSequence } from "@/server/collections/runner";
 import {
   completeTask,
@@ -113,6 +117,11 @@ export async function POST(request: Request) {
     cfpbId?: string;
     summary?: string;
     accountRef?: string;
+    dueOn?: string;
+    brandName?: string;
+    logoUrl?: string;
+    color?: string;
+    domain?: string;
     status?: "open" | "responded" | "closed";
     ownerApproved?: boolean;
     counselReviewed?: boolean;
@@ -166,30 +175,31 @@ export async function POST(request: Request) {
           }),
         });
       case "settings":
-        return NextResponse.json({
-          settings: updateVoiceSettings({
-            killSwitch: body.killSwitch,
-            blockInbound: body.blockInbound,
-            dailyOutboundCap: body.dailyOutboundCap,
-            maxDiscountPercent: body.maxDiscountPercent,
-            maxPlanMonths: body.maxPlanMonths,
-            rndSandboxClear: body.rndSandboxClear,
-          }),
+        const settings = updateVoiceSettings({
+          killSwitch: body.killSwitch,
+          blockInbound: body.blockInbound,
+          dailyOutboundCap: body.dailyOutboundCap,
+          maxDiscountPercent: body.maxDiscountPercent,
+          maxPlanMonths: body.maxPlanMonths,
+          rndSandboxClear: body.rndSandboxClear,
         });
+        const hungUp = body.killSwitch === true ? await hangupActiveCalls() : 0;
+        return NextResponse.json({ settings, hungUp });
       case "consent":
         if (!body.accountId || (body.channel !== "voice_cell" && body.channel !== "sms" && body.channel !== "email")) {
           return NextResponse.json({ error: "accountId and consent channel required" }, { status: 400 });
         }
         return NextResponse.json({ consent: recordConsent(body.workspaceId, body.accountId, body.channel, body.source || "operator") });
-      case "voice_start":
-        return NextResponse.json(
-          startVoice({
-            workspaceId: body.workspaceId,
-            direction: body.direction === "inbound" ? "inbound" : "outbound",
-            accountId: body.accountId,
-            campaignId: body.campaignId,
-          }),
-        );
+      case "voice_start": {
+        const started = startVoice({
+          workspaceId: body.workspaceId,
+          direction: body.direction === "inbound" ? "inbound" : "outbound",
+          accountId: body.accountId,
+          campaignId: body.campaignId,
+        });
+        const live = await attachLiveDial(started.id);
+        return NextResponse.json({ ...started, live });
+      }
       case "voice_turn":
         if (!body.callId || !body.turn) return NextResponse.json({ error: "callId and turn required" }, { status: 400 });
         return NextResponse.json(turnVoice(body.workspaceId, body.callId, body.turn));
@@ -285,6 +295,25 @@ export async function POST(request: Request) {
       case "payment_ach":
         if (!body.accountId || !body.amountCents) return NextResponse.json({ error: "accountId and amountCents required" }, { status: 400 });
         return NextResponse.json({ payment: await postAchPayment({ workspaceId: body.workspaceId, accountId: body.accountId, amountCents: body.amountCents, recurring: Boolean(body.recurring), accepted: Boolean(body.accepted) }) });
+      case "account_360":
+        if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
+        return NextResponse.json(account360(body.workspaceId, body.accountId));
+      case "promise_set":
+        if (!body.accountId || !body.amountCents || !body.dueOn) return NextResponse.json({ error: "accountId, amountCents, and dueOn required" }, { status: 400 });
+        return NextResponse.json({ account: setPromise(body.workspaceId, body.accountId, body.amountCents, body.dueOn) });
+      case "promise_kept":
+        if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
+        markPromiseKept(body.workspaceId, body.accountId);
+        return NextResponse.json({ ok: true });
+      case "scorecard":
+        return NextResponse.json(dailyScorecard(body.workspaceId));
+      case "skip_trace":
+        if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
+        return NextResponse.json(await applySkipTrace(body.workspaceId, body.accountId));
+      case "brand_get":
+        return NextResponse.json({ brand: currentBrand() });
+      case "brand_save":
+        return NextResponse.json({ brand: saveBrand({ name: body.brandName, logoUrl: body.logoUrl, color: body.color, domain: body.domain }, actor) });
       case "payment_reverse":
         if (!body.paymentId) return NextResponse.json({ error: "paymentId required" }, { status: 400 });
         if (actor !== "admin" && actor !== "compliance") return NextResponse.json({ error: "Compliance must reverse a payment" }, { status: 403 });

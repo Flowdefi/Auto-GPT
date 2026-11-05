@@ -234,6 +234,7 @@ export interface MergeContext {
 export function mergeContext(input: {
   account: PortfolioAccount;
   agencyName: string;
+  domain?: string;
   now?: Date;
   matrix?: SettlementMatrix;
   extra?: Record<string, MergeValue>;
@@ -245,6 +246,7 @@ export function mergeContext(input: {
   const offer = input.matrix ? settlementOffer(input.account, input.matrix, now) : null;
   const firstName = input.account.consumerName.split(/\s+/)[0];
   const paymentsCredits = (input.account.paymentsSinceItemizationCents ?? 0) + (input.account.creditsSinceItemizationCents ?? 0);
+  const host = input.domain?.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "") || "example.test";
   const values: Record<string, MergeValue> = {
     agency_name: input.agencyName,
     agency_name_caps: input.agencyName.toUpperCase(),
@@ -252,11 +254,11 @@ export function mergeContext(input: {
     agency_mailing_address: "PO Box 100, Example City, OH 44101",
     agency_phone: "1-800-555-0199",
     agency_hours: "weekdays 9 a.m. to 5 p.m. Eastern",
-    agency_website: "https://example.test",
-    agency_email: "consumer@example.test",
-    portal_url: `https://example.test/collect`,
-    dispute_portal_url: "https://example.test/collect",
-    email_optout_link: "https://example.test/u/example-token",
+    agency_website: `https://${host}`,
+    agency_email: `consumer@${host}`,
+    portal_url: `https://${host}/collect`,
+    dispute_portal_url: `https://${host}/collect`,
+    email_optout_link: `https://${host}/u/example-token`,
     account_ref: input.account.accountRef,
     account_last4: input.account.last4 || "0000",
     account_type: "credit card",
