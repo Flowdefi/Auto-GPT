@@ -194,18 +194,24 @@ test("validation pdf does not invent interest or an account type", () => {
   const plainAccount = plain.accounts.find((item) => item.accountRef === `PDF-${stamp}`);
   assert.ok(plainAccount);
   assert.equal(plainAccount.interestSinceItemizationCents, undefined);
+  assert.equal(plainAccount.feesSinceItemizationCents, undefined);
+  assert.equal(plainAccount.itemizationAmountCents, undefined);
   const omitted = new TextDecoder().decode(Buffer.from(validationPdfBase64("triton", plainAccount.id), "base64"));
   assert.match(omitted, /Account type was/);
-  assert.match(omitted, /missing interest figure as zero/);
+  assert.match(omitted, /Do not treat it as zero/);
   assert.equal(omitted.includes("+ $not supplied"), false);
   const supplied = importPortfolio({
     workspaceId: "triton",
-    csv: `account_ref,consumer_name,consumer_state,zip,last4,balance,interest_since\nPDF2-${stamp},Ada Example,OH,44101,4242,40.00,1.50\n`,
+    csv: `account_ref,consumer_name,consumer_state,zip,last4,balance,interest_since,fees_since,itemization_amount,payments_since\nPDF2-${stamp},Ada Example,OH,44101,4242,40.00,1.50,2.00,10.00,1.00\n`,
   });
   const suppliedAccount = supplied.accounts.find((item) => item.accountRef === `PDF2-${stamp}`);
   assert.equal(suppliedAccount?.interestSinceItemizationCents, 150);
+  assert.equal(suppliedAccount?.feesSinceItemizationCents, 200);
   const printed = new TextDecoder().decode(Buffer.from(validationPdfBase64("triton", suppliedAccount!.id), "base64"));
   assert.match(printed, /\+ \$1\.50/);
+  assert.match(printed, /\+ \$2\.00/);
+  assert.match(printed, /\$10\.00/);
+  assert.match(printed, /- \$1\.00/);
 });
 
 test("limitations table can be edited and still leaves unreviewed states blank", () => {

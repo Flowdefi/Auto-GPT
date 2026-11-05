@@ -1147,6 +1147,15 @@ export function accessReview(workspaceId: WorkspaceId = "triton"): {
   };
 }
 
+function suppliedDollars(cents: number | null | undefined): string {
+  return cents == null ? "not supplied" : (cents / 100).toFixed(2);
+}
+
+function suppliedPayments(payments: number | null | undefined, credits: number | null | undefined): string {
+  if (payments == null && credits == null) return "not supplied";
+  return (((payments ?? 0) + (credits ?? 0)) / 100).toFixed(2);
+}
+
 export function validationPdfBase64(workspaceId: WorkspaceId, accountId: string): string {
   const account = ensureValidationNotice(workspaceId, accountId);
   const end = account.validationMailedAt ? validationEndDate(account.validationMailedAt) : account.disputeDeadline || "";
@@ -1162,10 +1171,10 @@ export function validationPdfBase64(workspaceId: WorkspaceId, accountId: string)
     creditorOnItemizationDate: account.originalCreditor || "not supplied",
     accountLast4: account.last4 || "0000",
     itemizationDate: account.itemizationDate || "not supplied",
-    amountOnItemizationDate: ((account.itemizationAmountCents ?? 0) / 100).toFixed(2),
-    interestSince: account.interestSinceItemizationCents == null ? "not supplied" : (account.interestSinceItemizationCents / 100).toFixed(2),
-    feesSince: ((account.feesSinceItemizationCents ?? 0) / 100).toFixed(2),
-    paymentsCreditsSince: (((account.paymentsSinceItemizationCents ?? 0) + (account.creditsSinceItemizationCents ?? 0)) / 100).toFixed(2),
+    amountOnItemizationDate: suppliedDollars(account.itemizationAmountCents),
+    interestSince: suppliedDollars(account.interestSinceItemizationCents),
+    feesSince: suppliedDollars(account.feesSinceItemizationCents),
+    paymentsCreditsSince: suppliedPayments(account.paymentsSinceItemizationCents, account.creditsSinceItemizationCents),
     currentBalance: (account.balanceCents / 100).toFixed(2),
     currentCreditor: account.sellerName,
     validationEndDate: end,

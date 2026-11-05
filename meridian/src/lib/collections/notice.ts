@@ -5,6 +5,10 @@ function money(cents: number | undefined): string {
   return `$${((cents ?? 0) / 100).toFixed(2)}`;
 }
 
+function supplied(cents: number | null | undefined): string {
+  return cents == null ? "not supplied" : money(cents);
+}
+
 /** Text version of the Reg F validation information. Layout is not the CFPB model form. */
 export function validationNotice(account: PortfolioAccount, agency: string): { body: string; citation: string; needsCounselReview: true } {
   const body = [
@@ -15,10 +19,12 @@ export function validationNotice(account: PortfolioAccount, agency: string): { b
     `Seller / placer: ${account.sellerName}`,
     `Chain of title: ${account.chainOfTitle || "not supplied"}`,
     `Itemization date: ${account.itemizationDate || "not supplied"}`,
-    `Amount on the itemization date: ${money(account.itemizationAmountCents)}`,
-    `Payments since itemization: ${money(account.paymentsSinceItemizationCents)}`,
-    `Credits since itemization: ${money(account.creditsSinceItemizationCents)}`,
-    `Fees since itemization: ${money(account.feesSinceItemizationCents)}`,
+    `Amount on the itemization date: ${supplied(account.itemizationAmountCents)}`,
+    `Interest since itemization: ${supplied(account.interestSinceItemizationCents)}`,
+    `Payments since itemization: ${supplied(account.paymentsSinceItemizationCents)}`,
+    `Credits since itemization: ${supplied(account.creditsSinceItemizationCents)}`,
+    `Fees since itemization: ${supplied(account.feesSinceItemizationCents)}`,
+    `A missing figure is not zero.`,
     `Current amount: ${money(account.balanceCents)}`,
     `Account ending: ${account.last4 || "not supplied"}`,
     `If you dispute this debt, or any part of it, write to us within 30 days after you receive this notice. We will stop collection until we mail verification. You may ask for the name and address of the original creditor.`,

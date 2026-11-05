@@ -262,6 +262,7 @@ export function mergeContext(input: {
   const end = mailed ? validationEndDate(mailed) : null;
   const offer = input.matrix ? settlementOffer(input.account, input.matrix, now) : null;
   const firstName = input.account.consumerName.split(/\s+/)[0];
+  const paymentsKnown = input.account.paymentsSinceItemizationCents != null || input.account.creditsSinceItemizationCents != null;
   const paymentsCredits = (input.account.paymentsSinceItemizationCents ?? 0) + (input.account.creditsSinceItemizationCents ?? 0);
   const host = input.domain?.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "") || "example.test";
   const values: Record<string, MergeValue> = {
@@ -287,10 +288,10 @@ export function mergeContext(input: {
     original_creditor: input.account.originalCreditor || "Example Bank",
     creditor_on_itemization_date: input.account.originalCreditor || "Example Bank",
     current_balance: money(input.account.balanceCents),
-    amount_on_itemization_date: money(input.account.itemizationAmountCents),
+    amount_on_itemization_date: input.account.itemizationAmountCents == null ? "not supplied" : money(input.account.itemizationAmountCents),
     interest_since_itemization: input.account.interestSinceItemizationCents == null ? "not supplied" : money(input.account.interestSinceItemizationCents),
-    fees_since_itemization: money(input.account.feesSinceItemizationCents),
-    payments_credits_since_itemization: money(paymentsCredits),
+    fees_since_itemization: input.account.feesSinceItemizationCents == null ? "not supplied" : money(input.account.feesSinceItemizationCents),
+    payments_credits_since_itemization: paymentsKnown ? money(paymentsCredits) : "not supplied",
     itemization_date: input.account.itemizationDate || today,
     itemization_date_basis: "charge-off",
     notice_date: mailed ? mailed.slice(0, 10) : today,

@@ -86,11 +86,12 @@ export function modelFormPdf(fields: ModelFormFields): Uint8Array {
     commands.push(`${left} ${y - 3} m 558 ${y - 3} l S`);
     y -= 16;
   };
-  row(`As of ${fields.itemizationDate}, you owed:`, `$${fields.amountOnItemizationDate}`);
+  const figure = (prefix: string, value: string) => (value === "not supplied" ? "not supplied" : `${prefix}$${value}`);
+  row(`As of ${fields.itemizationDate}, you owed:`, figure("", fields.amountOnItemizationDate));
   write(`Between ${fields.itemizationDate} and today:`);
-  row("You were charged this amount in interest:", fields.interestSince === "not supplied" ? "not supplied" : `+ $${fields.interestSince}`);
-  row("You were charged this amount in fees:", `+ $${fields.feesSince}`);
-  row("You paid or were credited this amount toward the debt:", `- $${fields.paymentsCreditsSince}`);
+  row("You were charged this amount in interest:", figure("+ ", fields.interestSince));
+  row("You were charged this amount in fees:", figure("+ ", fields.feesSince));
+  row("You paid or were credited this amount toward the debt:", figure("- ", fields.paymentsCreditsSince));
   row("Total amount of the debt now:", `$${fields.currentBalance}`);
   y -= 6;
   write("How can you dispute the debt?", 12);
@@ -116,9 +117,10 @@ export function modelFormPdf(fields: ModelFormFields): Uint8Array {
   write("[ ] I want you to send me the name and address of the original creditor.");
   y -= 8;
   write("Draft layout of 12 CFR Part 1006 Appendix B Model Form B-1. Counsel must compare it to the current CFPB form before mailing.", 8);
-  if (fields.interestSince === "not supplied" || fields.accountType === "not supplied") {
+  const omittedFigure = [fields.interestSince, fields.feesSince, fields.paymentsCreditsSince, fields.amountOnItemizationDate, fields.accountType].includes("not supplied");
+  if (omittedFigure) {
     y -= 12;
-    write("Interest or account type shows not supplied when the file omitted it. Do not treat a missing interest figure as zero.", 8);
+    write("A missing itemization figure or account type shows not supplied. Do not treat it as zero.", 8);
   }
   const stream = commands.join("\n");
   const objects = [
