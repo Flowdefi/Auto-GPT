@@ -1,4 +1,5 @@
 import type { PortfolioAccount } from "./types";
+import { validationEndDate } from "./validation-period";
 
 function money(cents: number | undefined): string {
   return `$${((cents ?? 0) / 100).toFixed(2)}`;
@@ -25,13 +26,11 @@ export function validationNotice(account: PortfolioAccount, agency: string): { b
   ].join("\n");
   return {
     body,
-    citation: "12 CFR § 1006.34 (validation information and the 30-day validation period). Itemization content is § 1006.34(c). Receipt may be presumed under the regulation; this build uses mail date plus 35 days and marks that assumption for counsel.",
+    citation: "12 CFR § 1006.34(b)(5). Assumed receipt is five days after sending, excluding Saturdays, Sundays, and legal public holidays, and the validation period ends 30 days after that date. The holiday list follows 5 U.S.C. § 6103 and needs counsel review.",
     needsCounselReview: true,
   };
 }
 
 export function disputeDeadline(mailedAtIso: string): string {
-  const date = new Date(mailedAtIso);
-  date.setUTCDate(date.getUTCDate() + 35);
-  return date.toISOString().slice(0, 10);
+  return validationEndDate(mailedAtIso.slice(0, 10));
 }

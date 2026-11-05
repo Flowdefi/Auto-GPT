@@ -1,11 +1,21 @@
-import { readFileSync, readdirSync, existsSync } from "fs";
-import path from "path";
 import { requiresAllPartyRecording, emptyTranscript, rulesSummary, stepCall, type ConsumerTurn } from "@/lib/collections/voice";
 import { evaluateGate, type GateContext } from "@/lib/collections/gate";
 import { classifyInbound, draftConsumerReply } from "@/lib/collections/inbox";
+import { filterVoiceUtterance, loadVoiceGuardrails } from "@/lib/collections/guardrails";
 import { disputeDeadline, validationNotice } from "@/lib/collections/notice";
+import {
+  clearMatrixDefaults,
+  loadSettlementMatrix,
+  loadTemplateFiles,
+  mergeContext,
+  sendRuleBlocks,
+  templateSendChannel,
+  type SettlementMatrix,
+} from "@/lib/collections/template-library";
+import { missingInterpolations, renderMustache } from "@/lib/collections/mustache";
 import { parsePortfolioCsv, publicAccount, type ColumnMapping, type WidthField } from "@/lib/collections/portfolio";
 import type {
+  AccountStatus,
   CallTranscript,
   ChannelMessage,
   CollectionChannel,
@@ -26,7 +36,6 @@ import { loadDb, mutate, nextId } from "@/server/db";
 import { masterSecret } from "@/server/secrets";
 import { publicBaseUrl } from "@/server/mailer";
 
-const TEMPLATE_DIR = path.join(process.cwd(), "templates", "collections");
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 function accounts(workspaceId: WorkspaceId): PortfolioAccount[] {
@@ -44,7 +53,8 @@ export function collectionSnapshot(workspaceId: WorkspaceId) {
     payments: (db.consumerPayments ?? []).filter((payment) => payment.workspaceId === workspaceId),
     calls: (db.voiceCalls ?? []).filter((call) => call.workspaceId === workspaceId).slice(0, 30),
     messages: (db.channelMessages ?? []).filter((message) => message.workspaceId === workspaceId).slice(0, 30),
-    templates: db.collectionTemplates ?? [],
+    templates: syncCollectionTemplates(),
+    settlementMatrix: ensureSettlementMatrix(),
     events: (db.complianceEvents ?? []).filter((event) => event.workspaceId === workspaceId).slice(0, 40),
   };
 }
@@ -210,7 +220,13 @@ function logEvent(workspaceId: WorkspaceId, channel: CollectionChannel, accountI
   });
 }
 
-function gateFor(workspaceId: WorkspaceId, account: PortfolioAccount | null, channel: CollectionChannel, voicemailBody?: string) {
+function gateFor(
+  workspaceId: WorkspaceId,
+  account: PortfolioAccount | null,
+  channel: CollectionChannel,
+  voicemailBody?: string,
+  statusResponse?: AccountStatus | null,
+) {
   const db = loadDb();
   const now = new Date();
   const recent = (db.voiceCalls ?? []).filter((call) => call.workspaceId === workspaceId && call.accountId === account?.id);
@@ -236,6 +252,7 @@ function gateFor(workspaceId: WorkspaceId, account: PortfolioAccount | null, cha
     channel,
     voicemailBody,
     campaignSentToday: sentToday,
+    statusResponse,
   };
   return evaluateGate(ctx);
 }
@@ -321,7 +338,7 @@ export function turnVoice(workspaceId: WorkspaceId, callId: string, turn: Consum
   const transcript = open(call.transcriptCiphertext);
   const token = nextId("pay");
   const paymentUrl = `${publicBaseUrl()}/pay/sandbox/${token}`;
-  const stepped = stepCall({
+  let stepped = stepCall({
     transcript,
     turn,
     account,
@@ -330,6 +347,20 @@ export function turnVoice(workspaceId: WorkspaceId, callId: string, turn: Consum
     paymentUrl,
     agency: workspaceOf(workspaceId).legalName,
   });
+  const guardrail = filterVoiceUtterance(stepped.say, loadVoiceGuardrails());
+  if (guardrail.blocked) {
+    stepped = {
+      ...stepped,
+      say: guardrail.text,
+      qaFlags: [...stepped.qaFlags, { code: "guardrail", detail: guardrail.reason ?? "Voice guardrail" }],
+      transcript: {
+        ...stepped.transcript,
+        turns: stepped.transcript.turns.map((turn, index, turns) =>
+          index === turns.length - 1 && turn.role === "agent" ? { ...turn, text: guardrail.text } : turn,
+        ),
+      },
+    };
+  }
   const updated: VoiceCall = {
     ...call,
     phase: stepped.transcript.phase,
@@ -358,6 +389,28 @@ export function turnVoice(workspaceId: WorkspaceId, callId: string, turn: Consum
   return { ...updated, say: stepped.say, transcript: stepped.transcript, paymentUrl: stepped.paymentUrl };
 }
 
+function statusResponseFor(templateId: string | undefined): AccountStatus | null {
+  switch (templateId) {
+    case "LTR-040":
+    case "LTR-041":
+    case "LTR-042":
+    case "LTR-043":
+      return "disputed";
+    case "LTR-050":
+      return "ceased";
+    case "LTR-070":
+      return "bankruptcy";
+    case "LTR-071":
+      return "deceased";
+    case "LTR-072":
+      return "military";
+    case "LTR-074":
+      return "attorney";
+    default:
+      return null;
+  }
+}
+
 export function sendChannel(input: {
   workspaceId: WorkspaceId;
   accountId: string;
@@ -367,22 +420,63 @@ export function sendChannel(input: {
 }): ChannelMessage {
   const account = accounts(input.workspaceId).find((item) => item.id === input.accountId) ?? null;
   const template = (loadDb().collectionTemplates ?? []).find((item) => item.id === input.templateId);
-  if (template && !template.counselReviewed) {
-    const blocked = storeMessage(input, "blocked", "Template has not been marked counsel-reviewed.", null);
+  if (template && !template.ownerApproved) {
+    const blocked = storeMessage(input, "blocked", "Template stays disabled until an owner approves it for sending.", null);
     logEvent(input.workspaceId, input.channel, input.accountId, false, blocked.reason ?? "template");
     return blocked;
   }
-  const decision = gateFor(input.workspaceId, account, input.channel, input.channel === "voicemail_drop" ? input.body : undefined);
+  if (template?.id === "CALL-009") {
+    const blocked = storeMessage(input, "blocked", "Voice guardrails are a filter, not a message that can be sent.", null);
+    logEvent(input.workspaceId, input.channel, input.accountId, false, blocked.reason ?? "template");
+    return blocked;
+  }
+  let rendered = input.body;
+  if (template && account) {
+    const matrix = ensureSettlementMatrix();
+    const context = mergeContext({ account, agencyName: workspaceOf(input.workspaceId).legalName, matrix });
+    const missing = missingInterpolations(`${template.subject}\n${template.body}`, context.values);
+    if (missing.length > 0) {
+      const blocked = storeMessage(input, "blocked", `Required merge fields are empty: ${missing.join(", ")}.`, null);
+      logEvent(input.workspaceId, input.channel, input.accountId, false, blocked.reason ?? "merge");
+      return blocked;
+    }
+    const rules = sendRuleBlocks({
+      templateId: template.id,
+      rules: template.sendRules,
+      account,
+      channel: templateSendChannel(template.channel),
+      now: new Date(),
+      values: { ...context.values, subject_preview: renderMustache(template.subject, context.values) },
+      offer: context.offer,
+      priorLetterAt: (loadDb().channelMessages ?? []).find((row) => row.accountId === account.id && row.channel === "letter" && row.status === "sandbox_queued")?.at ?? null,
+      smsConsent: (loadDb().consents ?? []).some((row) => row.accountId === account.id && row.channel === "sms"),
+      emailConsent: (loadDb().consents ?? []).some((row) => row.accountId === account.id && row.channel === "email"),
+      reassigned: loadDb().voiceSettings?.rndSandboxClear ? "ok" : "unknown",
+    });
+    if (rules.length > 0) {
+      const blocked = storeMessage(input, "blocked", rules[0] ?? "Send rule blocked this template.", null);
+      logEvent(input.workspaceId, input.channel, input.accountId, false, rules.join(" "));
+      return blocked;
+    }
+    rendered = [renderMustache(template.subject, context.values), renderMustache(template.body, context.values)].filter(Boolean).join("\n\n");
+  }
+  const decision = gateFor(
+    input.workspaceId,
+    account,
+    input.channel,
+    input.channel === "voicemail_drop" ? rendered : undefined,
+    statusResponseFor(template?.id),
+  );
   logEvent(input.workspaceId, input.channel, input.accountId, decision.allowed, decision.reason);
   if (!decision.allowed) return storeMessage(input, "blocked", decision.reason, null);
   if (process.env.MERIDIAN_CHANNEL_DELIVER === "live") {
     throw new Error("Live email, SMS, voice, and mail delivery is disabled. Use sandbox mode.");
   }
-  return storeMessage(input, "sandbox_queued", decision.reason, `sandbox_${nextId("msg")}`);
+  return storeMessage({ ...input, body: rendered }, "sandbox_queued", decision.reason, `sandbox_${nextId("msg")}`);
 }
 
 function storeMessage(
-  input: { workspaceId: WorkspaceId; accountId: string; channel: CollectionChannel; templateId?: string },
+  input: { workspaceId: WorkspaceId; accountId: string; channel: CollectionChannel; templateId?: string; body?: string },
   status: ChannelMessage["status"],
   reason: string,
   providerId: string | null,
@@ -398,6 +492,7 @@ function storeMessage(
     provider: "sandbox",
     providerId,
     at: new Date().toISOString(),
+    bodyPreview: input.body?.slice(0, 500) ?? null,
   };
   mutate((db) => {
     db.channelMessages = [message, ...(db.channelMessages ?? [])].slice(0, 400);
@@ -405,33 +500,100 @@ function storeMessage(
   return message;
 }
 
-export function syncCollectionTemplates(): CollectionTemplate[] {
-  if (!existsSync(TEMPLATE_DIR)) return loadDb().collectionTemplates ?? [];
-  const files = readdirSync(TEMPLATE_DIR).filter((name) => name.endsWith(".md") && name.toLowerCase() !== "readme.md");
-  const loaded: CollectionTemplate[] = files.map((name) => {
-    const raw = readFileSync(path.join(TEMPLATE_DIR, name), "utf8");
-    const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
-    const meta = Object.fromEntries(
-      (match?.[1] ?? "")
-        .split("\n")
-        .map((line) => line.split(":").map((part) => part.trim()))
-        .filter((pair) => pair[0] && pair[1])
-        .map(([key, value]) => [key, value]),
-    );
-    const channel = (meta.channel ?? "letter") as CollectionTemplate["channel"];
-    return {
-      id: meta.id || name.replace(/\.md$/, ""),
-      channel,
-      name: meta.name || name,
-      body: (match?.[2] ?? raw).trim(),
-      sourceFile: name,
-      counselReviewed: meta.counselReviewed === "true",
-      limitedContent: meta.limitedContent === "true",
-      loadedAt: new Date().toISOString(),
-    };
+export function ensureSettlementMatrix(): SettlementMatrix {
+  const db = loadDb();
+  if (db.settlementMatrix?.customized) return db.settlementMatrix;
+  const seeded = loadSettlementMatrix();
+  mutate((state) => {
+    if (!state.settlementMatrix?.customized) state.settlementMatrix = seeded;
   });
+  return loadDb().settlementMatrix ?? seeded;
+}
+
+export function saveSettlementMatrix(matrix: SettlementMatrix, role: CollectionsRole): SettlementMatrix {
+  if (role !== "admin" && role !== "compliance") throw new Error("Only admin or compliance can edit settlement authority");
+  const saved = clearMatrixDefaults(matrix);
+  mutate((db) => {
+    db.settlementMatrix = saved;
+  });
+  return saved;
+}
+
+export function setTemplateApproval(
+  id: string,
+  patch: { ownerApproved?: boolean; counselReviewed?: boolean },
+  role: CollectionsRole,
+): CollectionTemplate {
+  if (role !== "admin" && role !== "compliance") throw new Error("Only admin or compliance can approve a template");
+  let updated: CollectionTemplate | undefined;
+  mutate((db) => {
+    db.collectionTemplates = (db.collectionTemplates ?? []).map((item) => {
+      if (item.id !== id) return item;
+      updated = {
+        ...item,
+        ownerApproved: patch.ownerApproved ?? item.ownerApproved,
+        counselReviewed: patch.counselReviewed ?? item.counselReviewed,
+        needsCounselReview: patch.counselReviewed ? false : item.needsCounselReview,
+      };
+      return updated;
+    });
+  });
+  if (!updated) throw new Error("Template not found");
+  return updated;
+}
+
+export function renderTemplatePreview(workspaceId: WorkspaceId, templateId: string, accountId: string) {
+  const template = (loadDb().collectionTemplates ?? []).find((item) => item.id === templateId);
+  const account = accounts(workspaceId).find((item) => item.id === accountId);
+  if (!template || !account) throw new Error("Template and account are required");
+  const context = mergeContext({ account, agencyName: workspaceOf(workspaceId).legalName, matrix: ensureSettlementMatrix() });
+  return {
+    subject: renderMustache(template.subject, context.values),
+    body: renderMustache(template.body, context.values),
+    missing: missingInterpolations(`${template.subject}\n${template.body}`, context.values),
+    needsCounselReview: template.needsCounselReview,
+    ownerApproved: template.ownerApproved,
+    offer: context.offer,
+  };
+}
+
+export function syncCollectionTemplates(): CollectionTemplate[] {
+  const files = loadTemplateFiles();
+  const loadedAt = new Date().toISOString();
   return mutate((db) => {
-    const manual = (db.collectionTemplates ?? []).filter((item) => !item.sourceFile);
+    const previous = new Map((db.collectionTemplates ?? []).map((item) => [item.id, item]));
+    const loaded: CollectionTemplate[] = files.map((file) => {
+      const prior = previous.get(file.id);
+      return {
+        ...file,
+        counselReviewed: prior?.counselReviewed ?? false,
+        ownerApproved: prior?.ownerApproved ?? false,
+        needsCounselReview: prior?.counselReviewed ? false : file.needsCounselReview,
+        loadedAt,
+      };
+    });
+    const guardrail = previous.get("CALL-009");
+    if (!loaded.some((item) => item.id === "CALL-009")) {
+      loaded.push({
+        id: "CALL-009",
+        channel: "voice_ai",
+        name: "Voice AI runtime guardrails",
+        subject: "",
+        body: "Runtime filter. Not a consumer script.",
+        sourceFile: "call-scripts/voice-ai-guardrails.json",
+        counselReviewed: guardrail?.counselReviewed ?? false,
+        ownerApproved: false,
+        needsCounselReview: true,
+        limitedContent: false,
+        purpose: "Output filter that runs apart from the voice model.",
+        mergeFields: [],
+        requiredDisclosures: [],
+        sendRules: ["Not a consumer message"],
+        legalCitations: [],
+        loadedAt,
+      });
+    }
+    const manual = (db.collectionTemplates ?? []).filter((item) => !item.sourceFile && !loaded.some((row) => row.id === item.id));
     db.collectionTemplates = [...loaded, ...manual];
     return db.collectionTemplates;
   });

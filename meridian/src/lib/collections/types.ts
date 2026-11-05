@@ -71,6 +71,9 @@ export interface PortfolioAccount {
   validationMailedAt?: string | null;
   disputeDeadline?: string | null;
   validationNotice?: string | null;
+  employerEmail?: boolean;
+  hardshipReported?: boolean;
+  attorneyName?: string;
   /** Removed before the account is stored or returned. */
   sensitive?: { ssn?: string; dob?: string; accountNumber?: string };
 }
@@ -182,14 +185,35 @@ export interface ComplianceEvent {
   reason: string;
 }
 
+export type TemplateChannel =
+  | "letter"
+  | "letter_block"
+  | "email"
+  | "sms"
+  | "voice"
+  | "voice_ai"
+  | "voicemail"
+  | "validation"
+  | "chat";
+
 export interface CollectionTemplate {
   id: string;
-  channel: "letter" | "email" | "sms" | "voice" | "voicemail" | "validation" | "chat";
+  channel: TemplateChannel;
   name: string;
+  subject: string;
   body: string;
   sourceFile: string | null;
+  /** Owner has marked the draft reviewed by counsel. */
   counselReviewed: boolean;
+  /** Live and sandbox sends stay off until an owner approves this id. */
+  ownerApproved: boolean;
+  needsCounselReview: boolean;
   limitedContent: boolean;
+  purpose: string;
+  mergeFields: string[];
+  requiredDisclosures: string[];
+  sendRules: string[];
+  legalCitations: string[];
   loadedAt: string;
 }
 
@@ -202,7 +226,7 @@ export interface CallTurn {
 }
 
 export interface QaFlag {
-  code: "threat" | "false_statement" | "third_party_disclosure" | "card_in_transcript" | "missing_ai_disclosure" | "missing_miranda";
+  code: "threat" | "false_statement" | "third_party_disclosure" | "card_in_transcript" | "missing_ai_disclosure" | "missing_miranda" | "guardrail";
   detail: string;
 }
 
@@ -247,6 +271,7 @@ export interface ChannelMessage {
   provider: string;
   providerId: string | null;
   at: string;
+  bodyPreview?: string | null;
 }
 
 export interface GateDecision {

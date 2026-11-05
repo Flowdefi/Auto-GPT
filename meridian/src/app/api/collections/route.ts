@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { SettlementMatrix } from "@/lib/collections/template-library";
 import type { CollectionChannel, ConsumerConsent } from "@/lib/collections/types";
 import type { ConsumerTurn } from "@/lib/collections/voice";
 import { isWorkspaceId } from "@/lib/workspace-id";
@@ -16,9 +17,12 @@ import {
   recordConsent,
   revealAccount,
   returnQuarantined,
+  renderTemplatePreview,
   sandboxPayment,
+  saveSettlementMatrix,
   sendChannel,
   setOperatorRole,
+  setTemplateApproval,
   startVoice,
   syncCollectionTemplates,
   turnVoice,
@@ -75,6 +79,9 @@ export async function POST(request: Request) {
     amountCents?: number;
     email?: string;
     role?: "admin" | "manager" | "collector" | "compliance" | "read_only";
+    ownerApproved?: boolean;
+    counselReviewed?: boolean;
+    matrix?: SettlementMatrix;
   };
   const actor = collectionsRole(gate.account.email, gate.account.role);
   if (actor === "read_only" && body.op && body.op !== "report") {
@@ -151,6 +158,17 @@ export async function POST(request: Request) {
         });
       case "templates":
         return NextResponse.json({ templates: syncCollectionTemplates() });
+      case "template_approval":
+        if (!body.templateId) return NextResponse.json({ error: "templateId required" }, { status: 400 });
+        return NextResponse.json({
+          template: setTemplateApproval(body.templateId, { ownerApproved: body.ownerApproved, counselReviewed: body.counselReviewed }, actor),
+        });
+      case "template_preview":
+        if (!body.templateId || !body.accountId) return NextResponse.json({ error: "templateId and accountId required" }, { status: 400 });
+        return NextResponse.json(renderTemplatePreview(body.workspaceId, body.templateId, body.accountId));
+      case "matrix":
+        if (!body.matrix) return NextResponse.json({ error: "matrix required" }, { status: 400 });
+        return NextResponse.json({ matrix: saveSettlementMatrix(body.matrix, actor) });
       case "reveal":
         if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
         return NextResponse.json({ pii: revealAccount(body.workspaceId, body.accountId, actor, gate.account.email) });

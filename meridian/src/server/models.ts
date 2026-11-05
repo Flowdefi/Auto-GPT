@@ -15,6 +15,7 @@ import type {
   OperatorRole,
   PortalSession,
 } from "@/lib/collections/types";
+import type { SettlementMatrix } from "@/lib/collections/template-library";
 
 export type WorkspaceId = "triton" | "aether";
 
@@ -532,6 +533,7 @@ export interface DatabaseFile {
   channelMessages?: ChannelMessage[];
   complianceEvents?: ComplianceEvent[];
   collectionTemplates?: CollectionTemplate[];
+  settlementMatrix?: SettlementMatrix;
   voiceSettings?: VoiceSettings;
   collectorTasks?: CollectorTask[];
   draftReplies?: DraftReply[];

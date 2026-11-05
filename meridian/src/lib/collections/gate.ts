@@ -1,5 +1,6 @@
 import { consumerTimeZone, withinCallingWindow } from "./time";
 import type {
+  AccountStatus,
   CollectionChannel,
   ConsumerConsent,
   DncEntry,
@@ -27,6 +28,8 @@ export interface GateContext {
   /** Voicemail body, when channel is voicemail_drop. */
   voicemailBody?: string;
   campaignSentToday: number;
+  /** When set, an acknowledgment for this exact status may pass the hold. */
+  statusResponse?: AccountStatus | null;
 }
 
 const OUTBOUND = new Set<CollectionChannel>([
@@ -102,7 +105,7 @@ export function evaluateGate(ctx: GateContext): GateDecision {
   if (account.status === "returned") {
     return block("Account was returned to the seller or placer.", "Owner geographic policy.");
   }
-  if (CLOSED_STATUSES.has(account.status)) {
+  if (CLOSED_STATUSES.has(account.status) && ctx.statusResponse !== account.status) {
     return block(
       `Account is marked ${account.status}. Outreach and the payment portal stay closed.`,
       "15 U.S.C. § 1692c(c) (cease); bankruptcy, counsel, SCRA, and dispute holds are owner policy pending counsel review.",
