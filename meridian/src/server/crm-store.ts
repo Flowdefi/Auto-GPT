@@ -2,6 +2,7 @@ import { blankCompany, blankContact, isCompanyKind, normalizeCompany, normalizeC
 import type { Company, Contact, WorkspaceId } from "@/lib/types";
 import { loadDb, mutate, nextId } from "./db";
 import type { CrmCompany, CrmContact, DatabaseFile, SuppressionReason } from "./models";
+import { openCrmRecord, sealCrmRecord } from "./at-rest";
 import { sqliteAll, sqliteExec, sqliteGet, sqliteRun } from "./sqlite";
 
 export interface SuppressionEdit {
@@ -222,7 +223,7 @@ export function readCrmJson(workspaceId: WorkspaceId, kind: string): Array<Recor
     ).flatMap((row) => {
       try {
         const parsed = JSON.parse(String(row.json)) as Record<string, unknown>;
-        return parsed && typeof parsed === "object" ? [parsed] : [];
+        return parsed && typeof parsed === "object" ? [openCrmRecord(kind, parsed)] : [];
       } catch {
         return [];
       }
@@ -243,7 +244,7 @@ export function readCrmOne(workspaceId: WorkspaceId, kind: string, id: string): 
     );
     if (!row?.json) return null;
     const parsed = JSON.parse(String(row.json)) as Record<string, unknown>;
-    return parsed && typeof parsed === "object" ? parsed : null;
+    return parsed && typeof parsed === "object" ? openCrmRecord(kind, parsed) : null;
   } catch {
     return null;
   }
@@ -283,7 +284,7 @@ export function writeCrmBlobs(
         kind,
         record.id,
         record.label,
-        record.json,
+        sealCrmRecord(kind, record.json),
         now,
       );
     }

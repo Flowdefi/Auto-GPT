@@ -7,6 +7,7 @@ import { persistSqlite, seedCrmSnapshot } from "./sqlite";
 import { seedCrmRecords } from "./crm";
 import { seedSegmentsInto } from "./segments";
 import { ensureCollectionDefaults } from "./collections/defaults";
+import { openDatabase, sealDatabase } from "./at-rest";
 import { seedDemoLeads, seedWorkflows } from "./workflow";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -85,7 +86,7 @@ export function loadDb(): DatabaseFile {
     seedCrmSnapshot();
     return cache;
   }
-  const parsed = JSON.parse(readFileSync(DATA_FILE, "utf8")) as DatabaseFile;
+  const parsed = openDatabase(JSON.parse(readFileSync(DATA_FILE, "utf8")) as DatabaseFile);
   if (!parsed.lists?.length) {
     cache = migrate(seedServerData(parsed.version ? parsed : emptyDb()));
     persist(cache);
@@ -101,7 +102,7 @@ export function loadDb(): DatabaseFile {
 export function persist(db: DatabaseFile): void {
   ensureDir();
   const tmp = `${DATA_FILE}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(db, null, 2));
+  writeFileSync(tmp, JSON.stringify(sealDatabase(db), null, 2));
   renameSync(tmp, DATA_FILE);
   cache = db;
   try {

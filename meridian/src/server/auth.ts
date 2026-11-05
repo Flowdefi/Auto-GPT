@@ -274,7 +274,7 @@ export function sessionCookieOptions(): {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    secure: publicUrl.startsWith("https://") || process.env.NODE_ENV === "production",
+    secure: publicUrl.startsWith("https://") || process.env.NODE_ENV === "production" || selfHosted(),
     maxAge: SESSION_HOURS * 60 * 60,
   };
 }

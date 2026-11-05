@@ -21,6 +21,13 @@ export const metadata: Metadata = {
   description:
     "HubSpot-class CRM, sales, marketing, SEO, service, and AI — purpose-built for Triton Financial Solutions and Aether Digital Markets.",
   applicationName: "Meridian",
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    noarchive: true,
+    nosnippet: true,
+  },
   appleWebApp: {
     capable: true,
     title: "Meridian",

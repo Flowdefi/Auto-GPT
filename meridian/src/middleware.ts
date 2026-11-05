@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { PUBLIC_API_PATHS, SESSION_COOKIE } from "@/lib/commerce";
 import { selfHosted } from "@/server/self-hosted";
 import { safeNextPath, selfHostClosure } from "@/server/self-host-routes";
+import { NO_STORE, SECURITY_HEADERS, noStorePath } from "@/server/security-headers";
 
 const PUBLIC_PAGES = new Set(["/", "/pricing", "/login", "/signup"]);
 
@@ -20,6 +21,12 @@ function isPublicPath(pathname: string): boolean {
     return true;
   }
   return false;
+}
+
+function harden(response: NextResponse, pathname: string): NextResponse {
+  for (const header of SECURITY_HEADERS) response.headers.set(header.key, header.value);
+  if (noStorePath(pathname)) response.headers.set("Cache-Control", NO_STORE);
+  return response;
 }
 
 function hasCredential(request: NextRequest): boolean {
@@ -65,28 +72,28 @@ function accessHandshake(request: NextRequest): NextResponse | null {
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (pathname.startsWith("/cdn-cgi/")) return NextResponse.next();
+  if (pathname.startsWith("/cdn-cgi/")) return harden(NextResponse.next(), pathname);
   const handshake = accessHandshake(request);
-  if (handshake) return handshake;
+  if (handshake) return harden(handshake, pathname);
   if (isPublicPath(pathname)) {
-    return NextResponse.next();
+    return harden(NextResponse.next(), pathname);
   }
 
   if (pathname.startsWith("/api/")) {
     if (!hasCredential(request)) {
-      return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+      return harden(NextResponse.json({ error: "Sign in required" }, { status: 401 }), pathname);
     }
-    return NextResponse.next();
+    return harden(NextResponse.next(), pathname);
   }
 
   if (!hasCredential(request)) {
     const login = request.nextUrl.clone();
     login.pathname = "/login";
     login.search = `?next=${encodeURIComponent(pathname)}`;
-    return NextResponse.redirect(login);
+    return harden(NextResponse.redirect(login), pathname);
   }
 
-  return NextResponse.next();
+  return harden(NextResponse.next(), pathname);
 }
 
 export const config = {

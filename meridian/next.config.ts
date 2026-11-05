@@ -1,26 +1,7 @@
 import type { NextConfig } from "next";
+import { NO_STORE, SECURITY_HEADERS } from "./src/server/security-headers";
 
-const securityHeaders = [
-  { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "X-Frame-Options", value: "DENY" },
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "X-DNS-Prefetch-Control", value: "off" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
-  {
-    key: "Content-Security-Policy",
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https:",
-      "font-src 'self' data:",
-      "connect-src 'self' https://api.polar.sh https://sandbox-api.polar.sh",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join("; "),
-  },
-];
+const noStore = [{ key: "Cache-Control", value: NO_STORE }];
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -28,10 +9,13 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [],
   async headers() {
     return [
-      {
-        source: "/:path*",
-        headers: securityHeaders,
-      },
+      { source: "/:path*", headers: SECURITY_HEADERS },
+      { source: "/api/:path*", headers: noStore },
+      { source: "/w/:path*", headers: noStore },
+      { source: "/login", headers: noStore },
+      { source: "/signup", headers: noStore },
+      { source: "/billing", headers: noStore },
+      { source: "/pricing", headers: noStore },
     ];
   },
 };

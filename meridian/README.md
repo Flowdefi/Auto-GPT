@@ -250,7 +250,26 @@ npm run sync:graph -- --workspace triton
 bash scripts/backup-db.sh
 ```
 
-The backup uses `sqlite3 .backup` into `data/backups` and deletes files older than 14 days. Cron it daily. `data/` is gitignored.
+Backups are `sqlite3 .backup` copies encrypted with AES-256-GCM. The passphrase is `MERIDIAN_BACKUP_KEY`, or `MERIDIAN_SECRET_KEY` when that is unset. The script uses `openssl enc -aes-256-gcm` when this OpenSSL accepts AEAD. OpenSSL 3's `enc` command often returns "AEAD ciphers not supported"; the script then uses `scripts/backup-crypt.mjs` (PBKDF2-SHA256, 200000 iterations, file magic `MDBC1`). Each file is mode `600` under `data/backups`, and files older than 14 days are deleted. Cron `bash scripts/backup-db.sh` daily. `data/` is gitignored.
+
+Restore a Node backup onto a stopped app, then start it again:
+
+```bash
+export MERIDIAN_BACKUP_KEY='the same passphrase'
+node scripts/backup-crypt.mjs dec data/backups/meridian-STAMP.db.enc data/meridian.db
+chmod 600 data/meridian.db
+```
+
+If the file was written by OpenSSL instead, decrypt with the same iteration count:
+
+```bash
+openssl enc -d -aes-256-gcm -pbkdf2 -iter 200000 \
+  -in data/backups/meridian-STAMP.db.enc \
+  -out data/meridian.db \
+  -pass env:MERIDIAN_BACKUP_KEY
+```
+
+What is encrypted at rest already: full SSN, date of birth, and full account number on a debtor account; call transcripts; MFA secrets; BYOK provider secrets. Debtor name, ZIP, portal code, attorney name, original creditor, chain of title, and validation notice are sealed in `data/meridian.json` and opened only in process memory. OneDrive masked-file links and deal file links are sealed in `crm_records`. CRM contact emails stay plaintext so import, suppression, Graph sync, and `GET /api/contacts?email=` can match them. They are counterparty addresses, not debtor identifiers, and are not written into the backup as a separate plaintext file.
 
 Bulk mail still refuses every suppressed address and every contact with `doNotEmail`, including test sends. Self-host mode does not turn that off.
 
@@ -263,7 +282,8 @@ Copy `.env.example` to `.env.local` (dev) or `.env` (Compose). Empty values are 
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `MERIDIAN_AUTH_SECRET` | Production | Session signing secret, 32+ characters |
-| `MERIDIAN_SECRET_KEY` | Production if you store BYOK secrets | Encryption key for provider secrets |
+| `MERIDIAN_SECRET_KEY` | Production if you store BYOK secrets | Encryption key for provider secrets. Also the backup passphrase if `MERIDIAN_BACKUP_KEY` is unset |
+| `MERIDIAN_BACKUP_KEY` | Backups | Passphrase for `scripts/backup-db.sh` (AES-256-GCM). Prefer this over the app secret |
 | `MERIDIAN_SEED_DEMO` | No | `false` disables `seedCrmRecords` and `seedDemoLeads`. Unset/`true` seeds demo data. Compose defaults to `false`. CLI scripts load `.env.local` | 
 | `MERIDIAN_SELF_HOSTED` | Owner box | `true` skips Polar, hides signup and pricing, and opens the Triton desk for the owner |
 | `MERIDIAN_CF_ACCESS_TEAM_DOMAIN` | Access login | Team host for `https://<team>/cdn-cgi/access/certs`, such as `your-team.cloudflareaccess.com` |
