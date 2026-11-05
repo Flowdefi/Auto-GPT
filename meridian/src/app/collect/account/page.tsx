@@ -132,7 +132,7 @@ export default function CollectAccountPage() {
     return (
       <main className="mx-auto max-w-lg px-6 py-10">
         <h1 className="text-2xl font-semibold">{copy.accountTitle}</h1>
-        <p className="mt-3 text-sm" role="status">{error ?? copy.loading}</p>
+        <p id={error ? "account-error" : undefined} ref={error ? errorRef : undefined} tabIndex={error ? -1 : undefined} className="mt-3 text-sm" role={error ? "alert" : "status"}>{error ? `${copy.error}: ${error}` : copy.loading}</p>
         <a className="mt-4 inline-flex min-h-11 items-center underline" href="/collect">
           {copy.back}
         </a>
@@ -164,7 +164,7 @@ export default function CollectAccountPage() {
         <p className="mt-6 text-sm leading-6">{copy.timeBarredHold} {copy.counsel}</p>
       ) : (
       <>
-      <form onSubmit={(event) => void savePlan(event)} className="mt-6 grid gap-2">
+      <form onSubmit={(event) => void savePlan(event)} className="mt-6 grid gap-2" aria-describedby={error ? "account-error" : undefined}>
         <h2 className="font-semibold">{copy.planTitle}</h2>
         <p className="text-sm">{copy.planBody}</p>
         {account.paymentPlan ? (
@@ -174,11 +174,11 @@ export default function CollectAccountPage() {
         ) : null}
         <label className="grid gap-1 text-sm" htmlFor="plan-months">
           {copy.months}
-          <input id="plan-months" className="min-h-11 rounded-xl border border-[#1c2430] px-3" inputMode="numeric" value={months} onChange={(event) => setMonths(event.target.value)} />
+          <input id="plan-months" className="min-h-11 rounded-xl border border-[#1c2430] px-3" inputMode="numeric" value={months} onChange={(event) => setMonths(event.target.value)} aria-invalid={error ? true : undefined} aria-describedby={error ? "account-error" : undefined} />
         </label>
         <label className="grid gap-1 text-sm" htmlFor="plan-amount">
           {copy.eachPayment}
-          <input id="plan-amount" className="min-h-11 rounded-xl border border-[#1c2430] px-3" inputMode="decimal" value={installment} onChange={(event) => setInstallment(event.target.value)} />
+          <input id="plan-amount" className="min-h-11 rounded-xl border border-[#1c2430] px-3" inputMode="decimal" value={installment} onChange={(event) => setInstallment(event.target.value)} aria-invalid={error ? true : undefined} aria-describedby={error ? "account-error" : undefined} />
         </label>
         <button className="min-h-11 rounded-xl border border-[#1c2430] px-4" type="submit">
           {copy.savePlan}
@@ -187,11 +187,11 @@ export default function CollectAccountPage() {
       <button className="mt-6 min-h-11 rounded-xl bg-[#1c2430] px-4 text-white" type="button" onClick={() => void pay()}>
         {copy.pay}
       </button>
-      <form className="mt-6 grid gap-2 text-sm" onSubmit={(event) => { event.preventDefault(); void payAch(); }}>
+      <form className="mt-6 grid gap-2 text-sm" aria-describedby={error ? "account-error" : undefined} onSubmit={(event) => { event.preventDefault(); void payAch(); }}>
         <h2 className="font-semibold">{copy.bankTitle}</h2>
         <p>{copy.bankBody}</p>
         <label className="flex min-h-11 items-start gap-2" htmlFor="ach-auth">
-          <input id="ach-auth" type="checkbox" checked={authorized} onChange={(event) => setAuthorized(event.target.checked)} />
+          <input id="ach-auth" type="checkbox" checked={authorized} onChange={(event) => setAuthorized(event.target.checked)} aria-invalid={error ? true : undefined} aria-describedby={error ? "account-error" : undefined} />
           <span>{copy.bankConsent}</span>
         </label>
         <button className="min-h-11 rounded-xl border border-[#1c2430] px-4" type="submit" disabled={!authorized}>{copy.bankSubmit}</button>
@@ -200,10 +200,10 @@ export default function CollectAccountPage() {
       </>
       )}
       {receipt ? <p className="mt-3 text-sm" role="status">{copy.receipt} {receipt.providerId} {money(receipt.amountCents)}. {copy.noCard}</p> : null}
-      <form onSubmit={(event) => void sendDispute(event)} className="mt-8 grid gap-2">
+      <form onSubmit={(event) => void sendDispute(event)} className="mt-8 grid gap-2" aria-describedby={error ? "account-error" : undefined}>
         <label className="grid gap-1 text-sm" htmlFor="dispute-text">
           {copy.dispute}
-          <textarea id="dispute-text" className="min-h-24 rounded-xl border border-[#1c2430] p-3" value={dispute} onChange={(event) => setDispute(event.target.value)} />
+          <textarea id="dispute-text" className="min-h-24 rounded-xl border border-[#1c2430] p-3" value={dispute} onChange={(event) => setDispute(event.target.value)} aria-invalid={error ? true : undefined} aria-describedby={error ? "account-error" : undefined} />
         </label>
         <button className="min-h-11 rounded-xl border border-[#1c2430] px-4" type="submit">
           {copy.submitDispute}
