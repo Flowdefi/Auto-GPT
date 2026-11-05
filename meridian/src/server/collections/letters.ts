@@ -2,13 +2,14 @@ import type { WorkspaceId } from "@/lib/types";
 import type { MailJob } from "@/lib/collections/desk";
 import { textPdf } from "@/lib/collections/text-pdf";
 import { loadDb, mutate, nextId } from "@/server/db";
-import { sendChannel, renderTemplatePreview, syncCollectionTemplates } from "./service";
+import { sendChannel, renderTemplatePreview, syncCollectionTemplates, templateForWorkspace } from "./service";
 
 const LETTER_CHANNELS = new Set(["letter", "letter_block", "validation"]);
 
 export function queueLetter(workspaceId: WorkspaceId, accountId: string, templateId: string): MailJob {
   syncCollectionTemplates();
-  const template = (loadDb().collectionTemplates ?? []).find((item) => item.id === templateId);
+  const stored = (loadDb().collectionTemplates ?? []).find((item) => item.id === templateId);
+  const template = stored ? templateForWorkspace(workspaceId, stored) : undefined;
   if (!template || !LETTER_CHANNELS.has(template.channel)) throw new Error("Template is not a letter");
   const account = (loadDb().portfolioAccounts ?? []).find((item) => item.id === accountId && item.workspaceId === workspaceId);
   if (!account) throw new Error("Account not found");

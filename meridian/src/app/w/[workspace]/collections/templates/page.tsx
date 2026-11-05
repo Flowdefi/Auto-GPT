@@ -66,7 +66,7 @@ export default function TemplateEditorPage() {
       <PageHeader
         eyebrow="Collections"
         title="Template editor"
-        subtitle="Every script stays disabled for sends until an owner approves it. Needs-counsel-review stays visible until someone marks counsel reviewed."
+        subtitle="Every script stays disabled for sends until an owner approves it for this workspace. The counsel flag stays on until this workspace marks it reviewed. The other agency does not inherit either choice."
       />
       {notice ? <Card className="mb-4 p-4 text-sm">{notice}</Card> : null}
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">

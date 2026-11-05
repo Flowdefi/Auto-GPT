@@ -230,6 +230,12 @@ export type TemplateChannel =
   | "validation"
   | "chat";
 
+/** Per-workspace send approval and counsel sign-off. The template text stays shared. */
+export interface TemplateApproval {
+  ownerApproved: boolean;
+  counselReviewed: boolean;
+}
+
 export interface CollectionTemplate {
   id: string;
   channel: TemplateChannel;

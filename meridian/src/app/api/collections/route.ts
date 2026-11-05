@@ -360,7 +360,7 @@ export async function POST(request: Request) {
       case "template_approval":
         if (!body.templateId) return NextResponse.json({ error: "templateId required" }, { status: 400 });
         return NextResponse.json({
-          template: setTemplateApproval(body.templateId, { ownerApproved: body.ownerApproved, counselReviewed: body.counselReviewed }, actor),
+          template: setTemplateApproval(body.templateId, { ownerApproved: body.ownerApproved, counselReviewed: body.counselReviewed }, actor, body.workspaceId),
         });
       case "template_preview":
         if (!body.templateId || !body.accountId) return NextResponse.json({ error: "templateId and accountId required" }, { status: 400 });

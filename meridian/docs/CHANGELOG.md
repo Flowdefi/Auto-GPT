@@ -33,7 +33,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 
 - SMS, email, letter, and payment adapters. Sandbox is the default. Stop, bounce, and unsubscribe webhooks are accepted with a sandbox header or a provider signature.
 - Every letter template can render to a one-page PDF and wait in the mail-house queue. Lob runs only behind its flag and live delivery. Returned mail pauses later letter steps.
-- Sequences and a visual workflow builder. Every step goes through the gate. Unapproved templates do not send.
+- Sequences and a visual workflow builder. Every step goes through the gate. Unapproved templates do not send. Send approval and the counsel flag are stored per workspace.
 - Settlement matrix, account preview, counter-offers, dual approval above a threshold, and a hold before a settling letter. Default matrix values still block an offer. A time-barred account uses the matrix time-barred tier. The preview is marked for counsel.
 - Portfolio cost, an illustrative recovery curve, cash-on-cash, model IRR, seller scorecards, and a final remittance statement. All of the curve and IRR figures are labeled model estimates.
 

@@ -1,6 +1,7 @@
 import type {
   ChannelMessage,
   CollectionTemplate,
+  TemplateApproval,
   ComplianceEvent,
   ConsumerConsent,
   DncEntry,
@@ -541,6 +542,8 @@ export interface DatabaseFile {
   channelMessages?: ChannelMessage[];
   complianceEvents?: ComplianceEvent[];
   collectionTemplates?: CollectionTemplate[];
+  /** Per-agency send approval and counsel sign-off. The legacy flags on each template remain the Triton copy. */
+  templateApprovals?: Partial<Record<WorkspaceId, Record<string, TemplateApproval>>>;
   settlementMatrix?: SettlementMatrix;
   /** Per-agency settlement authority. The legacy field remains the Triton copy. */
   settlementMatrices?: Partial<Record<WorkspaceId, SettlementMatrix>>;

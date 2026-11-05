@@ -25,6 +25,7 @@ import type {
   CollectionTemplate,
   CollectionsRole,
   OperatorRole,
+  TemplateApproval,
   ConsumerConsent,
   ConsumerPayment,
   DraftReply,
@@ -69,7 +70,7 @@ export function collectionSnapshot(workspaceId: WorkspaceId) {
     payments: (db.consumerPayments ?? []).filter((payment) => payment.workspaceId === workspaceId),
     calls: (db.voiceCalls ?? []).filter((call) => call.workspaceId === workspaceId).slice(0, 30),
     messages: (db.channelMessages ?? []).filter((message) => message.workspaceId === workspaceId).slice(0, 30),
-    templates: syncCollectionTemplates(),
+    templates: syncCollectionTemplates().map((item) => templateForWorkspace(workspaceId, item)),
     settlementMatrix: ensureSettlementMatrix(workspaceId),
     events: (db.complianceEvents ?? []).filter((event) => event.workspaceId === workspaceId).slice(0, 40),
     sequences: (db.sequences ?? []).filter((item) => item.workspaceId === workspaceId),
@@ -482,7 +483,8 @@ export async function sendChannel(input: {
     logEvent(input.workspaceId, input.channel, input.accountId, false, blocked.reason ?? "returned mail");
     return blocked;
   }
-  const template = (loadDb().collectionTemplates ?? []).find((item) => item.id === input.templateId);
+  const storedTemplate = (loadDb().collectionTemplates ?? []).find((item) => item.id === input.templateId);
+  const template = storedTemplate ? templateForWorkspace(input.workspaceId, storedTemplate) : undefined;
   if (template && !template.ownerApproved) {
     const blocked = storeMessage(input, "blocked", "Template stays disabled until an owner approves it for sending.", null);
     logEvent(input.workspaceId, input.channel, input.accountId, false, blocked.reason ?? "template");
@@ -594,33 +596,65 @@ export function saveSettlementMatrix(matrix: SettlementMatrix, role: Collections
   return saved;
 }
 
+function approvalFor(workspaceId: WorkspaceId, template: CollectionTemplate, db = loadDb()): TemplateApproval {
+  const scoped = db.templateApprovals?.[workspaceId]?.[template.id];
+  if (scoped) return scoped;
+  if (workspaceId === "triton") return { ownerApproved: template.ownerApproved, counselReviewed: template.counselReviewed };
+  return { ownerApproved: false, counselReviewed: false };
+}
+
+function applyTemplateApproval(template: CollectionTemplate, approval: TemplateApproval): CollectionTemplate {
+  return {
+    ...template,
+    ownerApproved: approval.ownerApproved,
+    counselReviewed: approval.counselReviewed,
+    needsCounselReview: approval.counselReviewed ? false : true,
+  };
+}
+
+/** Send approval and the counsel flag for one workspace. Aether does not inherit Triton's approval. */
+export function templateForWorkspace(workspaceId: WorkspaceId, template: CollectionTemplate): CollectionTemplate {
+  return applyTemplateApproval(template, approvalFor(workspaceId, template));
+}
+
 export function setTemplateApproval(
   id: string,
   patch: { ownerApproved?: boolean; counselReviewed?: boolean },
   role: CollectionsRole,
+  workspaceId: WorkspaceId = "triton",
 ): CollectionTemplate {
   if (role !== "admin" && role !== "compliance") throw new Error("Only admin or compliance can approve a template");
   let updated: CollectionTemplate | undefined;
   mutate((db) => {
-    db.collectionTemplates = (db.collectionTemplates ?? []).map((item) => {
-      if (item.id !== id) return item;
-      updated = {
-        ...item,
-        ownerApproved: patch.ownerApproved ?? item.ownerApproved,
-        counselReviewed: patch.counselReviewed ?? item.counselReviewed,
-        needsCounselReview: patch.counselReviewed ? false : item.needsCounselReview,
-      };
-      return updated;
-    });
+    const item = (db.collectionTemplates ?? []).find((row) => row.id === id);
+    if (!item) return;
+    const current = approvalFor(workspaceId, item, db);
+    const next: TemplateApproval = {
+      ownerApproved: patch.ownerApproved ?? current.ownerApproved,
+      counselReviewed: patch.counselReviewed ?? current.counselReviewed,
+    };
+    db.templateApprovals = {
+      ...(db.templateApprovals ?? {}),
+      [workspaceId]: { ...(db.templateApprovals?.[workspaceId] ?? {}), [id]: next },
+    };
+    if (workspaceId === "triton") {
+      db.collectionTemplates = (db.collectionTemplates ?? []).map((row) =>
+        row.id === id
+          ? { ...row, ownerApproved: next.ownerApproved, counselReviewed: next.counselReviewed, needsCounselReview: next.counselReviewed ? false : row.needsCounselReview }
+          : row,
+      );
+    }
+    updated = applyTemplateApproval(item, next);
   });
   if (!updated) throw new Error("Template not found");
   return updated;
 }
 
 export function renderTemplatePreview(workspaceId: WorkspaceId, templateId: string, accountId: string) {
-  const template = (loadDb().collectionTemplates ?? []).find((item) => item.id === templateId);
+  const stored = (loadDb().collectionTemplates ?? []).find((item) => item.id === templateId);
   const account = accounts(workspaceId).find((item) => item.id === accountId);
-  if (!template || !account) throw new Error("Template and account are required");
+  if (!stored || !account) throw new Error("Template and account are required");
+  const template = templateForWorkspace(workspaceId, stored);
   const context = mergeContext({ account, agencyName: brandFor(account.workspaceId).name, domain: brandFor(account.workspaceId).domain, matrix: ensureSettlementMatrix(account.workspaceId) });
   return {
     subject: renderMustache(template.subject, context.values),
