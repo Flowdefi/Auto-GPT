@@ -6,6 +6,29 @@ import { settlementOffer } from "@/lib/collections/template-library";
 import { queueLetter } from "./letters";
 import { ensureSettlementMatrix } from "./service";
 
+export function settlementPolicy(): { dualThresholdCents: number; holdDays: number } {
+  return { dualThresholdCents: thresholdCents(), holdDays: holdDays() };
+}
+
+export function previewSettlement(workspaceId: WorkspaceId, accountId: string) {
+  const account = (loadDb().portfolioAccounts ?? []).find((item) => item.id === accountId && item.workspaceId === workspaceId);
+  if (!account) throw new Error("Account not found");
+  const offer = settlementOffer(account, ensureSettlementMatrix());
+  const policy = settlementPolicy();
+  return {
+    accountId: account.id,
+    accountRef: account.accountRef,
+    state: account.state,
+    balanceCents: account.balanceCents,
+    openingCents: offer.openingCents,
+    floorCents: offer.floorCents,
+    blockedReason: offer.blockedReason,
+    needsCounselReview: true,
+    needsDualApproval: offer.openingCents >= policy.dualThresholdCents,
+    ...policy,
+  };
+}
+
 function thresholdCents(): number {
   const parsed = Number(process.env.MERIDIAN_SETTLEMENT_DUAL_CENTS ?? "50000");
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 50000;
@@ -84,8 +107,15 @@ export function approveSettlement(workspaceId: WorkspaceId, caseId: string, emai
   return updated;
 }
 
-export function listSettlements(workspaceId: WorkspaceId): SettlementCase[] {
-  return (loadDb().settlementCases ?? []).filter((row) => row.workspaceId === workspaceId).slice(0, 100);
+export function listSettlements(workspaceId: WorkspaceId): Array<SettlementCase & { accountRef: string }> {
+  const accounts = loadDb().portfolioAccounts ?? [];
+  return (loadDb().settlementCases ?? [])
+    .filter((row) => row.workspaceId === workspaceId)
+    .slice(0, 100)
+    .map((row) => ({
+      ...row,
+      accountRef: accounts.find((account) => account.id === row.accountId && account.workspaceId === workspaceId)?.accountRef ?? "",
+    }));
 }
 
 /** Settling-in-full letters wait until the hold date. The letter still needs owner approval and the gate. */

@@ -34,7 +34,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - SMS, email, letter, and payment adapters. Sandbox is the default. Stop, bounce, and unsubscribe webhooks are accepted with a sandbox header or a provider signature.
 - Every letter template can render to a one-page PDF and wait in the mail-house queue. Lob runs only behind its flag and live delivery. Returned mail pauses later letter steps.
 - Sequences and a visual workflow builder. Every step goes through the gate. Unapproved templates do not send.
-- Settlement matrix, counter-offers, dual approval above a threshold, and a hold before a settling letter.
+- Settlement matrix, account preview, counter-offers, dual approval above a threshold, and a hold before a settling letter. Default matrix values still block an offer. The preview is marked for counsel.
 - Portfolio cost, an illustrative recovery curve, cash-on-cash, model IRR, seller scorecards, and a final remittance statement. All of the curve and IRR figures are labeled model estimates.
 
 ## Compliance operations
@@ -52,7 +52,9 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 
 - `crm.debtmarket.net` stays the Access-protected desk. `collect.debtmarket.net` serves the public agency site and consumer portal and does not serve `/w`.
 - Consumer links use `MERIDIAN_PUBLIC_URL`. First go-live keeps `MERIDIAN_CHANNEL_DELIVER=sandbox`.
-- The owner seat for `portfolios@debtmarket.net` is created from `MERIDIAN_OWNER_PASSWORD`. The password is not written into git. MFA is still required before privileged actions.
+- The owner seat for `portfolios@debtmarket.net` is created from `MERIDIAN_OWNER_PASSWORD`. The password must be 12 to 128 characters. A shorter password does not create the seat and does not stop the desk. The password is not written into git. MFA is still required before privileged actions.
+- A freeze drill checks voice, SMS, email, and letters, then lifts the freeze unless that workspace was already frozen. It does not place a live call while delivery is sandbox.
+- The counsel packet lists draft surfaces. Those flags stay on until counsel signs them.
 
 ## Still for the owner and counsel
 

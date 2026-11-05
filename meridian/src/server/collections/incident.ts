@@ -1,8 +1,13 @@
 import type { WorkspaceId } from "@/lib/types";
 import type { TabletopRun } from "@/lib/collections/launch";
+import type { CollectionChannel } from "@/lib/collections/types";
+import { reasonCode } from "@/lib/collections/reason-code";
 import { loadDb, mutate, nextId } from "@/server/db";
+import { gateFor } from "./service";
 import { hangupActiveCalls } from "./voice-live";
 import type { FetchLike } from "./providers";
+
+const DRILL_CHANNELS: CollectionChannel[] = ["voice_outbound", "sms", "email", "letter"];
 
 export const TABLETOP_ITEMS = [
   "Name the incident lead and the Qualified Individual",
@@ -46,6 +51,29 @@ export function recordTabletop(workspaceId: WorkspaceId, checked: string[]): Tab
     db.tabletopRuns = [run, ...(db.tabletopRuns ?? [])].slice(0, 50);
   });
   return run;
+}
+
+/** Freezes this workspace, checks the four outbound channels, then lifts the freeze unless it was already on. */
+export async function runFreezeDrill(workspaceId: WorkspaceId, fetchImpl?: FetchLike) {
+  const already = workspaceFrozen(workspaceId);
+  const checks: Array<{ channel: CollectionChannel; blocked: boolean; reasonCode: string }> = [];
+  try {
+    await freezeOutbound(workspaceId, fetchImpl);
+    for (const channel of DRILL_CHANNELS) {
+      const decision = gateFor(workspaceId, null, channel);
+      checks.push({ channel, blocked: !decision.allowed, reasonCode: reasonCode(decision.reason) });
+    }
+  } finally {
+    if (!already) liftOutboundFreeze(workspaceId);
+  }
+  const other = workspaceId === "triton" ? "aether" : "triton";
+  return {
+    passed: checks.length === DRILL_CHANNELS.length && checks.every((row) => row.blocked && row.reasonCode === "kill_switch"),
+    already,
+    restored: already ? false : !workspaceFrozen(workspaceId),
+    crossed: workspaceFrozen(other),
+    checks,
+  };
 }
 
 export function incidentHome(workspaceId: WorkspaceId) {

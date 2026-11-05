@@ -18,9 +18,10 @@ import { listMailJobs, mailPdf, markMailReturned, queueLetter } from "@/server/c
 import { deskMetrics, listDigests } from "@/server/collections/observe";
 import { quizPrompts, scoreAndStore, seedTrainingDesk, TRAINING_SCENARIOS, trainingCleared, trainingStatus } from "@/server/collections/training";
 import { closePortfolio, portfolioEconomics, savePortfolioCost, sellerScorecards } from "@/server/collections/economics";
-import { freezeOutbound, incidentHome, liftOutboundFreeze, recordTabletop } from "@/server/collections/incident";
+import { counselPacket } from "@/server/collections/counsel";
+import { freezeOutbound, incidentHome, liftOutboundFreeze, recordTabletop, runFreezeDrill } from "@/server/collections/incident";
 import { runScrub, scrubHistory } from "@/server/collections/scrubs";
-import { approveSettlement, counterSettlement, listSettlements, openSettlement, releaseSettlementLetter } from "@/server/collections/settlement-desk";
+import { approveSettlement, counterSettlement, listSettlements, openSettlement, previewSettlement, releaseSettlementLetter, settlementPolicy } from "@/server/collections/settlement-desk";
 import { applySkipTrace } from "@/server/collections/skip-trace";
 import { attachLiveDial, hangupActiveCalls } from "@/server/collections/voice-live";
 import { currentBrand, saveBrand } from "@/server/brand";
@@ -155,7 +156,7 @@ export async function POST(request: Request) {
     taskIds?: string[];
   };
   const actor = collectionsRole(gate.account.email, gate.account.role);
-  const privileged = new Set(["reveal", "eligibility", "template_approval", "matrix", "role", "sol_save", "recording_save", "metro2_approve", "settlement_approve", "freeze_outbound"]);
+  const privileged = new Set(["reveal", "eligibility", "template_approval", "matrix", "role", "sol_save", "recording_save", "metro2_approve", "settlement_approve", "freeze_outbound", "freeze_drill"]);
   if (body.op && privileged.has(body.op)) {
     try {
       assertPrivilegedMfa(gate.account.id, actor);
@@ -166,7 +167,7 @@ export async function POST(request: Request) {
   if (actor === "client" && body.op && !["client_home", "client_place", "client_recall"].includes(body.op)) {
     return NextResponse.json({ error: "Clients can only see their own placements" }, { status: 403 });
   }
-  if (actor === "read_only" && body.op && !["report", "access_review", "complaint_report", "ops", "presence", "economics", "incident_home", "scrub_log"].includes(body.op)) {
+  if (actor === "read_only" && body.op && !["report", "access_review", "complaint_report", "ops", "presence", "economics", "incident_home", "scrub_log", "counsel_packet", "settlement_preview", "settlement_list"].includes(body.op)) {
     return NextResponse.json({ error: "Read-only role" }, { status: 403 });
   }
   if (!isWorkspaceId(body.workspaceId)) {
@@ -298,6 +299,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ event: await runScrub(body.workspaceId, body.accountId, body.scrubKind), history: scrubHistory(body.workspaceId, body.accountId) });
       case "scrub_log":
         return NextResponse.json({ history: scrubHistory(body.workspaceId, body.accountId) });
+      case "settlement_preview":
+        if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
+        return NextResponse.json({ preview: previewSettlement(body.workspaceId, body.accountId), policy: settlementPolicy() });
       case "settlement_open":
         if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
         return NextResponse.json({ settlement: openSettlement(body.workspaceId, body.accountId), cases: listSettlements(body.workspaceId) });
@@ -318,6 +322,11 @@ export async function POST(request: Request) {
         return NextResponse.json(await freezeOutbound(body.workspaceId));
       case "incident_home":
         return NextResponse.json(incidentHome(body.workspaceId));
+      case "freeze_drill":
+        if (actor !== "admin" && actor !== "compliance") return NextResponse.json({ error: "Compliance runs the freeze drill" }, { status: 403 });
+        return NextResponse.json(await runFreezeDrill(body.workspaceId));
+      case "counsel_packet":
+        return NextResponse.json(counselPacket(body.workspaceId));
       case "tabletop_save":
         return NextResponse.json({ run: recordTabletop(body.workspaceId, body.checked ?? []) });
       case "bulk_tasks":

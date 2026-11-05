@@ -38,7 +38,7 @@ MERIDIAN_METRO2_EXPORT=disabled
 MERIDIAN_BIND_PORT=3000
 ```
 
-Startup creates the owner seat for `portfolios@debtmarket.net` when the password is set. It does not reset the password on later boots, and it does not enroll MFA. Admin and compliance still need MFA before privileged actions.
+Startup creates the owner seat for `portfolios@debtmarket.net` when the password is set. The password must be 12 to 128 characters. A shorter value is ignored, the seat is not created, and the desk still starts. It does not reset the password on later boots, and it does not enroll MFA. Admin and compliance still need MFA before privileged actions.
 
 `MERIDIAN_CHANNEL_DELIVER=sandbox` means no live SMS, email, voice, or charges. The later flip, after counsel and the provider keys, is one line plus the provider selectors:
 

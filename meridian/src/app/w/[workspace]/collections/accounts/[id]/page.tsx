@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
@@ -103,6 +104,7 @@ export default function Account360Page() {
           <span>{account ? `${account.accountRef} · ${account.state}` : "Account"}</span>
           {account ? <Badge>{account.status}</Badge> : null}
           {account ? <span className="text-sm font-normal">${(account.balanceCents / 100).toFixed(2)}</span> : null}
+          <Link className="text-sm font-normal underline" href={`/w/${workspaceId}/collections/settlement-desk?account=${params.id}`}>Settle</Link>
         </div>
       </div>
       <PageHeader

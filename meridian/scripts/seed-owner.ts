@@ -1,6 +1,10 @@
 export async function main(): Promise<void> {
   const { ensureOwnerSeat } = await import("../src/server/seed-owner");
   const result = ensureOwnerSeat();
+  if (result.warning) {
+    console.log(JSON.stringify({ owner: result.email, created: false, seated: false, warning: result.warning }));
+    return;
+  }
   if (!result.email) {
     console.log(JSON.stringify({ owner: "skipped" }));
     return;
