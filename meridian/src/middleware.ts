@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { PUBLIC_API_PATHS, SESSION_COOKIE } from "@/lib/commerce";
+import { hostDecision, hostSplit, requestHostname } from "@/lib/hosts";
 
 const PUBLIC_PAGES = new Set(["/", "/pricing", "/login", "/signup"]);
 
@@ -31,7 +32,14 @@ function hasCredential(request: NextRequest): boolean {
 }
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
+  const decision = hostDecision(requestHostname(request.headers), pathname, search, hostSplit());
+  if (decision.kind === "wrong-host") {
+    return NextResponse.json({ error: "This host does not serve that API" }, { status: 421 });
+  }
+  if (decision.kind === "redirect") {
+    return NextResponse.redirect(decision.url, 302);
+  }
   if (isPublicPath(pathname)) {
     return NextResponse.next();
   }

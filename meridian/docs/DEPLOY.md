@@ -2,6 +2,54 @@
 
 This repository is public. Do not deploy it with a real portfolio until it is private, counsel has signed, and the Texas bond is on file.
 
+The apex site `https://debtmarket.net` stays the institutional site. It says Triton is not a collection agency. Collections copy is only on `https://collect.debtmarket.net`.
+
+## Dual host
+
+One app process. Two public names. Cloudflare Access stays on the admin name only.
+
+| Host | Who | Access | What it serves |
+| --- | --- | --- | --- |
+| `https://crm.debtmarket.net` | Operators | Cloudflare Access, existing tunnel `meridian-crm` | `/w/*`, login, billing, admin APIs |
+| `https://collect.debtmarket.net` | Consumers | No Access application | `/agency`, `/collect`, `/pay`, dispute, public webhooks |
+
+`/` on the collect host redirects to `/agency`. `/w/*` on the collect host redirects to crm. Consumer pages on crm redirect to collect. Admin API calls on the collect host return 421 instead of following a POST redirect.
+
+The container listens on port **3000** (`next start --hostname 0.0.0.0 --port 3000`). Compose publishes `${MERIDIAN_BIND_PORT:-3000}` to that port. Keep the healthy `meridian-crm` ingress on `http://127.0.0.1:3000`. Add `collect.debtmarket.net` as a second hostname to the **same** service. Do not put that hostname in the Access application. An example ingress is `deploy/cloudflared.example.yml`.
+
+### Env checklist for the first cut
+
+Set these on the host. Do not commit the password or the auth secret.
+
+```bash
+MERIDIAN_AUTH_SECRET=          # 32+ characters, already required
+MERIDIAN_SECRET_KEY=           # same store as the auth secret
+MERIDIAN_PUBLIC_URL=https://collect.debtmarket.net
+MERIDIAN_ADMIN_URL=https://crm.debtmarket.net
+NEXT_PUBLIC_APP_URL=https://collect.debtmarket.net
+MERIDIAN_OWNER_EMAIL=portfolios@debtmarket.net
+MERIDIAN_OWNER_PASSWORD=       # host env only, 12+ characters, never in git
+MERIDIAN_AGENCY_NAME=          # blank keeps {{agency_name}}; or DebtMarket Collections until counsel signs
+MERIDIAN_AGENCY_DOMAIN=collect.debtmarket.net
+MERIDIAN_CHANNEL_DELIVER=sandbox
+MERIDIAN_COLLECTIONS_DEMO=false
+MERIDIAN_VOICE_LIVE=
+MERIDIAN_METRO2_EXPORT=disabled
+MERIDIAN_BIND_PORT=3000
+```
+
+Startup creates the owner seat for `portfolios@debtmarket.net` when the password is set. It does not reset the password on later boots, and it does not enroll MFA. Admin and compliance still need MFA before privileged actions.
+
+`MERIDIAN_CHANNEL_DELIVER=sandbox` means no live SMS, email, voice, or charges. The later flip, after counsel and the provider keys, is one line plus the provider selectors:
+
+```bash
+MERIDIAN_CHANNEL_DELIVER=live
+```
+
+Leave `MERIDIAN_SMS_PROVIDER`, `MERIDIAN_EMAIL_PROVIDER`, `MERIDIAN_LETTER_PROVIDER`, `MERIDIAN_PAYMENTS_PROVIDER`, and `MERIDIAN_VOICE_LIVE` unset or `sandbox` until that day.
+
+## Docker
+
 ## Docker
 
 From `meridian/`:

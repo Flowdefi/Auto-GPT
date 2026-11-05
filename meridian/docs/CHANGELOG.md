@@ -48,6 +48,12 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - Workspace isolation between Triton and Example Harbor on Aether.
 - Next.js 15.5.29. `npm audit` reports 0 critical and 0 high. CI fails on a new critical.
 
+## Hosts
+
+- `crm.debtmarket.net` stays the Access-protected desk. `collect.debtmarket.net` serves the public agency site and consumer portal and does not serve `/w`.
+- Consumer links use `MERIDIAN_PUBLIC_URL`. First go-live keeps `MERIDIAN_CHANNEL_DELIVER=sandbox`.
+- The owner seat for `portfolios@debtmarket.net` is created from `MERIDIAN_OWNER_PASSWORD`. The password is not written into git. MFA is still required before privileged actions.
+
 ## Still for the owner and counsel
 
 Counsel review, the Texas bond on file, a private repository, MFA enrollment, owner-set settlement values, and vendor keys only after those are done. See `docs/OWNER-ONBOARDING.md`.

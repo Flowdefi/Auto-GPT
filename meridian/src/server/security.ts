@@ -6,14 +6,17 @@ export function assertSameOrigin(request: Request): void {
   if (!cookie) return;
   const origin = request.headers.get("origin");
   if (!origin) return;
-  const host = request.headers.get("host");
   let originHost = "";
   try {
-    originHost = new URL(origin).host;
+    originHost = new URL(origin).host.toLowerCase().replace(/:\d+$/, "");
   } catch {
     throw new Error("Cross-site request blocked");
   }
-  if (host && originHost !== host) throw new Error("Cross-site request blocked");
+  const names = [request.headers.get("x-forwarded-host"), request.headers.get("host")]
+    .flatMap((value) => (value ?? "").split(","))
+    .map((value) => value.trim().toLowerCase().replace(/:\d+$/, ""))
+    .filter(Boolean);
+  if (names.length > 0 && !names.includes(originHost)) throw new Error("Cross-site request blocked");
 }
 
 export function scanUpload(text: string): void {

@@ -1,10 +1,15 @@
 import { spawn } from "node:child_process";
 
-if (process.env.MERIDIAN_COLLECTIONS_DEMO === "true") {
-  const seed = spawn("npx", ["tsx", "scripts/seed-collections-demo.ts"], { stdio: "inherit" });
-  const code = await new Promise((resolve) => seed.on("exit", resolve));
+async function run(command, args) {
+  const child = spawn(command, args, { stdio: "inherit" });
+  const code = await new Promise((resolve) => child.on("exit", resolve));
   if (code !== 0) process.exit(typeof code === "number" ? code : 1);
 }
+
+if (process.env.MERIDIAN_COLLECTIONS_DEMO === "true") {
+  await run("npx", ["tsx", "scripts/seed-collections-demo.ts"]);
+}
+await run("npx", ["tsx", "scripts/seed-owner.ts"]);
 
 const server = spawn("npm", ["run", "start"], { stdio: "inherit" });
 for (const signal of ["SIGTERM", "SIGINT"]) {

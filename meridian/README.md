@@ -8,7 +8,7 @@ One command, from this directory, starts the desk with sandbox delivery and two 
 docker compose up --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Nothing is dialed, mailed, or charged. Live voice, skip-trace, letters, and the compliance digest stay off until `MERIDIAN_CHANNEL_DELIVER=live` and that feature's own flag are both set. Replace the demo `MERIDIAN_AUTH_SECRET` before any real portfolio. The owner checklist and the 15-minute first-hour script are in [docs/OWNER-ONBOARDING.md](docs/OWNER-ONBOARDING.md). The capability list is [docs/CHANGELOG.md](docs/CHANGELOG.md).
+Open [http://localhost:3000](http://localhost:3000). Nothing is dialed, mailed, or charged. Live voice, skip-trace, letters, and the compliance digest stay off until `MERIDIAN_CHANNEL_DELIVER=live` and that feature's own flag are both set. Replace the demo `MERIDIAN_AUTH_SECRET` before any real portfolio. The owner checklist and the 15-minute first-hour script are in [docs/OWNER-ONBOARDING.md](docs/OWNER-ONBOARDING.md). The capability list is [docs/CHANGELOG.md](docs/CHANGELOG.md). Live hosts are `crm.debtmarket.net` (desk, behind Access) and `collect.debtmarket.net` (public). The env list is [docs/DEPLOY.md](docs/DEPLOY.md).
 
 Enterprise customer platform — a HubSpot-class suite (Smart CRM, Sales, Marketing, Service, Content/CMS, SEO, Automation, Reporting, Compliance, and integrated AI) with a native-feeling **iOS + web** client.
 

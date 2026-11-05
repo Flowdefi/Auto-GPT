@@ -1,4 +1,4 @@
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   const { seedTrainingDesk } = await import("../src/server/collections/training");
   const triton = seedTrainingDesk("triton");
   const harbor = seedTrainingDesk("aether");
