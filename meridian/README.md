@@ -101,15 +101,83 @@ Production requires `MERIDIAN_AUTH_SECRET` (32+ characters). Polar webhook: `POS
 npm run build && npm run start
 ```
 
-Docker (persists `data/`):
+Docker (persists `data/` on the `meridian-data` volume, mounted at `/app/data`):
 
 ```bash
-docker compose up --build
+cp .env.example .env
+# set MERIDIAN_AUTH_SECRET to 32+ characters
+docker compose up --build -d
 ```
+
+Compose sets `MERIDIAN_SEED_DEMO=false` unless you override it, so a fresh volume does not load demo buyers and sellers. `npm run dev` still seeds demo data when that variable is unset.
 
 Public health stub: `GET /api/health`
 
-Demo CRM state persists in the browser. Server mail/graph data persists in `data/meridian.json`. Use **Reset demo** in the header to restore seed CRM data.
+Demo CRM state in the browser persists separately from the server. Server mail, graph, and CRM rows persist in `data/meridian.json` and `data/meridian.db`. Use **Reset demo** in the header to restore the in-browser seed. To remove server-side demo companies, contacts, leads, and `crm_records` from a workspace:
+
+```bash
+MERIDIAN_SEED_DEMO=false npm run purge:demo -- --workspace triton
+```
+
+## Debt-desk CRM and CSV import
+
+Contact and company records carry DebtMarket fields (lead type, asset class, buying states, NDA, do-not-email, HubSpot id, and outbound prospect segment/size). They are stored as JSON in `crm_records`, so no SQL migration is required. Open a record to view them, and use **Create** / **Edit** on Contacts and Companies. The contact list filters by lead type, asset class, state, NDA, and do-not-email.
+
+**Contacts → Import** accepts three CSV shapes:
+
+- Contacts — `First Name`, `Last Name`, `Email`, `Phone`, `Mobile`, `Job Title`, `Company Name`, `Company Domain`, `Website`, `Street`, `City`, `State`, `Zip`, `Country`, `LinkedIn`, `Lead Type`, `Stage`, `Lead Source`, `Owner`, `Created Date`, `Last Contacted`, `Asset Class Preference`, `Budget`, `Paper Age Preference`, `Coverage`, `Buying States`, `Collect or Litigate`, `NDA Signed`, `Closed Deal`, `Desk Replied`, `Email Status`, `Message Summary`, `Notes`, `Tags`, `HubSpot Record ID`, `Source`, plus optional `Reason` / `Removal Reason`
+- Companies — `Company Name`, `Domain`, `Website`, `Phone`, `Industry`, `Company Type / Debt Roles`, `Description`, `Additional Preferences`, `Street`, `City`, `State`, `Zip`, `Country`, `Employees`, `Year Founded`, `Lead Status`, `Lifecycle`, `Owner`, `LinkedIn`, `Target Account`, `Close Date`, `Notes`, `HubSpot Record ID`, `Contact Count`
+- Prospects — `segment`, `sub_type`, `company`, `website`, `hq_state`, `size_signal`, `why_fit`, `source_url`, `contact_name`, `title`, `linkedin`, `email`, `phone`, `confidence` (stored with lead source `outbound prospect`)
+
+Contacts link to companies by domain, then by name. Re-runs match HubSpot Record ID, then email, then name plus company, and update the existing row. `--dry-run` prints counts and does not write. Rows that cannot be identified are skipped and listed with a reason.
+
+```bash
+npm run import:csv -- --workspace triton \
+  --contacts ./contacts.csv \
+  --companies ./companies.csv \
+  --prospects ./prospects.csv
+
+# Mark every row do-not-email, or invalid, and insert those addresses into suppressions:
+npm run import:csv -- --workspace triton --contacts ./removed.csv --do-not-email
+npm run import:csv -- --workspace triton --contacts ./bounced.csv --invalid-email
+```
+
+Inside Docker, copy the files into the data volume and run the same script:
+
+```bash
+docker compose exec meridian mkdir -p /app/data/import
+docker compose cp ./contacts.csv meridian:/app/data/import/contacts.csv
+docker compose cp ./companies.csv meridian:/app/data/import/companies.csv
+docker compose exec meridian npm run import:csv -- \
+  --workspace triton \
+  --contacts /app/data/import/contacts.csv \
+  --companies /app/data/import/companies.csv
+```
+
+Do not commit lead files. Bulk send skips suppressed addresses and any contact with `doNotEmail`, including test sends.
+
+## Environment
+
+Copy `.env.example` to `.env.local` (dev) or `.env` (Compose). Empty values are fine until you use that feature.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `MERIDIAN_AUTH_SECRET` | Production | Session signing secret, 32+ characters |
+| `MERIDIAN_SECRET_KEY` | Production if you store BYOK secrets | Encryption key for provider secrets |
+| `MERIDIAN_SEED_DEMO` | No | `false` disables `seedCrmRecords` and `seedDemoLeads`. Unset/`true` seeds demo data. Compose defaults to `false` |
+| `MERIDIAN_PUBLIC_URL` | Recommended | Public origin for unsubscribe and tracking links |
+| `NEXT_PUBLIC_APP_URL` | Recommended | Same origin for the client |
+| `RESEND_API_KEY` | To send as `portfolios@debtmarket.net` | Resend |
+| `AGENTMAIL_API_KEY` | Alternate sender | AgentMail |
+| `AGENTMAIL_INBOX_TRITON` | No | Triton AgentMail inbox |
+| `AGENTMAIL_INBOX_AETHER` | No | Aether AgentMail inbox |
+| `AETHER_FROM_EMAIL` | No | Aether From address |
+| `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_MAILBOXES` | For Office 365 sync | Microsoft Graph app-only |
+| `OPENAI_BASE_URL` or `OLLAMA_BASE_URL`, `OPENAI_API_KEY`, `MERIDIAN_MODEL`, `MERIDIAN_FAST_MODEL`, `MERIDIAN_EMBED_MODEL` | For free-form model answers | OpenAI-compatible endpoint |
+| `SERP_PROVIDER_URL`, `SERP_PROVIDER_KEY`, `SERP_PROVIDER_NAME` | For live rank tracking | SERP provider |
+| `POLAR_ACCESS_TOKEN`, `POLAR_PRODUCT_ID`, `POLAR_WEBHOOK_SECRET`, `POLAR_SERVER` | To sell seats | Polar |
+
+`MERIDIAN_AUTH_SECRET` is the one production boot will not function correctly without. Mail, Graph, model, SERP, and Polar keys are required only for those features.
 
 ## Product notes
 

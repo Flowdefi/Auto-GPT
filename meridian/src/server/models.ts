@@ -77,11 +77,19 @@ export interface MailEvent {
   url?: string;
 }
 
+export type SuppressionReason =
+  | "unsubscribe"
+  | "bounce"
+  | "complaint"
+  | "manual"
+  | "do_not_email"
+  | "invalid_email";
+
 export interface Suppression {
   id: string;
   workspaceId: WorkspaceId;
   email: string;
-  reason: "unsubscribe" | "bounce" | "complaint" | "manual";
+  reason: SuppressionReason;
   at: string;
 }
 
@@ -139,6 +147,23 @@ export interface CrmCompany {
   lifecycle: string;
   score: number;
   notes: string;
+  companyType?: string;
+  debtRoles?: string[];
+  targetAccount?: boolean;
+  website?: string;
+  linkedin?: string;
+  phone?: string;
+  description?: string;
+  additionalPreferences?: string;
+  street?: string;
+  zip?: string;
+  country?: string;
+  yearFounded?: string;
+  leadStatus?: string;
+  ownerName?: string;
+  closeDate?: string | null;
+  hubspotRecordId?: string;
+  contactCount?: number;
   enrichedAt?: string;
   enrichment?: Record<string, unknown>;
   createdAt: string;
@@ -160,6 +185,34 @@ export interface CrmContact {
   state: string;
   tags: string[];
   lastActivityAt: string;
+  mobile?: string;
+  website?: string;
+  street?: string;
+  zip?: string;
+  country?: string;
+  linkedin?: string;
+  leadType?: string;
+  stage?: string;
+  leadSource?: string;
+  ownerName?: string;
+  assetClassPreference?: string[];
+  budget?: string;
+  paperAgePreference?: string;
+  coverage?: string;
+  buyingStates?: string[];
+  collectOrLitigate?: string;
+  ndaSigned?: string | null;
+  closedDeal?: boolean | string | null;
+  deskReplied?: boolean;
+  emailStatus?: string;
+  doNotEmail?: boolean;
+  hubspotRecordId?: string;
+  messageSummary?: string;
+  notes?: string;
+  source?: string;
+  removalReason?: string;
+  prospectSegment?: string;
+  sizeSignal?: string;
   enrichedAt?: string;
   enrichment?: Record<string, unknown>;
   createdAt: string;
@@ -451,6 +504,8 @@ export interface DatabaseFile {
   briefs: SeoBrief[];
   segments: Segment[];
   aiAudit: AiAuditEntry[];
+  /** Workspaces whose demo CRM rows were purged and must not be reseeded. */
+  demoPurgedWorkspaces?: WorkspaceId[];
 }
 
 export function emptyDb(): DatabaseFile {
@@ -483,5 +538,6 @@ export function emptyDb(): DatabaseFile {
     briefs: [],
     segments: [],
     aiAudit: [],
+    demoPurgedWorkspaces: [],
   };
 }

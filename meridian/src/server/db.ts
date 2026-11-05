@@ -47,6 +47,7 @@ function migrate(db: DatabaseFile): DatabaseFile {
       (db as unknown as Record<string, unknown[]>)[key] = [];
     }
   }
+  if (!Array.isArray(db.demoPurgedWorkspaces)) db.demoPurgedWorkspaces = [];
   seedCrmRecords(db);
   seedWorkflows(db);
   seedDemoLeads(db);

@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { seedAether } from "@/lib/seed/aether";
 import { seedTriton } from "@/lib/seed/triton";
 import type { WorkspaceData, WorkspaceId } from "@/lib/types";
+import { demoSeedEnabled } from "./demo-seed";
 import type { DatabaseFile } from "./models";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -271,7 +272,7 @@ export function persistSqlite(state: DatabaseFile): void {
   }
 }
 
-const CRM_KINDS = [
+export const CRM_KINDS = [
   "users",
   "companies",
   "contacts",
@@ -306,7 +307,13 @@ function recordLabel(kind: string, record: Record<string, unknown>): string {
   return `${kind}:${String(record.id ?? "")}`;
 }
 
+function demoPurged(db: SqliteHandle, workspaceId: WorkspaceId): boolean {
+  const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(`demo_purged_${workspaceId}`);
+  return String(row?.value ?? "") === "1";
+}
+
 export function seedCrmSnapshot(): void {
+  if (!demoSeedEnabled()) return;
   const db = open();
   if (!db) return;
   const existing = db.prepare("SELECT COUNT(*) AS n FROM crm_records").get() as { n?: number } | undefined;
@@ -315,10 +322,9 @@ export function seedCrmSnapshot(): void {
   const insert = db.prepare(
     "INSERT INTO crm_records (workspace_id, kind, id, label, json, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
   );
-  const workspaces: Array<[WorkspaceId, WorkspaceData]> = [
-    ["triton", seedTriton()],
-    ["aether", seedAether()],
-  ];
+  const workspaces: Array<[WorkspaceId, WorkspaceData]> = [];
+  if (!demoPurged(db, "triton")) workspaces.push(["triton", seedTriton()]);
+  if (!demoPurged(db, "aether")) workspaces.push(["aether", seedAether()]);
   db.exec("BEGIN");
   try {
     for (const [workspaceId, data] of workspaces) {

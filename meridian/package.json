@@ -8,7 +8,10 @@
     "build": "next build",
     "start": "next start --port 3000 --hostname 0.0.0.0",
     "lint": "next lint",
-    "license:mint": "node scripts/mint-license.mjs"
+    "typecheck": "tsc --noEmit",
+    "license:mint": "node scripts/mint-license.mjs",
+    "import:csv": "tsx scripts/import-csv.ts",
+    "purge:demo": "tsx scripts/purge-demo.ts"
   },
   "dependencies": {
     "@capacitor/app": "^7.1.2",
@@ -62,6 +65,7 @@
     "postcss": "^8.5.3",
     "sharp": "^0.35.4",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "^5.8.3"
   }
 }

@@ -34,6 +34,22 @@ export type ActivityType =
   | "ai"
   | "system";
 
+export type LeadType = "buyer" | "seller" | "broker" | "partner" | "other";
+
+export type AssetClass =
+  | "credit card"
+  | "auto deficiency"
+  | "medical"
+  | "personal/installment"
+  | "commercial/B2B"
+  | "telecom"
+  | "private student"
+  | "fintech/BNPL/payday"
+  | "judgments"
+  | "other";
+
+export type EmailStatus = "valid" | "invalid" | "bounced" | "unknown";
+
 export type TicketStatus = "new" | "waiting" | "in_progress" | "resolved";
 export type TicketPriority = "low" | "medium" | "high" | "urgent";
 export type CampaignStatus = "draft" | "scheduled" | "running" | "completed" | "paused";
@@ -78,11 +94,22 @@ export interface User {
   initials: string;
 }
 
+export type CompanyKind =
+  | "seller"
+  | "buyer"
+  | "partner"
+  | "issuer"
+  | "exchange"
+  | "fund"
+  | "market_maker"
+  | "broker"
+  | "other";
+
 export interface Company {
   id: string;
   name: string;
   domain: string;
-  type: "seller" | "buyer" | "partner" | "issuer" | "exchange" | "fund" | "market_maker";
+  type: CompanyKind;
   industry: string;
   city: string;
   state: string;
@@ -91,6 +118,24 @@ export interface Company {
   lifecycle: Lifecycle;
   score: number;
   notes: string;
+  /** Raw HubSpot "Company Type / Debt Roles" text. */
+  companyType?: string;
+  debtRoles?: string[];
+  targetAccount?: boolean;
+  website?: string;
+  linkedin?: string;
+  phone?: string;
+  description?: string;
+  additionalPreferences?: string;
+  street?: string;
+  zip?: string;
+  country?: string;
+  yearFounded?: string;
+  leadStatus?: string;
+  ownerName?: string;
+  closeDate?: string | null;
+  hubspotRecordId?: string;
+  contactCount?: number;
 }
 
 export interface Contact {
@@ -108,6 +153,39 @@ export interface Contact {
   state: string;
   lastActivityAt: string;
   tags: string[];
+  mobile?: string;
+  website?: string;
+  street?: string;
+  zip?: string;
+  country?: string;
+  linkedin?: string;
+  leadType?: LeadType;
+  /** Raw stage / lead-status text from the source file. */
+  stage?: string;
+  leadSource?: string;
+  ownerName?: string;
+  createdAt?: string;
+  assetClassPreference?: AssetClass[];
+  budget?: string;
+  paperAgePreference?: string;
+  coverage?: string;
+  buyingStates?: string[];
+  collectOrLitigate?: string;
+  /** ISO date (YYYY-MM-DD) when an NDA is signed, otherwise null. */
+  ndaSigned?: string | null;
+  /** True/false, or an ISO date when the closed deal has a close date. */
+  closedDeal?: boolean | string | null;
+  deskReplied?: boolean;
+  emailStatus?: EmailStatus;
+  doNotEmail?: boolean;
+  hubspotRecordId?: string;
+  messageSummary?: string;
+  notes?: string;
+  source?: string;
+  removalReason?: string;
+  /** Outbound prospect segment (and optional sub-type). */
+  prospectSegment?: string;
+  sizeSignal?: string;
 }
 
 export interface InventoryItem {
