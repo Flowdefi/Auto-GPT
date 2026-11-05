@@ -37,7 +37,7 @@ import { modelFormPdf } from "@/lib/collections/model-form-pdf";
 import { defaultSolTable, type SolRule } from "@/lib/collections/sol";
 import { validationEndDate } from "@/lib/collections/validation-period";
 import { decryptSecret, encryptSecret, sha256Hex } from "@/server/auth-crypto";
-import { currentBrand } from "@/server/brand";
+import { brandFor } from "@/server/brand";
 import { loadDb, mutate, nextId } from "@/server/db";
 import { logEvent as logLine } from "@/server/log";
 import { scanUpload, scanXlsx } from "@/server/security";
@@ -73,8 +73,8 @@ export function collectionSnapshot(workspaceId: WorkspaceId) {
     events: (db.complianceEvents ?? []).filter((event) => event.workspaceId === workspaceId).slice(0, 40),
     sequences: (db.sequences ?? []).filter((item) => item.workspaceId === workspaceId),
     jobs: (db.jobs ?? []).filter((job) => job.workspaceId === workspaceId).slice(0, 40),
-    solRules: ensureSolTable(),
-    recordingRules: ensureRecordingTable(),
+    solRules: ensureSolTable(workspaceId),
+    recordingRules: ensureRecordingTable(workspaceId),
     metro2: metro2Status(),
   };
 }
@@ -135,7 +135,7 @@ export function importPortfolio(input: {
     workspaceId: input.workspaceId,
     portfolioId,
     eligibility: db.stateEligibility ?? [],
-    solRules: ensureSolTable(),
+    solRules: ensureSolTable(input.workspaceId),
     existingRefs: existing,
     now: new Date().toISOString(),
     id: () => nextId("acct"),
@@ -319,8 +319,8 @@ export function startVoice(input: {
   const decision = gateFor(input.workspaceId, account, channel);
   logEvent(input.workspaceId, channel, account?.id ?? null, decision.allowed, decision.reason);
   const now = new Date().toISOString();
-  const agency = currentBrand().name;
-  const allParty = account ? requiresAllPartyRecording(account.state, ensureRecordingTable()) : true;
+  const agency = brandFor(input.workspaceId).name;
+  const allParty = account ? requiresAllPartyRecording(account.state, ensureRecordingTable(input.workspaceId)) : true;
   const transcript = emptyTranscript(agency, allParty, now);
   if (!decision.allowed) {
     const blocked: VoiceCall = {
@@ -388,7 +388,7 @@ export function turnVoice(workspaceId: WorkspaceId, callId: string, turn: Consum
     settings: db.voiceSettings!,
     at: new Date().toISOString(),
     paymentUrl,
-    agency: currentBrand().name,
+    agency: brandFor(workspaceId).name,
   });
   const guardrail = filterVoiceUtterance(stepped.say, loadVoiceGuardrails());
   if (guardrail.blocked) {
@@ -493,7 +493,7 @@ export async function sendChannel(input: {
   let rendered = input.body;
   if (template && account) {
     const matrix = ensureSettlementMatrix(account.workspaceId);
-    const context = mergeContext({ account, agencyName: currentBrand().name, domain: currentBrand().domain, matrix });
+    const context = mergeContext({ account, agencyName: brandFor(account.workspaceId).name, domain: brandFor(account.workspaceId).domain, matrix });
     const missing = missingInterpolations(`${template.subject}\n${template.body}`, context.values);
     if (missing.length > 0) {
       const blocked = storeMessage(input, "blocked", `Required merge fields are empty: ${missing.join(", ")}.`, null);
@@ -618,7 +618,7 @@ export function renderTemplatePreview(workspaceId: WorkspaceId, templateId: stri
   const template = (loadDb().collectionTemplates ?? []).find((item) => item.id === templateId);
   const account = accounts(workspaceId).find((item) => item.id === accountId);
   if (!template || !account) throw new Error("Template and account are required");
-  const context = mergeContext({ account, agencyName: currentBrand().name, domain: currentBrand().domain, matrix: ensureSettlementMatrix(account.workspaceId) });
+  const context = mergeContext({ account, agencyName: brandFor(account.workspaceId).name, domain: brandFor(account.workspaceId).domain, matrix: ensureSettlementMatrix(account.workspaceId) });
   return {
     subject: renderMustache(template.subject, context.values),
     body: renderMustache(template.body, context.values),
@@ -678,7 +678,7 @@ export function issueValidation(workspaceId: WorkspaceId, accountId: string): Po
   logEvent(workspaceId, "letter", accountId, decision.allowed, decision.reason);
   if (!decision.allowed) throw new Error(decision.reason);
   const mailedAt = new Date().toISOString();
-  const notice = validationNotice(account, currentBrand().name);
+  const notice = validationNotice(account, brandFor(workspaceId).name);
   const updated: PortfolioAccount = {
     ...account,
     validationMailedAt: mailedAt,
@@ -724,7 +724,7 @@ export function fileDispute(workspaceId: WorkspaceId, accountId: string, text: s
 export async function proposeDraft(workspaceId: WorkspaceId, accountId: string, inbound: string): Promise<DraftReply> {
   const account = accounts(workspaceId).find((item) => item.id === accountId);
   if (!account) throw new Error("Account not found");
-  const agency = currentBrand().name;
+  const agency = brandFor(workspaceId).name;
   const firstName = account.consumerName.split(" ")[0] ?? "";
   let modelText: string | null = null;
   let model: string | null = null;
@@ -828,8 +828,16 @@ export function completeTask(workspaceId: WorkspaceId, taskId: string, actor = "
   });
 }
 
-export function ensureSolTable(): SolRule[] {
-  const saved = loadDb().solRules ?? [];
+function savedSol(workspaceId: WorkspaceId): SolRule[] {
+  const db = loadDb();
+  const scoped = db.solTables?.[workspaceId];
+  if (scoped && scoped.length > 0) return scoped;
+  if (workspaceId === "triton" && db.solRules?.length) return db.solRules;
+  return [];
+}
+
+export function ensureSolTable(workspaceId: WorkspaceId = "triton"): SolRule[] {
+  const saved = savedSol(workspaceId);
   const byCode = new Map(saved.map((rule) => [rule.code, rule]));
   const placeholder = (rule: SolRule | undefined) => !rule || (rule.years == null && rule.citation.startsWith("No reviewed limitations period"));
   const table = defaultSolTable().map((rule) => (placeholder(byCode.get(rule.code)) ? rule : byCode.get(rule.code)!));
@@ -839,13 +847,14 @@ export function ensureSolTable(): SolRule[] {
   });
   if (saved.length === 0 || changed) {
     mutate((db) => {
-      db.solRules = table;
+      db.solTables = { ...(db.solTables ?? {}), [workspaceId]: table };
+      if (workspaceId === "triton") db.solRules = table;
     });
   }
   return table;
 }
 
-export function saveSolRules(rules: SolRule[], role: CollectionsRole): SolRule[] {
+export function saveSolRules(rules: SolRule[], role: CollectionsRole, workspaceId: WorkspaceId = "triton"): SolRule[] {
   if (role !== "admin" && role !== "compliance") throw new Error("Only admin or compliance can edit limitations");
   const allowed = new Set(defaultSolTable().map((rule) => rule.code));
   const clean = rules
@@ -856,25 +865,37 @@ export function saveSolRules(rules: SolRule[], role: CollectionsRole): SolRule[]
       citation: String(rule.citation || "No reviewed limitations period for this state. Do not calculate a date.").slice(0, 500),
       needsCounselReview: true,
     }));
+  const table = defaultSolTable().map((rule) => clean.find((item) => item.code === rule.code) ?? rule);
   mutate((db) => {
-    db.solRules = defaultSolTable().map((rule) => clean.find((item) => item.code === rule.code) ?? rule);
+    db.solTables = { ...(db.solTables ?? {}), [workspaceId]: table };
+    if (workspaceId === "triton") db.solRules = table;
   });
-  return ensureSolTable();
+  return ensureSolTable(workspaceId);
 }
 
-export function ensureRecordingTable(): RecordingRule[] {
-  const saved = loadDb().recordingRules ?? [];
+function savedRecording(workspaceId: WorkspaceId): RecordingRule[] {
+  const db = loadDb();
+  const scoped = db.recordingTables?.[workspaceId];
+  if (scoped && scoped.length > 0) return scoped;
+  if (workspaceId === "triton" && db.recordingRules?.length) return db.recordingRules;
+  return [];
+}
+
+export function ensureRecordingTable(workspaceId: WorkspaceId = "triton"): RecordingRule[] {
+  const saved = savedRecording(workspaceId);
   const byCode = new Map(saved.map((rule) => [rule.code, rule]));
   const table = defaultRecordingTable().map((rule) => byCode.get(rule.code) ?? rule);
   if (saved.length === 0) {
     mutate((db) => {
-      if (!db.recordingRules?.length) db.recordingRules = table;
+      if ((db.recordingTables?.[workspaceId]?.length ?? 0) > 0) return;
+      db.recordingTables = { ...(db.recordingTables ?? {}), [workspaceId]: table };
+      if (workspaceId === "triton" && !db.recordingRules?.length) db.recordingRules = table;
     });
   }
   return table;
 }
 
-export function saveRecordingRules(rules: RecordingRule[], role: CollectionsRole): RecordingRule[] {
+export function saveRecordingRules(rules: RecordingRule[], role: CollectionsRole, workspaceId: WorkspaceId = "triton"): RecordingRule[] {
   if (role !== "admin" && role !== "compliance") throw new Error("Only admin or compliance can edit recording consent");
   const allowed = new Set(defaultRecordingTable().map((rule) => rule.code));
   const parties = new Set(["all", "one", "uncertain"]);
@@ -886,10 +907,12 @@ export function saveRecordingRules(rules: RecordingRule[], role: CollectionsRole
       citation: String(rule.citation || "Counsel must confirm this state's recording rule.").slice(0, 500),
       needsCounselReview: true as const,
     }));
+  const table = defaultRecordingTable().map((rule) => clean.find((item) => item.code === rule.code) ?? rule);
   mutate((db) => {
-    db.recordingRules = defaultRecordingTable().map((rule) => clean.find((item) => item.code === rule.code) ?? rule);
+    db.recordingTables = { ...(db.recordingTables ?? {}), [workspaceId]: table };
+    if (workspaceId === "triton") db.recordingRules = table;
   });
-  return ensureRecordingTable();
+  return ensureRecordingTable(workspaceId);
 }
 
 export async function scrubAccount(workspaceId: WorkspaceId, accountId: string): Promise<PortfolioAccount> {
@@ -979,7 +1002,7 @@ export function validationPdfBase64(workspaceId: WorkspaceId, accountId: string)
   const account = ensureValidationNotice(workspaceId, accountId);
   const end = account.validationMailedAt ? validationEndDate(account.validationMailedAt) : account.disputeDeadline || "";
   const pdf = modelFormPdf({
-    agencyName: currentBrand().name,
+    agencyName: brandFor(workspaceId).name,
     agencyAddress: "PO Box 100, Example City, OH 44101",
     agencyPhone: "1-800-555-0199",
     noticeDate: (account.validationMailedAt || new Date().toISOString()).slice(0, 10),

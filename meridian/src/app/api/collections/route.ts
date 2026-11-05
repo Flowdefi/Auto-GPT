@@ -24,7 +24,7 @@ import { runScrub, scrubHistory } from "@/server/collections/scrubs";
 import { approveSettlement, counterSettlement, listSettlements, openSettlement, previewSettlement, releaseSettlementLetter, settlementPolicy } from "@/server/collections/settlement-desk";
 import { applySkipTrace } from "@/server/collections/skip-trace";
 import { attachLiveDial, hangupActiveCalls } from "@/server/collections/voice-live";
-import { currentBrand, saveBrand } from "@/server/brand";
+import { brandFor, currentBrand, saveBrand } from "@/server/brand";
 import { enrollSequence, listSequences, runDueJobs, saveSequence } from "@/server/collections/runner";
 import {
   completeTask,
@@ -400,12 +400,12 @@ export async function POST(request: Request) {
         if (!body.sequenceId || !body.accountId) return NextResponse.json({ error: "sequenceId and accountId required" }, { status: 400 });
         return NextResponse.json({ enqueued: enrollSequence(body.workspaceId, body.sequenceId, body.accountId) });
       case "sol_save":
-        return NextResponse.json({ rules: saveSolRules(body.solRules ?? [], actor) });
+        return NextResponse.json({ rules: saveSolRules(body.solRules ?? [], actor, body.workspaceId) });
       case "compliance_scrub":
         if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
         return NextResponse.json({ account: await scrubAccount(body.workspaceId, body.accountId) });
       case "recording_save":
-        return NextResponse.json({ rules: saveRecordingRules(body.recordingRules ?? [], actor) });
+        return NextResponse.json({ rules: saveRecordingRules(body.recordingRules ?? [], actor, body.workspaceId) });
       case "metro2_approve":
         return NextResponse.json({ metro2: approveMetro2(actor, gate.account.email) });
       case "metro2_export":
@@ -449,9 +449,9 @@ export async function POST(request: Request) {
         if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
         return NextResponse.json(await applySkipTrace(body.workspaceId, body.accountId));
       case "brand_get":
-        return NextResponse.json({ brand: currentBrand() });
+        return NextResponse.json({ brand: brandFor(body.workspaceId), publicBrand: currentBrand() });
       case "brand_save":
-        return NextResponse.json({ brand: saveBrand({ name: body.brandName, logoUrl: body.logoUrl, color: body.color, domain: body.domain }, actor) });
+        return NextResponse.json({ brand: saveBrand({ name: body.brandName, logoUrl: body.logoUrl, color: body.color, domain: body.domain }, actor, body.workspaceId) });
       case "payment_reverse":
         if (!body.paymentId) return NextResponse.json({ error: "paymentId required" }, { status: 400 });
         if (actor !== "admin" && actor !== "compliance") return NextResponse.json({ error: "Compliance must reverse a payment" }, { status: 403 });

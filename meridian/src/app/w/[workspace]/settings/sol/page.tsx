@@ -40,7 +40,7 @@ export default function SolTablePage() {
       <PageHeader
         eyebrow="Settings"
         title="Limitations table"
-        subtitle="Texas, Georgia, Missouri, Montana, New Hampshire, Ohio, South Carolina, South Dakota, Vermont, and Virginia start with a cited period and a counsel-review flag. Every other state stays blank. Accrual is last payment, otherwise charge-off, and that choice needs counsel review."
+        subtitle="This workspace has its own table. Texas, Georgia, Missouri, Montana, New Hampshire, Ohio, South Carolina, South Dakota, Vermont, and Virginia start with a cited period and a counsel-review flag. Every other state stays blank. Saving keeps that flag. Accrual is last payment, otherwise charge-off."
       />
       {notice ? <Card className="mb-4 p-4 text-sm">{notice}</Card> : null}
       <Button className="mb-4" onClick={() => void save()}>Save table</Button>

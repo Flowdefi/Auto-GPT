@@ -38,7 +38,7 @@ export default function RecordingTablePage() {
       <PageHeader
         eyebrow="Settings"
         title="Call recording consent"
-        subtitle="All-party states stop in the voice greeting until the person consents. One-party states announce recording and continue. Uncertain states ask for consent. Citations are a starting set for counsel, not a legal opinion."
+        subtitle="This workspace has its own table. All-party states stop in the voice greeting until the person consents. One-party states announce recording and continue. Uncertain states ask for consent. Saving keeps the counsel-review flag. Citations are a starting set, not a legal opinion."
       />
       {notice ? <Card className="mb-4 p-4 text-sm">{notice}</Card> : null}
       <Button className="mb-4" onClick={() => void save()}>Save table</Button>

@@ -45,7 +45,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - Metro 2 export stays off until the flag is on and owner and compliance have both approved. Accounts with no validation notice are excluded.
 - GLBA Safeguards draft, access review, incident playbook, tabletop checklist, and a per-workspace outbound freeze.
 - Retention purge, job worker, redacted logs, seated metrics, OpenTelemetry only when an endpoint is set, and a weekly compliance digest that emails only behind the digest flag and live delivery.
-- Workspace isolation between Triton and Example Harbor on Aether.
+- Workspace isolation between Triton and Example Harbor on Aether. Each workspace keeps its own limitations table, recording table, and brand for letters and notices. The public site stays on the Triton brand. Env brand values still win. State eligibility stays one table for the install.
 - Next.js 15.5.29. `npm audit` reports 0 critical and 0 high. CI fails on a new critical.
 
 ## Hosts
@@ -66,7 +66,7 @@ These match the status table. They are not finished by this changelog.
 - Card checkout and ACH stay sandbox. No bank account number is stored.
 - Portal accessibility and privacy copy are drafts. This is not a formal WCAG audit.
 - Metro 2 and the Safeguards pack stay drafts until counsel and both approvers sign.
-- Settlement authority is stored per workspace. The desk kill switch freezes only that workspace. The agency brand, limitations table, and recording table are still shared by the install.
+- Settlement authority, the limitations table, the recording table, and the saved brand are stored per workspace. The public site stays on the Triton brand. Env brand values still win. State eligibility stays install-wide. The desk kill switch freezes only that workspace.
 - The weekly compliance digest names its workspace and does not include consumer names, emails, or account references. A digest for one workspace is not listed in the other.
 
 ## Still for the owner and counsel

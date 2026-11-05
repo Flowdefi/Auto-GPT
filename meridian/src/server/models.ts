@@ -554,7 +554,11 @@ export interface DatabaseFile {
   jobs?: CollectionJob[];
   sequences?: CollectionSequence[];
   solRules?: SolRule[];
+  /** Per-agency limitations. The legacy field remains the Triton copy. */
+  solTables?: Partial<Record<WorkspaceId, SolRule[]>>;
   agencyBrand?: AgencyBrand;
+  /** Per-agency brand. The legacy field remains the Triton copy used by the public site. */
+  agencyBrands?: Partial<Record<WorkspaceId, AgencyBrand>>;
   agentPresence?: AgentPresence[];
   dialCampaigns?: DialCampaign[];
   dialAttempts?: DialAttempt[];
@@ -569,6 +573,8 @@ export interface DatabaseFile {
   clientGrants?: ClientGrant[];
   complaints?: Complaint[];
   recordingRules?: RecordingRule[];
+  /** Per-agency recording consent. The legacy field remains the Triton copy. */
+  recordingTables?: Partial<Record<WorkspaceId, RecordingRule[]>>;
   metro2Approval?: {
     ownerApprovedAt: string | null;
     ownerApprovedBy: string | null;
