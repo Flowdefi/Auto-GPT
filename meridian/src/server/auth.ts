@@ -5,7 +5,8 @@ import {
   SESSION_COOKIE,
   SESSION_HOURS,
 } from "@/lib/commerce";
-import { hashPassword, hashSecret, keyPrefix, mintApiKey, randomId, signPayload, verifyPassword, verifySignedPayload } from "./auth-crypto";
+import { hashPassword, hashSecret, keyPrefix, mintApiKey, mintLicenseKey, randomId, signPayload, verifyPassword, verifySignedPayload } from "./auth-crypto";
+import { selfHosted } from "./self-hosted";
 import { clientIp } from "./rate-limit";
 import { enterAccountContext, masterSecret } from "./secrets";
 import { sqliteAll, sqliteGet, sqliteReady, sqliteRun } from "./sqlite";
@@ -88,12 +89,49 @@ export function accountByEmail(email: string): Account | null {
   return row ? asAccount(row) : null;
 }
 
+let selfHostedSeatReady = false;
+
+/** Writes a redeemed lifetime seat for the earliest owner when self-hosting. */
+function ensureSelfHostedOwnerSeat(): void {
+  if (!selfHosted() || selfHostedSeatReady) return;
+  if (!sqliteReady()) return;
+  const owner = sqliteGet(
+    "SELECT id, email FROM accounts WHERE role = 'owner' ORDER BY created_at ASC LIMIT 1",
+  );
+  if (!owner?.id) return;
+  const accountId = String(owner.id);
+  const existing = sqliteGet(
+    "SELECT id FROM licenses WHERE account_id = ? AND redeemed_at IS NOT NULL LIMIT 1",
+    accountId,
+  );
+  if (!existing?.id) {
+    const key = mintLicenseKey();
+    const now = new Date().toISOString();
+    sqliteRun(
+      `INSERT INTO licenses (id, key_hash, key_prefix, kind, email, account_id, redeemed_at, created_at, notes)
+       VALUES (?, ?, ?, 'minted', ?, ?, ?, ?, ?)`,
+      randomId("lic"),
+      hashSecret(key),
+      keyPrefix(key, 12),
+      String(owner.email ?? ""),
+      accountId,
+      now,
+      now,
+      "Self-hosted owner seat",
+    );
+    markAccountActive(accountId);
+  }
+  selfHostedSeatReady = true;
+}
+
 export function accountHasSeat(accountId: string): boolean {
+  if (selfHosted()) ensureSelfHostedOwnerSeat();
   const row = sqliteGet(
     "SELECT id FROM licenses WHERE account_id = ? AND redeemed_at IS NOT NULL LIMIT 1",
     accountId,
   );
-  return Boolean(row?.id);
+  if (row?.id) return true;
+  return selfHosted();
 }
 
 export function markAccountActive(accountId: string): void {

@@ -76,7 +76,7 @@ First API call creates `data/meridian.json` and `data/meridian.db` (SQLite):
 - Knowledge graph nodes/edges
 - RAG chunks with **FTS5 + lexical** retrieval and neighbor expansion
 
-Schema: [`src/server/schema.sql`](src/server/schema.sql). Explore it in **Graph / RAG**. Public health is a stub at `GET /api/health`. Snapshot and RAG require a seated session or `mk_live_` key.
+Schema: [`src/server/schema.sql`](src/server/schema.sql). Explore it in **Graph / RAG**. Public health is `GET /api/health` with no auth. It returns `{ ok: true, version }`. Snapshot and RAG require a seated session or `mk_live_` key.
 
 ## Run
 
@@ -111,7 +111,7 @@ docker compose up --build -d
 
 Compose sets `MERIDIAN_SEED_DEMO=false` unless you override it, so a fresh volume does not load demo buyers and sellers. `npm run dev` still seeds demo data when that variable is unset.
 
-Public health stub: `GET /api/health`
+Public health: `GET /api/health` returns `{ ok: true, version }`.
 
 Demo CRM state in the browser persists separately from the server. Server mail, graph, and CRM rows persist in `data/meridian.json` and `data/meridian.db`. Use **Reset demo** in the header to restore the in-browser seed. To remove server-side demo companies, contacts, leads, and `crm_records` from a workspace:
 
@@ -154,6 +154,16 @@ docker compose exec meridian npm run import:csv -- \
   --companies /app/data/import/companies.csv
 ```
 
+The contacts file also accepts `tags` (semicolon-separated; commas and pipes work too) and the aliases `contact_email`, `contact_title`, `contact_linkedin`, and `contact_phone`. Repeat `--tag label` to add a tag to every contact and prospect in that run. Tags are merged, so a later import does not wipe tags already on the record.
+
+If an address is already on the suppression list, a normal import keeps `doNotEmail` set and does not remove the suppression. Suppression wins over a later file that does not mention the opt-out.
+
+```bash
+npm run import:csv -- --workspace triton --contacts ./contacts.csv --tag desk-2026
+```
+
+CLI scripts load `meridian/.env.local` before they open the database. `MERIDIAN_SEED_DEMO=false` in that file is honored by `import:csv` and `purge:demo`.
+
 Do not commit lead files. Bulk send skips suppressed addresses and any contact with `doNotEmail`, including test sends.
 
 ## Collections desk (sandbox)
@@ -170,6 +180,77 @@ The consumer portal is public at `/collect`. Lookup uses a reference number, the
 
 Put counsel-reviewed Markdown templates in `templates/collections/` and use **Sync templates**. Nothing in that folder is sent until `counselReviewed: true`. The public repo must stay free of real debtor files.
 
+## Self-hosting on a box with pm2 + Cloudflare Tunnel
+
+Triton runs this app at [https://crm.debtmarket.net](https://crm.debtmarket.net) on one box, behind Cloudflare Access, for a single owner team. Access does not replace Meridian sign-in. The repository is public: do not commit `.env.local`, `data/`, API keys, or lead files.
+
+```bash
+cd meridian
+cp .env.example .env.local
+```
+
+Set at least:
+
+```bash
+MERIDIAN_SELF_HOSTED=true
+MERIDIAN_SEED_DEMO=false
+MERIDIAN_AUTH_SECRET=replace-with-32-plus-random-characters
+MERIDIAN_PUBLIC_URL=https://crm.debtmarket.net
+NEXT_PUBLIC_APP_URL=https://crm.debtmarket.net
+```
+
+```bash
+npm ci
+npm run build
+pm2 start npm --name meridian -- start
+pm2 save
+```
+
+`npm start` listens on `0.0.0.0:3000`. Point cloudflared at that port and put a Cloudflare Access application on the hostname:
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:3000
+```
+
+For a named tunnel, route `crm.debtmarket.net` to `http://127.0.0.1:3000`.
+
+`MERIDIAN_SELF_HOSTED=true` skips the Polar seat check (`requireSeat`) and, once an owner account exists, attaches a lifetime seat to the earliest owner so `/w/triton` opens without the billing page. You can also attach a seat by email without that flag:
+
+```bash
+npm run seat:attach -- --email owner@example.com
+npm run key:create -- --name email-bot
+```
+
+`key:create` prints one `mk_live_` key and does not store the plaintext. The email bot sends `Authorization: Bearer mk_live_…`.
+
+| Method | Path | Auth |
+| --- | --- | --- |
+| `POST` | `/api/activities` | API key. Body `kind` is `inbound`, `outbound`, `draft`, `nda`, or `note`. Match with `email`, `contactId`, or `companyId`. A missing contact is created unless that address is suppressed or `createContact` is false. |
+| `GET` | `/api/contacts?email=` | API key. Workspace defaults to `triton`. |
+| `GET` | `/api/health` | None. `{ ok: true, version }`. |
+
+Portfolio inventory lives at `/w/triton/inventory`. The importer is idempotent on portfolio name:
+
+```bash
+npm run import:inventory -- ./portfolios.xlsx
+npm run import:inventory -- --workspace triton --dry-run ./portfolios.csv
+```
+
+Columns: portfolio name, paper type, face value, number of accounts, states, charge-off dates, asking price, status, and the OneDrive URL for the masked file. Optional seller, buyer, and deal columns link existing companies and deals.
+
+Microsoft Graph sync reads Inbox, Sent Items, and Drafts into activities, and merges mailbox contacts by email. It does not create a contact for a suppressed address. OneDrive is at `/w/triton/files` (search, open, attach the link to a portfolio or deal). If `MS_TENANT_ID`, `MS_CLIENT_ID`, or `MS_CLIENT_SECRET` is unset, sync and the file page no-op. `MS_MAILBOXES` defaults to `portfolios@debtmarket.net`. Set `MS_SYNC_INTERVAL_MS` to `60000` or more to repeat the sync inside the Next.js process; otherwise cron `npm run sync:graph`.
+
+```bash
+npm run sync:graph -- --workspace triton
+bash scripts/backup-db.sh
+```
+
+The backup uses `sqlite3 .backup` into `data/backups` and deletes files older than 14 days. Cron it daily. `data/` is gitignored.
+
+Bulk mail still refuses every suppressed address and every contact with `doNotEmail`, including test sends. Self-host mode does not turn that off.
+
+Phone home screen: the app is a standalone PWA (`manifest.json`, apple touch icon, safe-area insets). The bottom bar is Contacts, Companies, Deals, Inventory, and Activities.
+
 ## Environment
 
 Copy `.env.example` to `.env.local` (dev) or `.env` (Compose). Empty values are fine until you use that feature.
@@ -178,7 +259,9 @@ Copy `.env.example` to `.env.local` (dev) or `.env` (Compose). Empty values are 
 | --- | --- | --- |
 | `MERIDIAN_AUTH_SECRET` | Production | Session signing secret, 32+ characters |
 | `MERIDIAN_SECRET_KEY` | Production if you store BYOK secrets | Encryption key for provider secrets |
-| `MERIDIAN_SEED_DEMO` | No | `false` disables `seedCrmRecords` and `seedDemoLeads`. Unset/`true` seeds demo data. Compose defaults to `false` |
+| `MERIDIAN_SEED_DEMO` | No | `false` disables `seedCrmRecords` and `seedDemoLeads`. Unset/`true` seeds demo data. Compose defaults to `false`. CLI scripts load `.env.local` | 
+| `MERIDIAN_SELF_HOSTED` | Owner box | `true` skips Polar seat checks and attaches a seat to the first owner | 
+| `MS_SYNC_INTERVAL_MS` | No | Repeat Graph sync in-process. Minimum 60000. Unset disables the timer |
 | `MERIDIAN_CHANNEL_DELIVER` | No | `sandbox` records collection attempts locally. `live` is refused |
 | `MERIDIAN_PUBLIC_URL` | Recommended | Public origin for unsubscribe and tracking links |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Same origin for the client |
@@ -187,7 +270,7 @@ Copy `.env.example` to `.env.local` (dev) or `.env` (Compose). Empty values are 
 | `AGENTMAIL_INBOX_TRITON` | No | Triton AgentMail inbox |
 | `AGENTMAIL_INBOX_AETHER` | No | Aether AgentMail inbox |
 | `AETHER_FROM_EMAIL` | No | Aether From address |
-| `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_MAILBOXES` | For Office 365 sync | Microsoft Graph app-only |
+| `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_MAILBOXES` | For Office 365 sync | Microsoft Graph app-only. Mail.Read, Contacts.Read, Files.Read.All. Empty values no-op |
 | `OPENAI_BASE_URL` or `OLLAMA_BASE_URL`, `OPENAI_API_KEY`, `MERIDIAN_MODEL`, `MERIDIAN_FAST_MODEL`, `MERIDIAN_EMBED_MODEL` | For free-form model answers | OpenAI-compatible endpoint |
 | `SERP_PROVIDER_URL`, `SERP_PROVIDER_KEY`, `SERP_PROVIDER_NAME` | For live rank tracking | SERP provider |
 | `POLAR_ACCESS_TOKEN`, `POLAR_PRODUCT_ID`, `POLAR_WEBHOOK_SECRET`, `POLAR_SERVER` | To sell seats | Polar |

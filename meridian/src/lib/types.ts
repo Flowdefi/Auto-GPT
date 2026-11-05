@@ -34,6 +34,8 @@ export type ActivityType =
   | "ai"
   | "system";
 
+export type ActivityChannel = "inbound" | "outbound" | "draft" | "nda" | "note";
+
 export type LeadType = "buyer" | "seller" | "broker" | "partner" | "other";
 
 export type AssetClass =
@@ -203,6 +205,16 @@ export interface InventoryItem {
   scoreBand: string;
   status: "intake" | "listed" | "in_market" | "awarded" | "closed";
   notes: string;
+  chargeOffDates?: string;
+  chargeOffFrom?: string;
+  chargeOffTo?: string;
+  maskedFileUrl?: string;
+  buyerCompanyId?: string;
+  dealId?: string;
+  importKey?: string;
+  sellerName?: string;
+  buyerName?: string;
+  dealName?: string;
 }
 
 export interface Deal {
@@ -218,6 +230,8 @@ export interface Deal {
   probability: number;
   forecast: "omit" | "pipeline" | "best_case" | "commit" | "closed";
   nextStep: string;
+  fileUrl?: string;
+  fileName?: string;
 }
 
 export interface Activity {
@@ -231,6 +245,10 @@ export interface Activity {
   companyId?: string;
   dealId?: string;
   ticketId?: string;
+  channel?: ActivityChannel;
+  externalId?: string;
+  email?: string;
+  source?: string;
 }
 
 export interface Task {
