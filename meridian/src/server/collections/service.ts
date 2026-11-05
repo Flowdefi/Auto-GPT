@@ -37,6 +37,7 @@ import type {
 } from "@/lib/collections/types";
 import type { WorkspaceId } from "@/lib/types";
 import { modelFormPdf } from "@/lib/collections/model-form-pdf";
+import { REPORT_DRAFT_LABEL } from "@/lib/collections/report-csv";
 import { TIME_BARRED_HOLD, defaultSolTable, limitationsDatePassed, timeBarredSolicitation, type SolRule } from "@/lib/collections/sol";
 import { validationEndDate } from "@/lib/collections/validation-period";
 import { decryptSecret, encryptSecret, sha256Hex } from "@/server/auth-crypto";
@@ -1221,6 +1222,8 @@ export function collectionReport(workspaceId: WorkspaceId) {
       };
     }),
     collectors: collectorRows(db, workspaceId),
+    needsCounselReview: true as const,
+    label: REPORT_DRAFT_LABEL,
   };
 }
 
