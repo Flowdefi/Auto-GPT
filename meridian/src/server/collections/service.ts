@@ -38,6 +38,8 @@ import { defaultSolTable, type SolRule } from "@/lib/collections/sol";
 import { validationEndDate } from "@/lib/collections/validation-period";
 import { decryptSecret, encryptSecret, sha256Hex } from "@/server/auth-crypto";
 import { loadDb, mutate, nextId } from "@/server/db";
+import { logEvent as logLine } from "@/server/log";
+import { scanUpload, scanXlsx } from "@/server/security";
 import { masterSecret } from "@/server/secrets";
 import { completeFast } from "@/server/ai/complete";
 import { publicBaseUrl } from "@/server/mailer";
@@ -53,10 +55,13 @@ function accounts(workspaceId: WorkspaceId): PortfolioAccount[] {
 
 export function collectionSnapshot(workspaceId: WorkspaceId) {
   const db = loadDb();
+  const rows = accounts(workspaceId);
   return {
     settings: db.voiceSettings,
     eligibility: (db.stateEligibility ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
-    accounts: accounts(workspaceId).map(publicAccount),
+    accounts: rows.slice(0, 200).map(publicAccount),
+    accountCount: rows.length,
+    quarantineCount: rows.filter((account) => account.status === "quarantined" || account.status === "returned").length,
     tasks: (db.collectorTasks ?? []).filter((task) => task.workspaceId === workspaceId && task.status === "open"),
     drafts: (db.draftReplies ?? []).filter((draft) => draft.workspaceId === workspaceId),
     payments: (db.consumerPayments ?? []).filter((payment) => payment.workspaceId === workspaceId),
@@ -105,7 +110,11 @@ export function importPortfolio(input: {
   widths?: WidthField[];
   mapping?: ColumnMapping;
   portfolioId?: string;
+  /** When set, every row must belong to this seller. */
+  sellerLock?: string;
 }) {
+  if (input.csv) scanUpload(input.csv);
+  if (input.xlsxBase64) scanXlsx(Uint8Array.from(Buffer.from(input.xlsxBase64, "base64")));
   const db = loadDb();
   const portfolioId = input.portfolioId || nextId("pf");
   const existing = new Set(accounts(input.workspaceId).map((account) => account.accountRef.toLowerCase()));
@@ -123,24 +132,30 @@ export function importPortfolio(input: {
     now: new Date().toISOString(),
     id: () => nextId("acct"),
   });
+  if (input.sellerLock) {
+    const lock = input.sellerLock.trim();
+    for (const account of result.accounts) {
+      if (account.sellerName && account.sellerName !== "Unknown seller" && account.sellerName !== lock) {
+        throw new Error("A client can place only its own accounts.");
+      }
+      account.sellerName = lock;
+    }
+  }
   const stored = result.accounts.map(sealAccount);
+  const tasks = stored
+    .filter((account) => account.status === "workable")
+    .map((account) => ({
+      id: nextId("task"),
+      workspaceId: input.workspaceId,
+      accountId: account.id,
+      title: "Send Reg F validation notice",
+      queue: "collector" as const,
+      status: "open" as const,
+      createdAt: account.importedAt,
+    }));
   mutate((state) => {
     state.portfolioAccounts = [...(state.portfolioAccounts ?? []), ...stored];
-    for (const account of stored) {
-      if (account.status !== "workable") continue;
-      state.collectorTasks = [
-        {
-          id: nextId("task"),
-          workspaceId: input.workspaceId,
-          accountId: account.id,
-          title: "Send Reg F validation notice",
-          queue: "collector",
-          status: "open",
-          createdAt: account.importedAt,
-        },
-        ...(state.collectorTasks ?? []),
-      ];
-    }
+    if (tasks.length > 0) state.collectorTasks = [...tasks, ...(state.collectorTasks ?? [])];
     state.importAudits = [
       {
         id: nextId("aud"),
@@ -154,7 +169,8 @@ export function importPortfolio(input: {
       ...(state.importAudits ?? []),
     ].slice(0, 200);
   });
-  return { ...result, portfolioId, accounts: stored.map(publicAccount) };
+  logLine("portfolio_import", { workspaceId: input.workspaceId, portfolioId, created: result.created, quarantined: result.quarantined });
+  return { ...result, portfolioId, accounts: stored.slice(0, 100).map(publicAccount), accountCount: stored.length };
 }
 
 function sealAccount(account: PortfolioAccount): PortfolioAccount {
@@ -235,7 +251,7 @@ function logEvent(workspaceId: WorkspaceId, channel: CollectionChannel, accountI
   });
 }
 
-function gateFor(
+export function gateFor(
   workspaceId: WorkspaceId,
   account: PortfolioAccount | null,
   channel: CollectionChannel,

@@ -10,6 +10,7 @@ import { useActiveWorkspace } from "@/lib/use-workspace";
 interface Snapshot {
   settings: VoiceSettings;
   accounts: PortfolioAccount[];
+  quarantineCount?: number;
   calls: VoiceCall[];
   templates: Array<{ id: string; name: string; channel: string; counselReviewed: boolean }>;
   events: Array<{ id: string; channel: string; allowed: boolean; reason: string }>;
@@ -165,7 +166,7 @@ export default function CollectionsDeskPage() {
                 {account.quarantineReason}
               </p>
             ) : null}
-            <p>{data.accounts.filter((item) => item.status === "quarantined" || item.status === "returned").length} accounts are quarantined or returned and are not worked.</p>
+            <p>{data.quarantineCount ?? data.accounts.filter((item) => item.status === "quarantined" || item.status === "returned").length} accounts are quarantined or returned and are not worked.</p>
           </Card>
           <Card className="space-y-3 p-5 text-sm">
             <div className="font-semibold">Sandbox voice call</div>

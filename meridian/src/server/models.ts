@@ -14,7 +14,9 @@ import type {
   ImportAudit,
   OperatorRole,
   PortalSession,
+  ClientGrant,
 } from "@/lib/collections/types";
+import type { Complaint } from "@/lib/collections/complaints";
 import type { CollectionJob, CollectionSequence } from "@/lib/collections/jobs";
 import type { RecordingRule } from "@/lib/collections/recording";
 import type { SolRule } from "@/lib/collections/sol";
@@ -547,6 +549,8 @@ export interface DatabaseFile {
   jobs?: CollectionJob[];
   sequences?: CollectionSequence[];
   solRules?: SolRule[];
+  clientGrants?: ClientGrant[];
+  complaints?: Complaint[];
   recordingRules?: RecordingRule[];
   metro2Approval?: {
     ownerApprovedAt: string | null;

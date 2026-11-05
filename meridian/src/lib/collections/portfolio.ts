@@ -1,7 +1,6 @@
 import { normalizeState, parseDate } from "@/lib/debt";
 import { parseCsv, type CsvTable } from "@/server/csv";
 import type { PortfolioAccount, StateEligibility } from "./types";
-import { stateIsEligible } from "./eligibility";
 import { solFor, type SolRule } from "./sol";
 import { xlsxToCsv } from "./xlsx";
 
@@ -64,6 +63,8 @@ export function parsePortfolioCsv(input: {
   const accounts: PortfolioAccount[] = [];
   const skipped: Array<{ row: number; reason: string }> = [];
   const seen = new Set(input.existingRefs);
+  const eligibility = new Map(input.eligibility.map((row) => [row.code, row.eligible]));
+  const solByState = new Map((input.solRules ?? []).map((rule) => [rule.code, rule]));
   for (const row of table.rows) {
     const pick = (field: keyof ColumnMapping, ...aliases: string[]) => mapped(row.values, field, input.mapping, aliases);
     const accountRef = pick("account_ref", "account_ref", "account ref", "reference");
@@ -77,14 +78,15 @@ export function parsePortfolioCsv(input: {
       continue;
     }
     seen.add(accountRef.toLowerCase());
-    const eligible = stateIsEligible(input.eligibility, state);
+    const eligible = eligibility.get(state) === true;
     const last4source = pick("last4", "last4", "last 4");
     const accountNumber = pick("account_number", "account_number", "account number");
     const last4 = (last4source || accountNumber).replace(/\D/g, "").slice(-4);
     const chargeOffDate = parseDate(pick("charge_off_date", "charge_off_date", "charge off date"));
     const lastPaymentDate = parseDate(pick("last_payment_date", "last_payment_date", "last payment"));
     const itemizationDate = parseDate(pick("itemization_date", "itemization_date", "itemization date"));
-    const sol = solFor(state, lastPaymentDate, chargeOffDate, input.solRules);
+    const solRule = solByState.get(state);
+    const sol = solFor(state, lastPaymentDate, chargeOffDate, solRule ? [solRule] : input.solRules);
     const ssn = pick("ssn", "ssn", "social security");
     const dob = pick("dob", "dob", "date of birth");
     accounts.push({

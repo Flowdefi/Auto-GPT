@@ -16,6 +16,8 @@ export default function CollectAccountPage() {
   const [dispute, setDispute] = useState("");
   const [months, setMonths] = useState("4");
   const [installment, setInstallment] = useState("25");
+  const [authorized, setAuthorized] = useState(false);
+  const [proof, setProof] = useState<string | null>(null);
 
   useEffect(() => {
     void fetch("/api/portal")
@@ -29,6 +31,24 @@ export default function CollectAccountPage() {
       })
       .catch(() => setError(copy.loading));
   }, [copy.loading]);
+
+  async function payAch() {
+    if (!account || !authorized) return;
+    setError(null);
+    const response = await fetch("/api/portal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ op: "ach", amountCents: Math.min(account.balanceCents, 2500), recurring: false, accepted: true }),
+    });
+    const body = (await response.json()) as { error?: string; payment?: ConsumerPayment; account?: PortfolioAccount };
+    if (!response.ok || !body.payment) {
+      setError(body.error ?? copy.error);
+      return;
+    }
+    setReceipt(body.payment);
+    setProof(body.payment.authorization?.proofId ?? null);
+    if (body.account) setAccount(body.account);
+  }
 
   async function pay() {
     if (!account) return;
@@ -157,6 +177,16 @@ export default function CollectAccountPage() {
       <button className="mt-6 min-h-11 rounded-xl bg-[#1c2430] px-4 text-white" type="button" onClick={() => void pay()}>
         {copy.pay}
       </button>
+      <form className="mt-6 grid gap-2 text-sm" onSubmit={(event) => { event.preventDefault(); void payAch(); }}>
+        <h2 className="font-semibold">Bank debit authorization</h2>
+        <p>Draft for counsel review under 12 CFR § 1005.10(b). No bank account number is collected on this page.</p>
+        <label className="flex min-h-11 items-start gap-2" htmlFor="ach-auth">
+          <input id="ach-auth" type="checkbox" checked={authorized} onChange={(event) => setAuthorized(event.target.checked)} />
+          <span>I authorize a one-time debit of $25.00 and I have received this copy of the authorization.</span>
+        </label>
+        <button className="min-h-11 rounded-xl border border-[#1c2430] px-4" type="submit" disabled={!authorized}>Authorize test debit</button>
+        {proof ? <p role="status">Authorization proof {proof} is stored. The copy is the text above.</p> : null}
+      </form>
       {receipt ? <p className="mt-3 text-sm" role="status">{copy.receipt} {receipt.providerId} {money(receipt.amountCents)}. {copy.noCard}</p> : null}
       <form onSubmit={(event) => void sendDispute(event)} className="mt-8 grid gap-2">
         <label className="grid gap-1 text-sm" htmlFor="dispute-text">

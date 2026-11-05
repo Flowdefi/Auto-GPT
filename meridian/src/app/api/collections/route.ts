@@ -8,6 +8,10 @@ import type { ConsumerTurn } from "@/lib/collections/voice";
 import { isWorkspaceId } from "@/lib/workspace-id";
 import { requireSeat } from "@/server/api-guard";
 import { assertPrivilegedMfa } from "@/server/mfa-policy";
+import { assertSameOrigin } from "@/server/security";
+import { bindClient, clientHome, placeForClient, recallForClient } from "@/server/collections/client-portal";
+import { complaintReport, fileComplaint, setComplaintStatus } from "@/server/collections/complaint-store";
+import { postAchPayment, reversePayment } from "@/server/collections/payments";
 import { enrollSequence, listSequences, runDueJobs, saveSequence } from "@/server/collections/runner";
 import {
   completeTask,
@@ -56,6 +60,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  try {
+    assertSameOrigin(request);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Cross-site request blocked" }, { status: 403 });
+  }
   const gate = await requireSeat(request);
   if (!gate.ok) return gate.response;
   const body = (await request.json()) as {
@@ -92,7 +101,19 @@ export async function POST(request: Request) {
     approve?: boolean;
     amountCents?: number;
     email?: string;
-    role?: "admin" | "manager" | "collector" | "compliance" | "read_only";
+    role?: "admin" | "manager" | "collector" | "compliance" | "read_only" | "client";
+    sellerName?: string;
+    recurring?: boolean;
+    accepted?: boolean;
+    paymentId?: string;
+    reversal?: "reversed" | "nsf";
+    complaintId?: string;
+    complaintChannel?: string;
+    rootCause?: string;
+    cfpbId?: string;
+    summary?: string;
+    accountRef?: string;
+    status?: "open" | "responded" | "closed";
     ownerApproved?: boolean;
     counselReviewed?: boolean;
     matrix?: SettlementMatrix;
@@ -110,7 +131,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error instanceof Error ? error.message : "MFA required", mfaRequired: true }, { status: 403 });
     }
   }
-  if (actor === "read_only" && body.op && body.op !== "report" && body.op !== "access_review") {
+  if (actor === "client" && body.op && !["client_home", "client_place", "client_recall"].includes(body.op)) {
+    return NextResponse.json({ error: "Clients can only see their own placements" }, { status: 403 });
+  }
+  if (actor === "read_only" && body.op && body.op !== "report" && body.op !== "access_review" && body.op !== "complaint_report") {
     return NextResponse.json({ error: "Read-only role" }, { status: 403 });
   }
   if (!isWorkspaceId(body.workspaceId)) {
@@ -240,6 +264,31 @@ export async function POST(request: Request) {
         return NextResponse.json(exportMetro2(body.workspaceId));
       case "access_review":
         return NextResponse.json(accessReview());
+      case "client_bind":
+        if (actor !== "admin" || !body.email || !body.sellerName) return NextResponse.json({ error: "Admin email and seller are required" }, { status: 403 });
+        return NextResponse.json({ grant: bindClient(body.email, body.sellerName, actor) });
+      case "client_home":
+        return NextResponse.json(clientHome(body.workspaceId, actor, gate.account.email));
+      case "client_place":
+        if (!body.csv) return NextResponse.json({ error: "csv required" }, { status: 400 });
+        return NextResponse.json(placeForClient(body.workspaceId, actor, gate.account.email, body.csv));
+      case "client_recall":
+        return NextResponse.json({ returned: recallForClient(body.workspaceId, actor, gate.account.email, body.portfolioId) });
+      case "complaint_file":
+        return NextResponse.json({ complaint: fileComplaint(body.workspaceId, { channel: body.complaintChannel, accountRef: body.accountRef, summary: body.summary ?? body.inbound, cfpbId: body.cfpbId, rootCause: body.rootCause }) });
+      case "complaint_status":
+        if (!body.complaintId || !body.status) return NextResponse.json({ error: "complaintId and status required" }, { status: 400 });
+        if (actor !== "admin" && actor !== "compliance") return NextResponse.json({ error: "Compliance must update complaint status" }, { status: 403 });
+        return NextResponse.json({ complaint: setComplaintStatus(body.workspaceId, body.complaintId, body.status) });
+      case "complaint_report":
+        return NextResponse.json(complaintReport(body.workspaceId));
+      case "payment_ach":
+        if (!body.accountId || !body.amountCents) return NextResponse.json({ error: "accountId and amountCents required" }, { status: 400 });
+        return NextResponse.json({ payment: await postAchPayment({ workspaceId: body.workspaceId, accountId: body.accountId, amountCents: body.amountCents, recurring: Boolean(body.recurring), accepted: Boolean(body.accepted) }) });
+      case "payment_reverse":
+        if (!body.paymentId) return NextResponse.json({ error: "paymentId required" }, { status: 400 });
+        if (actor !== "admin" && actor !== "compliance") return NextResponse.json({ error: "Compliance must reverse a payment" }, { status: 403 });
+        return NextResponse.json({ payment: reversePayment(body.workspaceId, body.paymentId, body.reversal === "nsf" ? "nsf" : "reversed") });
       case "notice_pdf":
         if (!body.accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
         return NextResponse.json({ pdfBase64: validationPdfBase64(body.workspaceId, body.accountId) });

@@ -83,11 +83,17 @@ export interface PortfolioAccount {
   sensitive?: { ssn?: string; dob?: string; accountNumber?: string };
 }
 
-export type CollectionsRole = "admin" | "manager" | "collector" | "compliance" | "read_only";
+export type CollectionsRole = "admin" | "manager" | "collector" | "compliance" | "read_only" | "client";
 
 export interface OperatorRole {
   email: string;
   role: CollectionsRole;
+}
+
+/** Binds a client login to one seller. A client cannot read another seller's portfolios. */
+export interface ClientGrant {
+  email: string;
+  sellerName: string;
 }
 
 export interface CollectorTask {
@@ -122,12 +128,21 @@ export interface ConsumerPayment {
   workspaceId: WorkspaceId;
   accountId: string;
   amountCents: number;
-  status: "succeeded" | "pending";
+  status: "succeeded" | "pending" | "reversed" | "nsf";
   provider: string;
   providerId: string;
+  method?: "sandbox" | "ach" | "card";
   at: string;
   reconciledAt?: string;
   checkoutUrl?: string;
+  /** Reg E preauthorized-transfer proof. Bank account numbers are not stored. */
+  authorization?: {
+    text: string;
+    acceptedAt: string;
+    proofId: string;
+    copyProvidedAt: string;
+    recurring: boolean;
+  };
 }
 
 export interface ImportAudit {
