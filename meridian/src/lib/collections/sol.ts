@@ -91,6 +91,38 @@ export function defaultSolTable(): SolRule[] {
   });
 }
 
+/** True only when a calculated limitations date is already in the past. A blank date is not treated as past. */
+export function limitationsDatePassed(solExpiresOn: string | null | undefined, at: string): boolean {
+  const onFile = solExpiresOn?.slice(0, 10);
+  if (!onFile || !/^\d{4}-\d{2}-\d{2}$/.test(onFile)) return false;
+  return onFile < at.slice(0, 10);
+}
+
+const PAYMENT_SOLICITATION_IDS = new Set([
+  "SMS-004",
+  "SMS-005",
+  "SMS-006",
+  "EML-004",
+  "EML-005",
+  "LTR-002",
+  "LTR-003",
+  "LTR-004",
+  "LTR-005",
+  "LTR-010",
+  "LTR-011",
+  "LTR-012",
+  "LTR-013",
+  "LTR-030",
+]);
+
+/** Payment, plan, and settlement asks stay held. The counsel-reviewed time-barred notices do not. */
+export function timeBarredSolicitation(templateId: string | undefined, body: string): boolean {
+  if (templateId === "LTR-060" || templateId === "LTR-061") return false;
+  if (templateId && PAYMENT_SOLICITATION_IDS.has(templateId)) return true;
+  if (!templateId && /\b(pay|payment|settle|settlement|payment plan)\b/i.test(body)) return true;
+  return false;
+}
+
 export function solFor(
   state: string,
   lastPaymentDate: string | null,

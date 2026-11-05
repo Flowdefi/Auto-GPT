@@ -11,6 +11,7 @@ export function reasonCode(reason: string): string {
   if (text.includes("returned mail")) return "returned_mail";
   if (text.includes("do-not-call")) return "dnc";
   if (text.includes("marked") || text.includes("ceased") || text.includes("disputed")) return "account_hold";
+  if (text.includes("time-barred")) return "time_barred";
   if (text.includes("cap")) return "daily_cap";
   if (text.includes("inbound voice")) return "inbound_block";
   if (text.includes("template")) return "template";

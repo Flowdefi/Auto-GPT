@@ -4,11 +4,11 @@ import { STATE_ELIGIBILITY_SEED, assertSeedCoverage, policyEligible, stateIsElig
 import { evaluateGate } from "./gate";
 import { classifyInbound } from "./inbox";
 import { maskSsn, parsePortfolioCsv, publicAccount } from "./portfolio";
-import { solFor } from "./sol";
+import { limitationsDatePassed, solFor, timeBarredSolicitation } from "./sol";
 import { withinCallingWindow } from "./time";
 import type { PortfolioAccount, VoiceSettings } from "./types";
 import { totp, verifyTotp } from "../../server/totp";
-import { importPortfolio, setupPaymentPlan } from "../../server/collections/service";
+import { importPortfolio, sendChannel, setupPaymentPlan } from "../../server/collections/service";
 import { emptyTranscript, redactSensitive, stepCall } from "./voice";
 
 const settings: VoiceSettings = {
@@ -221,6 +221,34 @@ test("voice flow withholds the debt until two identifiers match and will not sto
   assert.equal(open.disposition, "plan_offered");
   const code = totp("JBSWY3DPEHPK3PXP", 1_700_000_000_000);
   assert.equal(verifyTotp("JBSWY3DPEHPK3PXP", code, 1_700_000_000_000), true);
+});
+
+test("sms and email payment asks stay held when the limitations date is past", async () => {
+  assert.equal(timeBarredSolicitation("SMS-006", "offer"), true);
+  assert.equal(timeBarredSolicitation("EML-005", "offer"), true);
+  assert.equal(timeBarredSolicitation("LTR-010", "offer"), true);
+  assert.equal(timeBarredSolicitation("LTR-060", "Please pay"), false);
+  assert.equal(timeBarredSolicitation("LTR-061", "Please pay"), false);
+  assert.equal(timeBarredSolicitation(undefined, "Please pay the balance"), true);
+  assert.equal(timeBarredSolicitation(undefined, "Hello"), false);
+  assert.equal(limitationsDatePassed(null, "2026-11-05"), false);
+  const stamp = Date.now().toString(36);
+  const row = (ref: string, chargeOff: string) =>
+    `account_ref,consumer_name,consumer_state,zip,last4,balance,charge_off_date\n${ref},Example Buyer,TX,78701,4242,40.00,${chargeOff}\n`;
+  const past = importPortfolio({ workspaceId: "triton", csv: row(`PAST-${stamp}`, "2020-01-01") });
+  const future = importPortfolio({ workspaceId: "triton", csv: row(`FUTR-${stamp}`, "2025-06-01") });
+  const pastAccount = past.accounts.find((item) => item.accountRef === `PAST-${stamp}`);
+  const futureAccount = future.accounts.find((item) => item.accountRef === `FUTR-${stamp}`);
+  assert.ok(pastAccount?.solExpiresOn && pastAccount.solExpiresOn < "2026-11-05");
+  assert.ok(futureAccount?.solExpiresOn && futureAccount.solExpiresOn >= "2026-11-05");
+  const sms = await sendChannel({ workspaceId: "triton", accountId: pastAccount.id, channel: "sms", body: "Please pay the balance" });
+  const email = await sendChannel({ workspaceId: "triton", accountId: pastAccount.id, channel: "email", body: "A settlement is available" });
+  assert.equal(sms.status, "blocked");
+  assert.match(sms.reason ?? "", /counsel-reviewed time-barred notice/);
+  assert.equal(email.status, "blocked");
+  assert.match(email.reason ?? "", /counsel-reviewed time-barred notice/);
+  const later = await sendChannel({ workspaceId: "triton", accountId: futureAccount.id, channel: "sms", body: "Please pay the balance" });
+  assert.equal((later.reason ?? "").includes("time-barred notice"), false);
 });
 
 test("sandbox payment plan stays inside the balance and the month cap", () => {

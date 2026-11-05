@@ -1,4 +1,5 @@
 import { requiresAllPartyRecording } from "./recording";
+import { limitationsDatePassed } from "./sol";
 import type { CallTranscript, CallTurn, PortfolioAccount, QaFlag, VoiceSettings } from "./types";
 
 export { requiresAllPartyRecording };
@@ -55,12 +56,6 @@ export function emptyTranscript(agency: string, allParty: boolean, at: string): 
 
 function push(transcript: CallTranscript, role: CallTurn["role"], text: string, at: string): CallTranscript {
   return { ...transcript, turns: [...transcript.turns, { role, text, at }] };
-}
-
-function limitationsDatePassed(account: PortfolioAccount | null, at: string): boolean {
-  const onFile = account?.solExpiresOn?.slice(0, 10);
-  if (!onFile || !/^\d{4}-\d{2}-\d{2}$/.test(onFile)) return false;
-  return onFile < at.slice(0, 10);
 }
 
 function miniMiranda(agency: string): string {
@@ -159,7 +154,7 @@ export function stepCall(input: {
   }
 
   const lower = heard.toLowerCase();
-  const barred = limitationsDatePassed(input.account, input.at);
+  const barred = limitationsDatePassed(input.account?.solExpiresOn, input.at);
   const asksToPay = /\b(pay|payment|settle|plan)\b/i.test(heard) || Boolean(redacted?.hadCard) || /\b(card number|visa|mastercard)\b/i.test(heard);
   if (barred && asksToPay) {
     const say = "The limitations date on file is in the past. I will not offer a payment plan or a payment page. A collector has to use the counsel-reviewed time-barred notice. I can transfer you to a person.";

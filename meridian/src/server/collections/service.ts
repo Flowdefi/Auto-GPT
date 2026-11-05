@@ -37,7 +37,7 @@ import type {
 } from "@/lib/collections/types";
 import type { WorkspaceId } from "@/lib/types";
 import { modelFormPdf } from "@/lib/collections/model-form-pdf";
-import { defaultSolTable, type SolRule } from "@/lib/collections/sol";
+import { defaultSolTable, limitationsDatePassed, timeBarredSolicitation, type SolRule } from "@/lib/collections/sol";
 import { validationEndDate } from "@/lib/collections/validation-period";
 import { decryptSecret, encryptSecret, sha256Hex } from "@/server/auth-crypto";
 import { brandFor } from "@/server/brand";
@@ -531,6 +531,21 @@ export async function sendChannel(input: {
   if (template?.id === "CALL-009") {
     const blocked = storeMessage(input, "blocked", "Voice guardrails are a filter, not a message that can be sent.", null);
     logEvent(input.workspaceId, input.channel, input.accountId, false, blocked.reason ?? "template");
+    return blocked;
+  }
+  if (
+    account &&
+    (input.channel === "sms" || input.channel === "email" || input.channel === "letter") &&
+    limitationsDatePassed(account.solExpiresOn, new Date().toISOString()) &&
+    timeBarredSolicitation(template?.id, input.body)
+  ) {
+    const blocked = storeMessage(
+      input,
+      "blocked",
+      "Limitations date on file is in the past. This payment or settlement message stays held. Use the counsel-reviewed time-barred notice.",
+      null,
+    );
+    logEvent(input.workspaceId, input.channel, input.accountId, false, blocked.reason ?? "time-barred");
     return blocked;
   }
   let rendered = input.body;
