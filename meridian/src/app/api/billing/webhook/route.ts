@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { applyPolarEvent, verifyPolarWebhook } from "@/server/billing";
 import { clientIp, rateLimited, tooMany } from "@/server/rate-limit";
+import { selfHosted } from "@/server/self-hosted";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  if (selfHosted()) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (rateLimited(`polar-webhook:${clientIp(request)}`, 60, 60_000)) return tooMany();
   const raw = await request.text();
   if (!verifyPolarWebhook(request, raw)) {

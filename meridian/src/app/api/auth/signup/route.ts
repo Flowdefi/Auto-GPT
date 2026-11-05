@@ -3,11 +3,13 @@ import { SESSION_COOKIE } from "@/lib/commerce";
 import { accountById, accountHasSeat, createAccount, issueSessionCookie, publicAccount, sessionCookieOptions } from "@/server/auth";
 import { claimReservedLicense } from "@/server/billing";
 import { clientIp, rateLimited, tooMany } from "@/server/rate-limit";
+import { selfHosted } from "@/server/self-hosted";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  if (selfHosted()) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (rateLimited(`signup:${clientIp(request)}`, 8, 60_000)) return tooMany();
   let body: { email?: string; name?: string; password?: string };
   try {

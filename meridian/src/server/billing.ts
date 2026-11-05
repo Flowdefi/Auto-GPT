@@ -120,7 +120,9 @@ export function attachSeatToEmail(email: string): {
 } {
   const account = accountByEmail(email);
   if (!account) {
-    throw new Error(`No account for ${email}. Create the owner at /signup, then rerun seat:attach.`);
+    throw new Error(
+      `No account for ${email}. On the self-hosted desk, run npm run owner:set-password -- --email ${email}`,
+    );
   }
   const existing = sqliteGet(
     "SELECT id FROM licenses WHERE account_id = ? AND redeemed_at IS NOT NULL LIMIT 1",

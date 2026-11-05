@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { PUBLIC_API_PATHS, SESSION_COOKIE } from "@/lib/commerce";
+import { selfHosted } from "@/server/self-hosted";
+import { safeNextPath, selfHostClosure } from "@/server/self-host-routes";
 
 const PUBLIC_PAGES = new Set(["/", "/pricing", "/login", "/signup"]);
 
@@ -26,8 +28,46 @@ function hasCredential(request: NextRequest): boolean {
   return Boolean(auth && auth.trim());
 }
 
+function hasSession(request: NextRequest): boolean {
+  return Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+}
+
+function accessHandshake(request: NextRequest): NextResponse | null {
+  const { pathname } = request.nextUrl;
+  const session = hasSession(request);
+  const jwt = request.headers.get("cf-access-jwt-assertion");
+  const loginError = pathname === "/login" && request.nextUrl.searchParams.has("error");
+  const document = !pathname.startsWith("/api/") && !pathname.startsWith("/_next/");
+  if (!session && jwt && document && !loginError) {
+    const url = request.nextUrl.clone();
+    const next = pathname === "/" ? "/w/triton/home" : `${pathname}${request.nextUrl.search}`;
+    url.pathname = "/api/auth/access";
+    url.search = `?next=${encodeURIComponent(safeNextPath(next))}`;
+    return NextResponse.redirect(url);
+  }
+  if (!selfHosted()) return null;
+  const closed = selfHostClosure(pathname);
+  if (closed === "api") return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (closed === "page") {
+    const url = request.nextUrl.clone();
+    url.pathname = session ? "/w/triton/home" : "/login";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+  if (pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = session ? "/w/triton/home" : "/login";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+  return null;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (pathname.startsWith("/cdn-cgi/")) return NextResponse.next();
+  const handshake = accessHandshake(request);
+  if (handshake) return handshake;
   if (isPublicPath(pathname)) {
     return NextResponse.next();
   }

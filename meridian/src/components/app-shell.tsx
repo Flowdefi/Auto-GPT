@@ -23,6 +23,7 @@ import { useMeridian } from "@/lib/store";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 import { cn } from "@/lib/utils";
 import { WORKSPACES } from "@/lib/workspaces";
+import { useSelfHosted } from "./self-host";
 import { AiDrawer } from "./ai-drawer";
 import { CommandPalette } from "./meridian/command-palette";
 import { NavIcon } from "./meridian/icon";
@@ -98,6 +99,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [aiOpen, setAiOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [ios, setIos] = useState(false);
+  const privateDesk = useSelfHosted();
 
   const hub = hubFromPath(pathname);
   const nav = navFor(workspaceId);
@@ -262,10 +264,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <NavIcon name="Plug" className="size-4" />
                   Integrations
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => router.push("/billing")}>
-                  <NavIcon name="KeyRound" className="size-4" />
-                  Billing &amp; keys
-                </DropdownMenuItem>
+                {privateDesk ? null : (
+                  <DropdownMenuItem onSelect={() => router.push("/billing")}>
+                    <NavIcon name="KeyRound" className="size-4" />
+                    Billing &amp; keys
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onSelect={() => {
                     resetWorkspace(workspaceId);
@@ -277,10 +281,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => {
-                    void fetch("/api/auth/logout", { method: "POST" }).then(() => {
-                      router.push("/login");
-                      router.refresh();
-                    });
+                    void fetch("/api/auth/logout", { method: "POST" })
+                      .then(async (response) => {
+                        const payload = (await response.json()) as { next?: string };
+                        window.location.assign(payload.next || "/login");
+                      })
+                      .catch(() => {
+                        window.location.assign(privateDesk ? "/cdn-cgi/access/logout" : "/login");
+                      });
                   }}
                 >
                   Sign out

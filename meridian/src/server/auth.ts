@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import {
   API_KEY_PREFIX,
@@ -160,6 +161,47 @@ export function createAccount(input: { email: string; name: string; password: st
   const created = accountById(id);
   if (!created) throw new Error("Could not create account");
   return created;
+}
+
+/** Owner row for the triton desk. Creates one with an unusable password when missing. */
+export function ensureOwnerAccount(email: string): Account {
+  const clean = assertEmail(email);
+  const existing = accountByEmail(clean);
+  if (existing) {
+    sqliteRun(
+      "UPDATE accounts SET role = 'owner', status = 'active', failed_logins = 0, locked_until = NULL WHERE id = ?",
+      existing.id,
+    );
+    accountHasSeat(existing.id);
+    const fresh = accountById(existing.id);
+    if (!fresh) throw new Error("Could not load owner account");
+    return fresh;
+  }
+  const created = createAccount({
+    email: clean,
+    name: clean.split("@")[0] || "Owner",
+    password: randomBytes(32).toString("hex"),
+  });
+  markAccountActive(created.id);
+  accountHasSeat(created.id);
+  const fresh = accountById(created.id);
+  if (!fresh) throw new Error("Could not create owner account");
+  return fresh;
+}
+
+export function setOwnerPassword(email: string, password: string): Account {
+  const account = ensureOwnerAccount(email);
+  const clean = assertPassword(password);
+  const { hash, salt } = hashPassword(clean);
+  sqliteRun(
+    "UPDATE accounts SET password_hash = ?, password_salt = ?, failed_logins = 0, locked_until = NULL, status = 'active' WHERE id = ?",
+    hash,
+    salt,
+    account.id,
+  );
+  const fresh = accountById(account.id);
+  if (!fresh) throw new Error("Could not update owner password");
+  return fresh;
 }
 
 export function authenticate(email: string, password: string): Account {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
+import { useSelfHosted } from "@/components/self-host";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 interface PlatformSnapshot {
@@ -18,6 +19,7 @@ interface PlatformSnapshot {
 
 export default function IntegrationsPage() {
   const { workspaceId, config } = useActiveWorkspace();
+  const privateDesk = useSelfHosted();
   const [data, setData] = useState<PlatformSnapshot | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -117,10 +119,14 @@ export default function IntegrationsPage() {
             </li>
             <li>SEO ranks · {data?.seo.configured ? data.seo.name : "local estimate (no SERP key)"}</li>
             <li>
-              Provider keys · store encrypted BYOK values on{" "}
-              <Link className="underline" href="/billing">
-                Billing
-              </Link>
+              Provider keys ·{" "}
+              {privateDesk ? (
+                "set them in the server environment"
+              ) : (
+                <Link className="underline" href="/billing">
+                  Billing
+                </Link>
+              )}
             </li>
           </ul>
         </Card>

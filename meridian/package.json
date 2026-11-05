@@ -15,10 +15,11 @@
     "import:inventory": "tsx scripts/import-inventory.ts",
     "purge:demo": "tsx scripts/purge-demo.ts",
     "key:create": "tsx scripts/create-key.ts",
+    "owner:set-password": "tsx scripts/set-owner-password.ts",
     "seat:attach": "tsx scripts/seat-attach.ts",
     "sync:graph": "tsx scripts/sync-graph.ts",
     "backup:db": "bash scripts/backup-db.sh",
-    "test:crm": "tsx --test src/server/csv-import.test.ts src/server/portfolio-parse.test.ts src/server/self-host.test.ts"
+    "test:crm": "tsx --test src/server/csv-import.test.ts src/server/portfolio-parse.test.ts src/server/self-host.test.ts src/server/access.test.ts"
   },
   "dependencies": {
     "@capacitor/app": "^7.1.2",

@@ -197,6 +197,9 @@ MERIDIAN_SEED_DEMO=false
 MERIDIAN_AUTH_SECRET=replace-with-32-plus-random-characters
 MERIDIAN_PUBLIC_URL=https://crm.debtmarket.net
 NEXT_PUBLIC_APP_URL=https://crm.debtmarket.net
+MERIDIAN_CF_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com
+MERIDIAN_CF_ACCESS_AUD=your-access-application-aud
+MERIDIAN_OWNER_EMAILS=portfolios@debtmarket.net,alex.floresj@icloud.com
 ```
 
 ```bash
@@ -214,14 +217,16 @@ cloudflared tunnel --url http://127.0.0.1:3000
 
 For a named tunnel, route `crm.debtmarket.net` to `http://127.0.0.1:3000`.
 
-`MERIDIAN_SELF_HOSTED=true` skips the Polar seat check (`requireSeat`) and, once an owner account exists, attaches a lifetime seat to the earliest owner so `/w/triton` opens without the billing page. You can also attach a seat by email without that flag:
+`MERIDIAN_SELF_HOSTED=true` skips Polar, hides signup, pricing, and billing, and sends `/` to the Triton desk (or `/login` when nobody is signed in). Cloudflare Access sits on the hostname. Meridian verifies `Cf-Access-Jwt-Assertion` against `https://<MERIDIAN_CF_ACCESS_TEAM_DOMAIN>/cdn-cgi/access/certs` and the audience in `MERIDIAN_CF_ACCESS_AUD`. It does not trust the email header by itself. If the verified email is in `MERIDIAN_OWNER_EMAILS`, the first visit creates the owner and the seat and opens `/w/triton`. A service token (no email in the JWT) does not get a browser session. Bots keep using `Authorization: Bearer mk_live_…`.
 
 ```bash
-npm run seat:attach -- --email owner@example.com
+npm run owner:set-password -- --email portfolios@debtmarket.net
 npm run key:create -- --name email-bot
 ```
 
-`key:create` prints one `mk_live_` key and does not store the plaintext. The email bot sends `Authorization: Bearer mk_live_…`.
+`owner:set-password` prints a generated password once when `--password` is omitted. `/login` is email and password for those owner addresses only, and it is rate limited. `key:create` creates the owner row if this is the first run, then prints one `mk_live_` key. Sign out also sends the browser to `/cdn-cgi/access/logout`.
+
+Run `npm run build` after changing `MERIDIAN_SELF_HOSTED`. The page and API guards read the variable on each request. The edge middleware inlines it at build time.
 
 | Method | Path | Auth |
 | --- | --- | --- |
@@ -260,7 +265,10 @@ Copy `.env.example` to `.env.local` (dev) or `.env` (Compose). Empty values are 
 | `MERIDIAN_AUTH_SECRET` | Production | Session signing secret, 32+ characters |
 | `MERIDIAN_SECRET_KEY` | Production if you store BYOK secrets | Encryption key for provider secrets |
 | `MERIDIAN_SEED_DEMO` | No | `false` disables `seedCrmRecords` and `seedDemoLeads`. Unset/`true` seeds demo data. Compose defaults to `false`. CLI scripts load `.env.local` | 
-| `MERIDIAN_SELF_HOSTED` | Owner box | `true` skips Polar seat checks and attaches a seat to the first owner | 
+| `MERIDIAN_SELF_HOSTED` | Owner box | `true` skips Polar, hides signup and pricing, and opens the Triton desk for the owner |
+| `MERIDIAN_CF_ACCESS_TEAM_DOMAIN` | Access login | Team host for `https://<team>/cdn-cgi/access/certs`, such as `your-team.cloudflareaccess.com` |
+| `MERIDIAN_CF_ACCESS_AUD` | Access login | Application audience (AUD) tag from the Cloudflare Access app |
+| `MERIDIAN_OWNER_EMAILS` | Owner box | Comma-separated inboxes allowed to sign in. Example: `portfolios@debtmarket.net,alex.floresj@icloud.com` | 
 | `MS_SYNC_INTERVAL_MS` | No | Repeat Graph sync in-process. Minimum 60000. Unset disables the timer |
 | `MERIDIAN_CHANNEL_DELIVER` | No | `sandbox` records collection attempts locally. `live` is refused |
 | `MERIDIAN_PUBLIC_URL` | Recommended | Public origin for unsubscribe and tracking links |

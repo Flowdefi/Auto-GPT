@@ -14,6 +14,7 @@ export const PUBLIC_API_PATHS = [
   "/api/auth/login",
   "/api/auth/signup",
   "/api/auth/logout",
+  "/api/auth/access",
   "/api/auth/me",
   "/api/billing/webhook",
   "/api/email/track/open",
