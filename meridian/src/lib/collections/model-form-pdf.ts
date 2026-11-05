@@ -103,6 +103,7 @@ export function modelFormPdf(fields: ModelFormFields): Uint8Array {
   block("Go to www.cfpb.gov/debt-collection to learn more about your rights under federal law. For instance, you have the right to stop or limit how we contact you.");
   block("Contact us about your payment options.");
   block("Pongase en contacto con nosotros para solicitar una copia de este formulario en espanol.");
+  block("The Spanish line above is an ASCII draft, not the CFPB Spanish model form.");
   if (fields.limitationsNote) block(fields.limitationsNote);
   y -= 8;
   commands.push(`${left} ${y} m 558 ${y} l S`);

@@ -159,6 +159,7 @@ test("model form pdf follows the B-1 section order", () => {
   assert.match(pdf, /debt collector/);
   assert.match(pdf, /Total amount of the debt now/);
   assert.match(pdf, /Counsel must compare it to the current CFPB form/);
+  assert.match(pdf, /not the CFPB Spanish model form/);
   assert.equal(pdf.includes("state time-barred notice"), false);
   assert.equal(pdf.includes("900-"), false);
   const flagged = new TextDecoder().decode(modelFormPdf({
