@@ -24,6 +24,7 @@ import type { SolRule } from "@/lib/collections/sol";
 import type { AgencyBrand } from "@/lib/brand";
 import type { AgentPresence, ComplianceDigest, DialAttempt, DialCampaign, MailJob, TrainingPass } from "@/lib/collections/desk";
 import type { PortfolioBook, ScrubEvent, SettlementCase, TabletopRun } from "@/lib/collections/launch";
+import type { Metro2Signoff } from "@/lib/collections/metro2";
 import type { SettlementMatrix } from "@/lib/collections/template-library";
 
 export type WorkspaceId = "triton" | "aether";
@@ -572,18 +573,17 @@ export interface DatabaseFile {
   scrubEvents?: ScrubEvent[];
   settlementCases?: SettlementCase[];
   frozenWorkspaces?: WorkspaceId[];
+  /** Per-agency sandbox clear for the reassigned-number check. Absent means Triton uses the legacy voice setting and Aether stays unknown. */
+  rndSandboxClearByWorkspace?: Partial<Record<WorkspaceId, boolean>>;
   tabletopRuns?: TabletopRun[];
   clientGrants?: ClientGrant[];
   complaints?: Complaint[];
   recordingRules?: RecordingRule[];
   /** Per-agency recording consent. The legacy field remains the Triton copy. */
   recordingTables?: Partial<Record<WorkspaceId, RecordingRule[]>>;
-  metro2Approval?: {
-    ownerApprovedAt: string | null;
-    ownerApprovedBy: string | null;
-    complianceApprovedAt: string | null;
-    complianceApprovedBy: string | null;
-  };
+  metro2Approval?: Metro2Signoff;
+  /** Per-agency Metro 2 sign-off. The legacy field remains the Triton copy. */
+  metro2Approvals?: Partial<Record<WorkspaceId, Metro2Signoff>>;
 }
 
 export function emptyDb(): DatabaseFile {

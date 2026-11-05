@@ -18,7 +18,7 @@ export function counselPacket(workspaceId: WorkspaceId) {
       { area: "Public agency site and privacy", flag: "needs_counsel_review", note: "The public site uses the Triton brand. Another workspace's brand does not change it. Copy is on collect.debtmarket.net only. Saving a brand is not counsel approval." },
       { area: "Recording consent, ACH authorization, complaint date", flag: "needs_counsel_review", note: "Each workspace has its own recording table. Saving keeps the counsel flag. The 15-day complaint date is operational, not a Reg F deadline." },
       { area: "SCRA, bankruptcy, and deceased scrubs", flag: "needs_counsel_review", note: "Sandbox returns unknown. Unknown is not a clearance. A hit holds the account." },
-      { area: "Safeguards pack and Metro 2", flag: "needs_counsel_review", note: "Metro 2 stays off until the flag is on and owner and compliance both approve." },
+      { area: "Safeguards pack and Metro 2", flag: "needs_counsel_review", note: "Each workspace needs its own owner and compliance approval. That approval does not clear this counsel flag, and the file is still not the CDIA guide." },
     ],
   };
 }

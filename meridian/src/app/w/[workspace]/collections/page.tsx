@@ -135,7 +135,7 @@ export default function CollectionsDeskPage() {
                 checked={data.settings.rndSandboxClear}
                 onChange={(event) => void post({ op: "settings", rndSandboxClear: event.target.checked })}
               />
-              Sandbox reassigned-number clear (not the FCC database)
+              Sandbox reassigned-number clear for this workspace (not the FCC database)
             </label>
             <p>Daily cap {data.settings.dailyOutboundCap}. Settlement authority {data.settings.maxDiscountPercent}% / {data.settings.maxPlanMonths} months.</p>
             <label className="grid gap-1">

@@ -42,7 +42,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - MFA for admin and compliance before privileged actions, including reveal.
 - SCRA and FCC reassigned-number adapters. Sandbox returns unknown and does not clear anyone.
 - Bankruptcy and deceased scrubs. Sandbox returns unknown. A hit holds the account. The history log has no consumer name.
-- Metro 2 export stays off until the flag is on and owner and compliance have both approved. Accounts with no validation notice are excluded.
+- Metro 2 export stays off until the flag is on and owner and compliance have both approved that workspace. A sandbox reassigned-number clear on one agency does not clear the other. The daily cap, inbound block, and discount percent stay install-wide.
 - GLBA Safeguards draft, access review, incident playbook, tabletop checklist, and a per-workspace outbound freeze.
 - Retention purge, job worker, redacted logs, seated metrics, OpenTelemetry only when an endpoint is set, and a weekly compliance digest that emails only behind the digest flag and live delivery. The subject names the workspace. A compliance seat limited to one workspace is left off the other digest.
 - Workspace isolation between Triton and Example Harbor on Aether. Each workspace keeps its own limitations table, recording table, and brand for letters and notices. The public site stays on the Triton brand. Env brand values still win. State eligibility stays one table for the install.

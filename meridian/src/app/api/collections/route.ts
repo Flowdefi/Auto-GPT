@@ -51,6 +51,7 @@ import {
   scrubAccount,
   sendChannel,
   setOperatorRole,
+  setRndSandboxClear,
   setTemplateApproval,
   startVoice,
   syncCollectionTemplates,
@@ -203,14 +204,17 @@ export async function POST(request: Request) {
         if (body.killSwitch !== undefined && actor !== "admin" && actor !== "compliance") {
           return NextResponse.json({ error: "Compliance must set the kill switch" }, { status: 403 });
         }
+        if (body.rndSandboxClear !== undefined && actor !== "admin" && actor !== "compliance") {
+          return NextResponse.json({ error: "Compliance must set the reassigned-number sandbox clear" }, { status: 403 });
+        }
         if (body.killSwitch === true) await freezeOutbound(body.workspaceId);
         if (body.killSwitch === false) liftOutboundFreeze(body.workspaceId);
+        if (body.rndSandboxClear !== undefined) setRndSandboxClear(body.workspaceId, body.rndSandboxClear);
         updateVoiceSettings({
           blockInbound: body.blockInbound,
           dailyOutboundCap: body.dailyOutboundCap,
           maxDiscountPercent: body.maxDiscountPercent,
           maxPlanMonths: body.maxPlanMonths,
-          rndSandboxClear: body.rndSandboxClear,
         });
         const hungUp = body.killSwitch === true ? await hangupActiveCalls(undefined, body.workspaceId) : 0;
         return NextResponse.json({ settings: voiceSettingsFor(body.workspaceId), hungUp });
@@ -408,7 +412,7 @@ export async function POST(request: Request) {
       case "recording_save":
         return NextResponse.json({ rules: saveRecordingRules(body.recordingRules ?? [], actor, body.workspaceId) });
       case "metro2_approve":
-        return NextResponse.json({ metro2: approveMetro2(actor, gate.account.email) });
+        return NextResponse.json({ metro2: approveMetro2(actor, gate.account.email, body.workspaceId) });
       case "metro2_export":
         return NextResponse.json(exportMetro2(body.workspaceId));
       case "access_review":

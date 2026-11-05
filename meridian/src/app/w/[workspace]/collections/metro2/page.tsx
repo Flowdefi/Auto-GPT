@@ -44,7 +44,7 @@ export default function Metro2Page() {
       <PageHeader
         eyebrow="Collections"
         title="Metro 2 export"
-        subtitle="Disabled unless MERIDIAN_METRO2_EXPORT=enabled and both an owner and a compliance user approve it. Accounts with no mailed validation notice are left out under 12 CFR § 1006.30(a). Social Security numbers are not written into the file."
+        subtitle="Disabled unless MERIDIAN_METRO2_EXPORT=enabled and both an owner and a compliance user approve it for this workspace. Another agency's approval does not carry over. Accounts with no mailed validation notice are left out under 12 CFR § 1006.30(a). Social Security numbers are not written into the file. Approval is not counsel sign-off of the layout."
       />
       {notice ? <Card className="mb-4 p-4 text-sm">{notice}</Card> : null}
       <Card className="space-y-3 p-5 text-sm">

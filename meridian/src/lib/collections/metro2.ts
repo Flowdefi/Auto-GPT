@@ -9,6 +9,14 @@ export interface Metro2RowResult {
   reason: string;
 }
 
+/** Owner and compliance sign-off for one workspace. This is not counsel approval of the file. */
+export interface Metro2Signoff {
+  ownerApprovedAt: string | null;
+  ownerApprovedBy: string | null;
+  complianceApprovedAt: string | null;
+  complianceApprovedBy: string | null;
+}
+
 export interface Metro2Export {
   file: string;
   included: number;

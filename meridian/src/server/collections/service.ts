@@ -1,5 +1,5 @@
 import { composeConsumerDraft } from "@/lib/collections/drafting";
-import { buildMetro2 } from "@/lib/collections/metro2";
+import { buildMetro2, type Metro2Signoff } from "@/lib/collections/metro2";
 import { defaultRecordingTable, requiresAllPartyRecording, type RecordingRule } from "@/lib/collections/recording";
 import { emptyTranscript, rulesSummary, stepCall, type ConsumerTurn } from "@/lib/collections/voice";
 import { evaluateGate, type GateContext } from "@/lib/collections/gate";
@@ -77,7 +77,7 @@ export function collectionSnapshot(workspaceId: WorkspaceId) {
     jobs: (db.jobs ?? []).filter((job) => job.workspaceId === workspaceId).slice(0, 40),
     solRules: ensureSolTable(workspaceId),
     recordingRules: ensureRecordingTable(workspaceId),
-    metro2: metro2Status(),
+    metro2: metro2Status(workspaceId),
   };
 }
 
@@ -98,7 +98,17 @@ export function voiceSettingsFor(workspaceId: WorkspaceId): VoiceSettings {
   const db = loadDb();
   const base = db.voiceSettings!;
   const frozen = (db.frozenWorkspaces ?? []).includes(workspaceId);
-  return { ...base, killSwitch: Boolean(base.killSwitch) || frozen };
+  const scopedClear = db.rndSandboxClearByWorkspace?.[workspaceId];
+  const rndSandboxClear = scopedClear ?? (workspaceId === "triton" ? Boolean(base.rndSandboxClear) : false);
+  return { ...base, killSwitch: Boolean(base.killSwitch) || frozen, rndSandboxClear };
+}
+
+export function setRndSandboxClear(workspaceId: WorkspaceId, enabled: boolean): VoiceSettings {
+  mutate((db) => {
+    db.rndSandboxClearByWorkspace = { ...(db.rndSandboxClearByWorkspace ?? {}), [workspaceId]: enabled };
+    if (workspaceId === "triton" && db.voiceSettings) db.voiceSettings.rndSandboxClear = enabled;
+  });
+  return voiceSettingsFor(workspaceId);
 }
 
 export function updateVoiceSettings(patch: Partial<VoiceSettings>): VoiceSettings {
@@ -281,10 +291,7 @@ export function gateFor(
   const lastConversationAt = conversations[0]?.updatedAt ?? null;
   const sentToday = (db.channelMessages ?? []).filter((message) => message.workspaceId === workspaceId && message.status !== "blocked" && message.at.slice(0, 10) === now.toISOString().slice(0, 10)).length
     + recent.filter((call) => call.direction === "outbound" && !call.blockedReason && call.createdAt.slice(0, 10) === now.toISOString().slice(0, 10)).length;
-  const settings = {
-    ...db.voiceSettings!,
-    killSwitch: Boolean(db.voiceSettings?.killSwitch) || (db.frozenWorkspaces ?? []).includes(workspaceId),
-  };
+  const settings = voiceSettingsFor(workspaceId);
   const ctx: GateContext = {
     now,
     settings,
@@ -516,7 +523,7 @@ export async function sendChannel(input: {
       priorLetterAt: (loadDb().channelMessages ?? []).find((row) => row.accountId === account.id && row.channel === "letter" && row.status !== "blocked")?.at ?? null,
       smsConsent: (loadDb().consents ?? []).some((row) => row.accountId === account.id && row.channel === "sms"),
       emailConsent: (loadDb().consents ?? []).some((row) => row.accountId === account.id && row.channel === "email"),
-      reassigned: loadDb().voiceSettings?.rndSandboxClear ? "ok" : "unknown",
+      reassigned: voiceSettingsFor(input.workspaceId).rndSandboxClear ? "ok" : "unknown",
     });
     if (rules.length > 0) {
       const blocked = storeMessage(input, "blocked", rules[0] ?? "Send rule blocked this template.", null);
@@ -975,33 +982,51 @@ export async function scrubAccount(workspaceId: WorkspaceId, accountId: string):
   return publicAccount(updated);
 }
 
-function metro2Status() {
-  const approval = loadDb().metro2Approval;
+const EMPTY_METRO2: Metro2Signoff = {
+  ownerApprovedAt: null,
+  ownerApprovedBy: null,
+  complianceApprovedAt: null,
+  complianceApprovedBy: null,
+};
+
+function metro2Signoff(workspaceId: WorkspaceId, db = loadDb()): Metro2Signoff {
+  const scoped = db.metro2Approvals?.[workspaceId];
+  if (scoped) return scoped;
+  if (workspaceId === "triton" && db.metro2Approval) return db.metro2Approval;
+  return EMPTY_METRO2;
+}
+
+function metro2Status(workspaceId: WorkspaceId) {
+  const approval = metro2Signoff(workspaceId);
   return {
     enabled: process.env.MERIDIAN_METRO2_EXPORT === "enabled",
-    ownerApproved: Boolean(approval?.ownerApprovedAt),
-    complianceApproved: Boolean(approval?.complianceApprovedAt),
+    ownerApproved: Boolean(approval.ownerApprovedAt),
+    complianceApproved: Boolean(approval.complianceApprovedAt),
     needsCounselReview: true as const,
   };
 }
 
-export function approveMetro2(role: CollectionsRole, actor: string): ReturnType<typeof metro2Status> {
+export function approveMetro2(role: CollectionsRole, actor: string, workspaceId: WorkspaceId = "triton"): ReturnType<typeof metro2Status> {
   if (role !== "admin" && role !== "compliance") throw new Error("Owner and compliance must approve Metro 2");
   const now = new Date().toISOString();
   mutate((db) => {
-    const current = db.metro2Approval ?? { ownerApprovedAt: null, ownerApprovedBy: null, complianceApprovedAt: null, complianceApprovedBy: null };
-    if (role === "admin") db.metro2Approval = { ...current, ownerApprovedAt: now, ownerApprovedBy: actor };
-    else db.metro2Approval = { ...current, complianceApprovedAt: now, complianceApprovedBy: actor };
+    const current = metro2Signoff(workspaceId, db);
+    const next: Metro2Signoff =
+      role === "admin"
+        ? { ...current, ownerApprovedAt: now, ownerApprovedBy: actor }
+        : { ...current, complianceApprovedAt: now, complianceApprovedBy: actor };
+    db.metro2Approvals = { ...(db.metro2Approvals ?? {}), [workspaceId]: next };
+    if (workspaceId === "triton") db.metro2Approval = next;
   });
-  return metro2Status();
+  return metro2Status(workspaceId);
 }
 
 export function exportMetro2(workspaceId: WorkspaceId): ReturnType<typeof buildMetro2> {
   if (process.env.MERIDIAN_METRO2_EXPORT !== "enabled") {
     throw new Error("Metro 2 export is disabled. Set MERIDIAN_METRO2_EXPORT=enabled only after owner and compliance approval.");
   }
-  const approval = loadDb().metro2Approval;
-  if (!approval?.ownerApprovedAt || !approval.complianceApprovedAt) {
+  const approval = metro2Signoff(workspaceId);
+  if (!approval.ownerApprovedAt || !approval.complianceApprovedAt) {
     throw new Error("Owner and compliance must both approve Metro 2 before an export.");
   }
   return buildMetro2(accounts(workspaceId));
