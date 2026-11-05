@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { usePortalCopy } from "@/components/collect/portal-frame";
+import { suppliedMoney } from "@/lib/collections/portal-copy";
 import { limitationsDatePassed } from "@/lib/collections/sol";
 import type { ConsumerPayment, PortfolioAccount } from "@/lib/collections/types";
 
@@ -149,10 +150,11 @@ export default function CollectAccountPage() {
         <h2 id="itemization-heading" className="font-semibold">{copy.itemization}</h2>
         <p>{copy.creditor}: {account.originalCreditor || copy.notSupplied}</p>
         <p>{copy.itemDate}: {account.itemizationDate || copy.notSupplied}</p>
-        <p>{copy.amountThen}: {money(account.itemizationAmountCents)}</p>
-        <p>{copy.payments}: {money(account.paymentsSinceItemizationCents)}</p>
-        <p>{copy.credits}: {money(account.creditsSinceItemizationCents)}</p>
-        <p>{copy.fees}: {money(account.feesSinceItemizationCents)}</p>
+        <p>{copy.amountThen}: {suppliedMoney(account.itemizationAmountCents, copy.notSupplied)}</p>
+        <p>{copy.interest}: {suppliedMoney(account.interestSinceItemizationCents, copy.notSupplied)}</p>
+        <p>{copy.payments}: {suppliedMoney(account.paymentsSinceItemizationCents, copy.notSupplied)}</p>
+        <p>{copy.credits}: {suppliedMoney(account.creditsSinceItemizationCents, copy.notSupplied)}</p>
+        <p>{copy.fees}: {suppliedMoney(account.feesSinceItemizationCents, copy.notSupplied)}</p>
         <p>{copy.chain}: {account.chainOfTitle || copy.notSupplied}</p>
         <p>{copy.limitations}: {account.solExpiresOn || copy.notCalculated} {account.solNeedsCounselReview ? `(${copy.counselShort})` : ""}</p>
       </section>

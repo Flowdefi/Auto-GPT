@@ -33,6 +33,7 @@ export interface PortalCopy {
   creditor: string;
   itemDate: string;
   amountThen: string;
+  interest: string;
   payments: string;
   credits: string;
   fees: string;
@@ -58,6 +59,11 @@ export interface PortalCopy {
   submitDispute: string;
   status: string;
   error: string;
+}
+
+export function suppliedMoney(cents: number | null | undefined, missing: string): string {
+  if (cents == null || Number.isNaN(cents)) return missing;
+  return `$${(cents / 100).toFixed(2)}`;
 }
 
 const disclosureEn =
@@ -99,6 +105,7 @@ export const portalCopy: Record<PortalLang, PortalCopy> = {
     creditor: "Original creditor",
     itemDate: "Itemization date",
     amountThen: "Amount then",
+    interest: "Interest since",
     payments: "Payments since",
     credits: "Credits since",
     fees: "Fees since",
@@ -158,6 +165,7 @@ export const portalCopy: Record<PortalLang, PortalCopy> = {
     creditor: "Acreedor original",
     itemDate: "Fecha del detalle",
     amountThen: "Monto en esa fecha",
+    interest: "Interés desde entonces",
     payments: "Pagos desde entonces",
     credits: "Créditos desde entonces",
     fees: "Cargos desde entonces",
