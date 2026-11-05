@@ -274,7 +274,7 @@ export interface CallTurn {
 }
 
 export interface QaFlag {
-  code: "threat" | "false_statement" | "third_party_disclosure" | "card_in_transcript" | "missing_ai_disclosure" | "missing_miranda" | "guardrail";
+  code: "threat" | "false_statement" | "third_party_disclosure" | "card_in_transcript" | "missing_ai_disclosure" | "missing_miranda" | "guardrail" | "time_barred";
   detail: string;
 }
 

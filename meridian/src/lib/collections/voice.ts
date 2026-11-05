@@ -57,6 +57,12 @@ function push(transcript: CallTranscript, role: CallTurn["role"], text: string, 
   return { ...transcript, turns: [...transcript.turns, { role, text, at }] };
 }
 
+function limitationsDatePassed(account: PortfolioAccount | null, at: string): boolean {
+  const onFile = account?.solExpiresOn?.slice(0, 10);
+  if (!onFile || !/^\d{4}-\d{2}-\d{2}$/.test(onFile)) return false;
+  return onFile < at.slice(0, 10);
+}
+
 function miniMiranda(agency: string): string {
   return `This is an attempt to collect a debt, and any information obtained will be used for that purpose. This communication is from a debt collector at ${agency}.`;
 }
@@ -153,6 +159,14 @@ export function stepCall(input: {
   }
 
   const lower = heard.toLowerCase();
+  const barred = limitationsDatePassed(input.account, input.at);
+  const asksToPay = /\b(pay|payment|settle|plan)\b/i.test(heard) || Boolean(redacted?.hadCard) || /\b(card number|visa|mastercard)\b/i.test(heard);
+  if (barred && asksToPay) {
+    const say = "The limitations date on file is in the past. I will not offer a payment plan or a payment page. A collector has to use the counsel-reviewed time-barred notice. I can transfer you to a person.";
+    flags.push({ code: "time_barred", detail: "Draft disclosure. Counsel has not approved this sentence or the state's time-barred notice." });
+    transcript = push(transcript, "agent", say, input.at);
+    return finish(transcript, say, "time_barred_hold", {}, null, false, null, flags);
+  }
   if (/\b(cease|stop calling|do not call|don't call)\b/i.test(heard)) {
     const say = "I am noting that you want communications to stop. We will not place further collection calls. Goodbye.";
     transcript = { ...push(transcript, "agent", say, input.at), phase: "ended" };

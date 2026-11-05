@@ -195,6 +195,30 @@ test("voice flow withholds the debt until two identifiers match and will not sto
   assert.equal(transfer.disposition, "warm_transfer");
   assert.equal(JSON.stringify(pay.transcript).includes("4242424242424242"), false);
   assert.equal(redactSensitive("4242424242424242").hadCard, true);
+  const barred = stepCall({
+    transcript: verified.transcript,
+    turn: { type: "say", text: "I want to pay" },
+    account: account({ solExpiresOn: "2020-01-01" }),
+    settings,
+    at: "2026-11-05T18:05:00.000Z",
+    paymentUrl: "https://example.test/pay",
+    agency: "Triton",
+  });
+  assert.equal(barred.disposition, "time_barred_hold");
+  assert.equal(barred.paymentUrl, null);
+  assert.equal(barred.plan, null);
+  assert.match(barred.say, /counsel-reviewed time-barred notice/);
+  assert.equal(barred.qaFlags.some((flag) => flag.code === "time_barred"), true);
+  const open = stepCall({
+    transcript: verified.transcript,
+    turn: { type: "say", text: "I want a plan" },
+    account: account({ solExpiresOn: "2027-01-01" }),
+    settings,
+    at: "2026-11-05T18:05:00.000Z",
+    paymentUrl: "https://example.test/pay",
+    agency: "Triton",
+  });
+  assert.equal(open.disposition, "plan_offered");
   const code = totp("JBSWY3DPEHPK3PXP", 1_700_000_000_000);
   assert.equal(verifyTotp("JBSWY3DPEHPK3PXP", code, 1_700_000_000_000), true);
 });
