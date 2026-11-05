@@ -426,9 +426,10 @@ export function turnVoice(workspaceId: WorkspaceId, callId: string, turn: Consum
   const transcript = open(call.transcriptCiphertext);
   const token = nextId("pay");
   const paymentUrl = `${publicBaseUrl()}/pay/sandbox/${token}`;
+  const safeTurn: ConsumerTurn = turn.type === "say" ? { ...turn, text: redactIdentifiers(turn.text) } : turn;
   let stepped = stepCall({
     transcript,
-    turn,
+    turn: safeTurn,
     account,
     settings: voiceSettingsFor(workspaceId),
     at: new Date().toISOString(),
@@ -832,6 +833,7 @@ export async function proposeDraft(workspaceId: WorkspaceId, accountId: string, 
   if (!account) throw new Error("Account not found");
   const agency = brandFor(workspaceId).name;
   const firstName = account.consumerName.split(" ")[0] ?? "";
+  const cleanInbound = redactIdentifiers(inbound).slice(0, 2000);
   let modelText: string | null = null;
   let model: string | null = null;
   try {
@@ -841,14 +843,14 @@ export async function proposeDraft(workspaceId: WorkspaceId, accountId: string, 
         content:
           "Classify one consumer collections message and draft a reply. Return JSON only: {\"classification\":\"dispute|cease|hardship|promise|bankruptcy|attorney|other\",\"draft\":\"...\"}. Do not threaten. Include that you are a debt collector. Do not include a Social Security number or a card number. The draft is not sent.",
       },
-      { role: "user", content: inbound.slice(0, 2000) },
+      { role: "user", content: cleanInbound },
     ]);
     modelText = completed?.text ?? null;
     model = completed?.model ?? null;
   } catch {
     modelText = null;
   }
-  const composed = composeConsumerDraft({ inbound, firstName, agency, modelText, model });
+  const composed = composeConsumerDraft({ inbound: cleanInbound, firstName, agency, modelText, model });
   const decision = gateFor(workspaceId, account, "email");
   const limitationsHold =
     decision.allowed &&
@@ -858,9 +860,9 @@ export async function proposeDraft(workspaceId: WorkspaceId, accountId: string, 
     id: nextId("draft"),
     workspaceId,
     accountId,
-    inbound: inbound.slice(0, 2000),
+    inbound: cleanInbound,
     classification: composed.classification,
-    draft: composed.draft,
+    draft: redactIdentifiers(composed.draft),
     status: "pending_approval",
     gateAllowed: decision.allowed && !limitationsHold,
     gateReason: limitationsHold ? TIME_BARRED_HOLD : decision.reason,

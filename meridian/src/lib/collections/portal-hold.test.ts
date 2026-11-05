@@ -5,7 +5,7 @@ import { reasonCode } from "./reason-code";
 import { TIME_BARRED_HOLD } from "./sol";
 import { deskMetrics, writeComplianceDigest } from "../../server/collections/observe";
 import type { DraftReply } from "./types";
-import { approveDraft, fileDispute, importPortfolio, openPortal, proposeDraft, recordConsent, sendChannel, setTemplateApproval, syncCollectionTemplates, templateForWorkspace } from "../../server/collections/service";
+import { approveDraft, fileDispute, importPortfolio, openPortal, proposeDraft, recordConsent, sendChannel, setTemplateApproval, startVoice, syncCollectionTemplates, templateForWorkspace, turnVoice } from "../../server/collections/service";
 import { loadDb, mutate } from "../../server/db";
 
 function portalRequest(token: string, body: Record<string, unknown>): Request {
@@ -79,6 +79,26 @@ test("a dispute keeps its words and redacts an identifier", () => {
   assert.match(updated.quarantineReason ?? "", /I dispute this debt/);
   assert.equal((updated.quarantineReason ?? "").includes("123-45-6789"), false);
   assert.equal((updated.quarantineReason ?? "").includes("4242424242424242"), false);
+});
+
+test("a draft and a voice turn store an identifier as redacted", async () => {
+  const stamp = Date.now().toString(36);
+  const ref = `DRF-${stamp}`;
+  const imported = importPortfolio({
+    workspaceId: "triton",
+    csv: `account_ref,consumer_name,consumer_state,zip,last4,balance\n${ref},Ada Example,OH,44101,4242,40.00\n`,
+  });
+  const account = imported.accounts.find((item) => item.accountRef === ref);
+  assert.ok(account);
+  const draft = await proposeDraft("triton", account.id, "I dispute this debt. SSN 123-45-6789.");
+  assert.equal(draft.classification, "dispute");
+  assert.match(draft.inbound, /I dispute this debt/);
+  assert.equal(draft.inbound.includes("123-45-6789"), false);
+  const call = startVoice({ workspaceId: "triton", direction: "inbound" });
+  const stepped = turnVoice("triton", call.id, { type: "say", text: "My card is 4242424242424242" });
+  const spoken = stepped.transcript.turns.map((turn) => turn.text).join(" ");
+  assert.equal(spoken.includes("4242424242424242"), false);
+  assert.match(spoken, /\[redacted\]/);
 });
 
 test("approving a promise reply stays pending when the limitations date is past", async () => {
