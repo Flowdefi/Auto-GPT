@@ -45,6 +45,19 @@ test("the settlement matrix rejects a floor above the opening and a percent over
   assert.throws(() => validateSettlementMatrix(huge), /between 0 and 100/);
 });
 
+test("a time-barred account uses the time-barred tier after defaults are cleared", () => {
+  const saved = clearMatrixDefaults(loadSettlementMatrix());
+  const offer = settlementOffer(
+    sampleAccount({ solExpiresOn: "2020-01-01", balanceCents: 80000 }),
+    saved,
+    new Date("2026-06-01T00:00:00.000Z"),
+  );
+  assert.equal(offer.blockedReason, null);
+  assert.equal(offer.tierId, "T5_time_barred");
+  assert.equal(offer.openingCents, 32000);
+  assert.equal(offer.floorCents, 20000);
+});
+
 test("a cleared matrix can price an offer and hardship lowers it", () => {
   const saved = clearMatrixDefaults(loadSettlementMatrix());
   const plain = settlementOffer(sampleAccount(), saved, new Date("2026-06-01T00:00:00.000Z"));

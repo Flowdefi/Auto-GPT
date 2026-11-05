@@ -58,6 +58,7 @@ import {
   validationPdfBase64,
   updateEligibility,
   updateVoiceSettings,
+  voiceSettingsFor,
 } from "@/server/collections/service";
 import type { ColumnMapping, WidthField } from "@/lib/collections/portfolio";
 
@@ -197,17 +198,22 @@ export async function POST(request: Request) {
             needsCounselReview: body.needsCounselReview,
           }),
         });
-      case "settings":
-        const settings = updateVoiceSettings({
-          killSwitch: body.killSwitch,
+      case "settings": {
+        if (body.killSwitch !== undefined && actor !== "admin" && actor !== "compliance") {
+          return NextResponse.json({ error: "Compliance must set the kill switch" }, { status: 403 });
+        }
+        if (body.killSwitch === true) await freezeOutbound(body.workspaceId);
+        if (body.killSwitch === false) liftOutboundFreeze(body.workspaceId);
+        updateVoiceSettings({
           blockInbound: body.blockInbound,
           dailyOutboundCap: body.dailyOutboundCap,
           maxDiscountPercent: body.maxDiscountPercent,
           maxPlanMonths: body.maxPlanMonths,
           rndSandboxClear: body.rndSandboxClear,
         });
-        const hungUp = body.killSwitch === true ? await hangupActiveCalls() : 0;
-        return NextResponse.json({ settings, hungUp });
+        const hungUp = body.killSwitch === true ? await hangupActiveCalls(undefined, body.workspaceId) : 0;
+        return NextResponse.json({ settings: voiceSettingsFor(body.workspaceId), hungUp });
+      }
       case "consent":
         if (!body.accountId || (body.channel !== "voice_cell" && body.channel !== "sms" && body.channel !== "email")) {
           return NextResponse.json({ error: "accountId and consent channel required" }, { status: 400 });

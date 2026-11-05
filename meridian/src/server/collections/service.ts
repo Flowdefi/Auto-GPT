@@ -58,7 +58,7 @@ export function collectionSnapshot(workspaceId: WorkspaceId) {
   const db = loadDb();
   const rows = accounts(workspaceId);
   return {
-    settings: db.voiceSettings,
+    settings: voiceSettingsFor(workspaceId),
     eligibility: (db.stateEligibility ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
     accounts: rows.slice(0, 200).map(publicAccount),
     accountCount: rows.length,
@@ -90,6 +90,13 @@ export function updateEligibility(code: string, patch: Partial<Pick<StateEligibi
     row.lastReviewed = new Date().toISOString().slice(0, 10);
     return row;
   });
+}
+
+export function voiceSettingsFor(workspaceId: WorkspaceId): VoiceSettings {
+  const db = loadDb();
+  const base = db.voiceSettings!;
+  const frozen = (db.frozenWorkspaces ?? []).includes(workspaceId);
+  return { ...base, killSwitch: Boolean(base.killSwitch) || frozen };
 }
 
 export function updateVoiceSettings(patch: Partial<VoiceSettings>): VoiceSettings {

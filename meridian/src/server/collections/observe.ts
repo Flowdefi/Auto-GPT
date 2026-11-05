@@ -23,7 +23,7 @@ export function deskMetrics(workspaceId: WorkspaceId) {
   }
   for (const payment of db.consumerPayments ?? []) {
     if (payment.workspaceId !== workspaceId || payment.status !== "succeeded") continue;
-    const account = (db.portfolioAccounts ?? []).find((item) => item.id === payment.accountId);
+    const account = (db.portfolioAccounts ?? []).find((item) => item.id === payment.accountId && item.workspaceId === workspaceId);
     if (!account) continue;
     const row = recovery.get(account.portfolioId) ?? { collectedCents: 0, balanceCents: 0 };
     row.collectedCents += payment.amountCents;
@@ -60,7 +60,7 @@ export async function writeComplianceDigest(
   const recipients = (loadDb().operatorRoles ?? []).filter((row) => row.role === "compliance").map((row) => row.email);
   const blocked = Object.entries(metrics.blockedByReason).map(([code, count]) => `${code}=${count}`).join(", ") || "none";
   const connect = metrics.callConnectRate === null ? "no placed calls" : String(metrics.callConnectRate);
-  const summary = `Weekly compliance digest. Blocked sends by reason: ${blocked}. Call connect rate: ${connect}. Job lag seconds: ${metrics.jobLagSeconds}. Error rate: ${metrics.errorRate}. Portfolios in the recovery rollup: ${metrics.recoveryByPortfolio.length}. Compliance seats on file: ${recipients.length}. No consumer name, phone, or account number is included.`;
+  const summary = `Weekly compliance digest for ${workspaceId}. Blocked sends by reason: ${blocked}. Call connect rate: ${connect}. Job lag seconds: ${metrics.jobLagSeconds}. Error rate: ${metrics.errorRate}. Portfolios in the recovery rollup: ${metrics.recoveryByPortfolio.length}. Compliance seats on file: ${recipients.length}. No consumer name, phone, or account number is included.`;
   const liveRequested = process.env.MERIDIAN_COMPLIANCE_DIGEST === "enabled" && process.env.MERIDIAN_CHANNEL_DELIVER === "live";
   let delivery: ComplianceDigest["delivery"] = "sandbox";
   if (liveRequested && process.env.RESEND_API_KEY && recipients.length > 0) {

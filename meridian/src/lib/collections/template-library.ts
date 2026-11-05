@@ -206,6 +206,7 @@ export function settlementOffer(account: PortfolioAccount, matrix: SettlementMat
   const timeBarred = Boolean(account.solExpiresOn && account.solExpiresOn < now.toISOString().slice(0, 10));
   const base = matrix.tiers.find((tier) => {
     if (tier.applies_on_top_of_base_tier) return false;
+    if (timeBarred && tier.match.time_barred !== true) return false;
     if (tier.match.time_barred === true) return timeBarred;
     if (tier.match.time_barred === false && timeBarred) return false;
     const monthRange = tier.match.months_since_chargeoff;

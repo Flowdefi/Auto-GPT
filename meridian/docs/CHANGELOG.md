@@ -34,7 +34,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - SMS, email, letter, and payment adapters. Sandbox is the default. Stop, bounce, and unsubscribe webhooks are accepted with a sandbox header or a provider signature.
 - Every letter template can render to a one-page PDF and wait in the mail-house queue. Lob runs only behind its flag and live delivery. Returned mail pauses later letter steps.
 - Sequences and a visual workflow builder. Every step goes through the gate. Unapproved templates do not send.
-- Settlement matrix, account preview, counter-offers, dual approval above a threshold, and a hold before a settling letter. Default matrix values still block an offer. The preview is marked for counsel.
+- Settlement matrix, account preview, counter-offers, dual approval above a threshold, and a hold before a settling letter. Default matrix values still block an offer. A time-barred account uses the matrix time-barred tier. The preview is marked for counsel.
 - Portfolio cost, an illustrative recovery curve, cash-on-cash, model IRR, seller scorecards, and a final remittance statement. All of the curve and IRR figures are labeled model estimates.
 
 ## Compliance operations
@@ -66,7 +66,8 @@ These match the status table. They are not finished by this changelog.
 - Card checkout and ACH stay sandbox. No bank account number is stored.
 - Portal accessibility and privacy copy are drafts. This is not a formal WCAG audit.
 - Metro 2 and the Safeguards pack stay drafts until counsel and both approvers sign.
-- Settlement authority is now stored per workspace. The agency brand, limitations table, and recording table are still shared by the install.
+- Settlement authority is stored per workspace. The desk kill switch freezes only that workspace. The agency brand, limitations table, and recording table are still shared by the install.
+- The weekly compliance digest names its workspace and does not include consumer names, emails, or account references. A digest for one workspace is not listed in the other.
 
 ## Still for the owner and counsel
 
