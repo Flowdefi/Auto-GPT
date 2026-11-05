@@ -209,6 +209,11 @@ test("validation pdf does not invent interest or an account type", () => {
   assert.equal(merged.values.original_creditor, "not supplied");
   assert.equal(merged.values.itemization_date, "not supplied");
   assert.equal(String(merged.values.consumer_mailing_address).includes("Example Street"), false);
+  assert.equal(merged.values.agency_website, "not supplied");
+  assert.equal(merged.values.collector_name, "not supplied");
+  assert.equal(String(merged.values.portal_url).includes("example.test"), false);
+  const hosted = mergeContext({ account: plainAccount, agencyName: "Example Agency", domain: "collect.example" });
+  assert.equal(hosted.values.portal_url, "https://collect.example/collect");
   const supplied = importPortfolio({
     workspaceId: "triton",
     csv: `account_ref,consumer_name,consumer_state,zip,last4,balance,interest_since,fees_since,itemization_amount,payments_since\nPDF2-${stamp},Ada Example,OH,44101,4242,40.00,1.50,2.00,10.00,1.00\n`,

@@ -264,7 +264,8 @@ export function mergeContext(input: {
   const firstName = input.account.consumerName.split(/\s+/)[0];
   const paymentsKnown = input.account.paymentsSinceItemizationCents != null || input.account.creditsSinceItemizationCents != null;
   const paymentsCredits = (input.account.paymentsSinceItemizationCents ?? 0) + (input.account.creditsSinceItemizationCents ?? 0);
-  const host = input.domain?.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "") || "example.test";
+  const host = input.domain?.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "") ?? "";
+  const site = host ? `https://${host}` : "";
   const values: Record<string, MergeValue> = {
     agency_name: input.agencyName,
     agency_name_caps: input.agencyName.toUpperCase(),
@@ -272,10 +273,10 @@ export function mergeContext(input: {
     agency_mailing_address: "not supplied",
     agency_phone: "not supplied",
     agency_hours: "not supplied",
-    agency_website: `https://${host}`,
+    agency_website: site || "not supplied",
     agency_email: "not supplied",
-    portal_url: `https://${host}/collect`,
-    dispute_portal_url: `https://${host}/collect`,
+    portal_url: site ? `${site}/collect` : "not supplied",
+    dispute_portal_url: site ? `${site}/collect` : "not supplied",
     email_optout_link: "not supplied",
     account_ref: input.account.accountRef,
     account_last4: input.account.last4 || "not supplied",
@@ -301,8 +302,8 @@ export function mergeContext(input: {
     within_validation_period: end ? withinValidationPeriod(mailed, today) : false,
     time_barred: Boolean(input.account.solExpiresOn && input.account.solExpiresOn < today),
     accepts_electronic_disputes: true,
-    collector_name: "Example Collector",
-    ai_agent_name: "Example Assistant",
+    collector_name: "not supplied",
+    ai_agent_name: "not supplied",
     is_ai_agent: false,
     settlement_amount: offer ? money(offer.openingCents) : "",
     offer_expiration_date: "",
@@ -314,7 +315,7 @@ export function mergeContext(input: {
     values.offer_expiration_date = expiration.toISOString().slice(0, 10);
     values.lump_sum_amount = money(offer.openingCents);
     values.settlement_amount = money(offer.openingCents);
-    values.min_plan_payment = "25.00";
+    values.min_plan_payment = "not supplied";
   }
   return { values, validationEnd: end, offer };
 }
