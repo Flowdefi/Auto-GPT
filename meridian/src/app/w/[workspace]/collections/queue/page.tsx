@@ -90,7 +90,9 @@ export default function CollectorQueuePage() {
                 <Badge>{draft.classification}</Badge>
                 <Badge>{draft.draftSource === "model" ? "Model" : "Rules"}</Badge>
                 <Badge tone={draft.status === "pending_approval" ? "warn" : draft.status === "approved" ? "good" : "bad"}>{draft.status}</Badge>
-                <Badge tone={draft.gateAllowed ? "good" : "bad"}>{draft.gateAllowed ? "Gate allows email" : "Gate would block"}</Badge>
+                <Badge tone={draft.gateAllowed ? "good" : "bad"}>
+                  {draft.gateAllowed ? "Gate allows email" : draft.gateReason.includes("time-barred") ? "Limitations hold" : "Gate would block"}
+                </Badge>
               </div>
               <p className="mt-2 whitespace-pre-wrap">{draft.draft}</p>
               <p className="mt-1 text-xs text-muted-foreground">{draft.guardNote} {draft.gateReason}</p>

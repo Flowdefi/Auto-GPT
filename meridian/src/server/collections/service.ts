@@ -835,6 +835,10 @@ export async function proposeDraft(workspaceId: WorkspaceId, accountId: string, 
   }
   const composed = composeConsumerDraft({ inbound, firstName, agency, modelText, model });
   const decision = gateFor(workspaceId, account, "email");
+  const limitationsHold =
+    decision.allowed &&
+    limitationsDatePassed(account.solExpiresOn, new Date().toISOString()) &&
+    timeBarredSolicitation(undefined, composed.draft);
   const row: DraftReply = {
     id: nextId("draft"),
     workspaceId,
@@ -843,8 +847,8 @@ export async function proposeDraft(workspaceId: WorkspaceId, accountId: string, 
     classification: composed.classification,
     draft: composed.draft,
     status: "pending_approval",
-    gateAllowed: decision.allowed,
-    gateReason: decision.reason,
+    gateAllowed: decision.allowed && !limitationsHold,
+    gateReason: limitationsHold ? TIME_BARRED_HOLD : decision.reason,
     createdAt: new Date().toISOString(),
     draftSource: composed.source,
     guardNote: composed.guardNote,

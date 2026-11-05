@@ -5,7 +5,7 @@ import { reasonCode } from "./reason-code";
 import { TIME_BARRED_HOLD } from "./sol";
 import { deskMetrics, writeComplianceDigest } from "../../server/collections/observe";
 import type { DraftReply } from "./types";
-import { approveDraft, importPortfolio, openPortal, recordConsent, sendChannel, setTemplateApproval, syncCollectionTemplates, templateForWorkspace } from "../../server/collections/service";
+import { approveDraft, importPortfolio, openPortal, proposeDraft, recordConsent, sendChannel, setTemplateApproval, syncCollectionTemplates, templateForWorkspace } from "../../server/collections/service";
 import { loadDb, mutate } from "../../server/db";
 
 function portalRequest(token: string, body: Record<string, unknown>): Request {
@@ -97,6 +97,40 @@ test("approving a promise reply stays pending when the limitations date is past"
   assert.equal(saved?.gateAllowed, false);
   const message = (loadDb().channelMessages ?? []).find((item) => item.accountId === account.id && item.reason === TIME_BARRED_HOLD);
   assert.equal(message?.status, "blocked");
+});
+
+test("a promise draft shows the limitations hold before anyone approves it", async () => {
+  const stamp = Date.now().toString(36);
+  const ref = `QUEUE-${stamp}`;
+  const imported = importPortfolio({
+    workspaceId: "triton",
+    csv: `account_ref,consumer_name,consumer_state,zip,last4,balance\n${ref},Ada Example,OH,44101,4242,40.00\n`,
+  });
+  const account = imported.accounts.find((item) => item.accountRef === ref);
+  assert.ok(account);
+  recordConsent("triton", account.id, "email", "sandbox test");
+  const priorBase = process.env.OPENAI_BASE_URL;
+  const priorOllama = process.env.OLLAMA_BASE_URL;
+  delete process.env.OPENAI_BASE_URL;
+  delete process.env.OLLAMA_BASE_URL;
+  mutate((db) => {
+    db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) => (item.id === account.id ? { ...item, solExpiresOn: "2020-01-01" } : item));
+  });
+  try {
+    const promise = await proposeDraft("triton", account.id, "I will pay on Friday");
+    assert.equal(promise.classification, "promise");
+    assert.equal(promise.status, "pending_approval");
+    assert.equal(promise.gateAllowed, false);
+    assert.equal(promise.gateReason, TIME_BARRED_HOLD);
+    const dispute = await proposeDraft("triton", account.id, "I dispute this debt");
+    assert.equal(dispute.classification, "dispute");
+    assert.equal(dispute.gateAllowed, true);
+  } finally {
+    if (priorBase === undefined) delete process.env.OPENAI_BASE_URL;
+    else process.env.OPENAI_BASE_URL = priorBase;
+    if (priorOllama === undefined) delete process.env.OLLAMA_BASE_URL;
+    else process.env.OLLAMA_BASE_URL = priorOllama;
+  }
 });
 
 test("a scheduled settlement text is held when the body is empty", async () => {
