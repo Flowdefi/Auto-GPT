@@ -4,10 +4,13 @@ import { DatabaseSync } from "node:sqlite";
 import { seedAether } from "@/lib/seed/aether";
 import { seedTriton } from "@/lib/seed/triton";
 import type { WorkspaceData, WorkspaceId } from "@/lib/types";
+import { meridianDataDir } from "./data-dir";
+import { demoSeedEnabled } from "./demo-seed";
 import type { DatabaseFile } from "./models";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const SQLITE_FILE = path.join(DATA_DIR, "meridian.db");
+function sqliteFile(): string {
+  return path.join(meridianDataDir(), "meridian.db");
+}
 
 type RunResult = { changes?: number };
 type Statement = {
@@ -26,15 +29,17 @@ let handle: SqliteHandle | null = null;
 let available = false;
 
 function ensureDir(): void {
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+  const dir = meridianDataDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
 function open(): SqliteHandle | null {
   if (handle) return handle;
   try {
     ensureDir();
-    handle = new DatabaseSync(SQLITE_FILE) as unknown as SqliteHandle;
+    handle = new DatabaseSync(sqliteFile()) as unknown as SqliteHandle;
     handle.exec("PRAGMA journal_mode = WAL;");
+    handle.exec("PRAGMA busy_timeout = 5000;");
     handle.exec("PRAGMA foreign_keys = ON;");
     const schema = readFileSync(path.join(process.cwd(), "src/server/schema.sql"), "utf8");
     handle.exec(schema);
@@ -271,7 +276,7 @@ export function persistSqlite(state: DatabaseFile): void {
   }
 }
 
-const CRM_KINDS = [
+export const CRM_KINDS = [
   "users",
   "companies",
   "contacts",
@@ -306,7 +311,13 @@ function recordLabel(kind: string, record: Record<string, unknown>): string {
   return `${kind}:${String(record.id ?? "")}`;
 }
 
+function demoPurged(db: SqliteHandle, workspaceId: WorkspaceId): boolean {
+  const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(`demo_purged_${workspaceId}`);
+  return String(row?.value ?? "") === "1";
+}
+
 export function seedCrmSnapshot(): void {
+  if (!demoSeedEnabled()) return;
   const db = open();
   if (!db) return;
   const existing = db.prepare("SELECT COUNT(*) AS n FROM crm_records").get() as { n?: number } | undefined;
@@ -315,10 +326,9 @@ export function seedCrmSnapshot(): void {
   const insert = db.prepare(
     "INSERT INTO crm_records (workspace_id, kind, id, label, json, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
   );
-  const workspaces: Array<[WorkspaceId, WorkspaceData]> = [
-    ["triton", seedTriton()],
-    ["aether", seedAether()],
-  ];
+  const workspaces: Array<[WorkspaceId, WorkspaceData]> = [];
+  if (!demoPurged(db, "triton")) workspaces.push(["triton", seedTriton()]);
+  if (!demoPurged(db, "aether")) workspaces.push(["aether", seedAether()]);
   db.exec("BEGIN");
   try {
     for (const [workspaceId, data] of workspaces) {
@@ -385,7 +395,7 @@ export function searchFts(workspaceId: WorkspaceId, prompt: string, limit = 8): 
 }
 
 export function sqliteStats(): { path: string; ready: boolean } {
-  return { path: SQLITE_FILE, ready: sqliteReady() };
+  return { path: sqliteFile(), ready: sqliteReady() };
 }
 
 /** Auth/billing tables. Never passed to persistSqlite's replaceTable wipe. */

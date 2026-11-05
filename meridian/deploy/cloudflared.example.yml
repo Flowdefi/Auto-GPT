@@ -1,0 +1,13 @@
+# Example only. The live tunnel meridian-crm already points crm.debtmarket.net
+# at this app. Add collect.debtmarket.net to the same origin. Do not attach
+# a Cloudflare Access application to collect.debtmarket.net.
+#
+# The app listens on port 3000. If the existing ingress uses a different
+# local port, set MERIDIAN_BIND_PORT to that port instead of changing the app.
+tunnel: meridian-crm
+ingress:
+  - hostname: crm.debtmarket.net
+    service: http://127.0.0.1:3000
+  - hostname: collect.debtmarket.net
+    service: http://127.0.0.1:3000
+  - service: http_status:404

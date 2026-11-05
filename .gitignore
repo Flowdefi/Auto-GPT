@@ -162,6 +162,8 @@ openai/
 # news
 CURRENT_BULLETIN.md
 
+.playwright-mcp/
+
 # Meridian platform
 meridian/node_modules/
 meridian/.next/

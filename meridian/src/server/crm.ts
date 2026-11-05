@@ -1,44 +1,28 @@
+import { emailDomain, isFreeMailDomain } from "@/lib/debt";
 import { seedAether } from "@/lib/seed/aether";
 import { seedTriton } from "@/lib/seed/triton";
 import type { WorkspaceData, WorkspaceId } from "@/lib/types";
+import { demoSeedEnabled } from "./demo-seed";
 import { loadDb, mutate, nextId } from "./db";
 import type { CrmCompany, CrmContact, DatabaseFile } from "./models";
 
-const FREE_MAIL = new Set([
-  "gmail.com",
-  "yahoo.com",
-  "hotmail.com",
-  "outlook.com",
-  "aol.com",
-  "icloud.com",
-  "proton.me",
-  "pm.me",
-  "protonmail.com",
-  "live.com",
-  "msn.com",
-  "gmx.com",
-  "mail.com",
-  "yandex.com",
-  "zoho.com",
-]);
-
-export function isFreeMailDomain(domain: string): boolean {
-  return FREE_MAIL.has(domain.toLowerCase());
-}
+export { isFreeMailDomain };
 
 export function domainOf(email: string): string {
-  const at = email.lastIndexOf("@");
-  return at === -1 ? "" : email.slice(at + 1).toLowerCase().trim();
+  return emailDomain(email);
 }
 
 export function seedCrmRecords(db: DatabaseFile): void {
-  if (db.companies.length > 0) return;
+  if (!demoSeedEnabled()) return;
+  const purged = new Set(db.demoPurgedWorkspaces ?? []);
   const now = new Date().toISOString();
   const sets: Array<[WorkspaceId, WorkspaceData]> = [
     ["triton", seedTriton()],
     ["aether", seedAether()],
   ];
   for (const [workspaceId, data] of sets) {
+    if (purged.has(workspaceId)) continue;
+    if (db.companies.some((company) => company.workspaceId === workspaceId)) continue;
     for (const company of data.companies) {
       db.companies.push({
         id: company.id,
@@ -54,6 +38,23 @@ export function seedCrmRecords(db: DatabaseFile): void {
         lifecycle: company.lifecycle,
         score: company.score,
         notes: company.notes,
+        companyType: company.companyType,
+        debtRoles: company.debtRoles,
+        targetAccount: company.targetAccount,
+        website: company.website,
+        linkedin: company.linkedin,
+        phone: company.phone,
+        description: company.description,
+        additionalPreferences: company.additionalPreferences,
+        street: company.street,
+        zip: company.zip,
+        country: company.country,
+        yearFounded: company.yearFounded,
+        leadStatus: company.leadStatus,
+        ownerName: company.ownerName,
+        closeDate: company.closeDate,
+        hubspotRecordId: company.hubspotRecordId,
+        contactCount: company.contactCount,
         createdAt: now,
       });
     }
@@ -74,7 +75,35 @@ export function seedCrmRecords(db: DatabaseFile): void {
         state: contact.state,
         tags: contact.tags,
         lastActivityAt: contact.lastActivityAt,
-        createdAt: now,
+        mobile: contact.mobile,
+        website: contact.website,
+        street: contact.street,
+        zip: contact.zip,
+        country: contact.country,
+        linkedin: contact.linkedin,
+        leadType: contact.leadType,
+        stage: contact.stage,
+        leadSource: contact.leadSource,
+        ownerName: contact.ownerName,
+        assetClassPreference: contact.assetClassPreference,
+        budget: contact.budget,
+        paperAgePreference: contact.paperAgePreference,
+        coverage: contact.coverage,
+        buyingStates: contact.buyingStates,
+        collectOrLitigate: contact.collectOrLitigate,
+        ndaSigned: contact.ndaSigned,
+        closedDeal: contact.closedDeal,
+        deskReplied: contact.deskReplied,
+        emailStatus: contact.emailStatus,
+        doNotEmail: contact.doNotEmail === true,
+        hubspotRecordId: contact.hubspotRecordId,
+        messageSummary: contact.messageSummary,
+        notes: contact.notes,
+        source: contact.source,
+        removalReason: contact.removalReason,
+        prospectSegment: contact.prospectSegment,
+        sizeSignal: contact.sizeSignal,
+        createdAt: contact.createdAt ?? now,
       });
     }
   }

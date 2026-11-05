@@ -1,0 +1,316 @@
+{
+  "id": "CALL-009",
+  "title": "Voice AI runtime guardrails",
+  "status": "DRAFT - Requires counsel review before use",
+  "version": "1.0.0",
+  "applies_to": [
+    "voice_ai_outbound",
+    "voice_ai_inbound",
+    "sms_ai",
+    "email_ai_drafts"
+  ],
+  "enforcement": "Runtime filters run on every model turn BEFORE text-to-speech. A blocked utterance is replaced by a safe fallback and the call is flagged. The model cannot override these rules.",
+  "pre_call_gates": {
+    "calling_window_local": {
+      "start": "08:00",
+      "end": "21:00",
+      "source": "12 CFR 1006.6(b)(1)",
+      "if_timezone_unknown": "use window valid in all possible time zones"
+    },
+    "max_call_attempts_per_debt_7_days": 7,
+    "no_calls_within_7_days_after_conversation": true,
+    "frequency_source": "12 CFR 1006.14(b)(2)",
+    "owner_may_set_stricter_limits": true,
+    "require_prior_express_consent_for_ai_voice_to_wireless": true,
+    "consent_source": "47 U.S.C. 227(b)(1); FCC 24-17 (Feb. 8, 2024); FCC 2008 ACA Declaratory Ruling 23 FCC Rcd 559",
+    "require_reassigned_number_check": true,
+    "blocking_flags": [
+      "CEASE",
+      "ATTORNEY_REP",
+      "BANKRUPTCY",
+      "DECEASED_UNVERIFIED",
+      "DISPUTE_PENDING_VERIFICATION",
+      "OUT_OF_SCOPE_STATE",
+      "DNC_INTERNAL",
+      "SCRA_REVIEW",
+      "ID_THEFT_REVIEW",
+      "WRONG_NUMBER",
+      "INCONVENIENT_TIME",
+      "WORKPLACE_NO_CALL",
+      "MEDIUM_OPT_OUT_VOICE"
+    ],
+    "state_scope": "Only consumers in owner-approved states (no-license states per counsel-maintained table) plus Texas with 392.101 bond on file"
+  },
+  "mandatory_disclosures": {
+    "ai_disclosure": {
+      "text": "I'm an automated AI assistant for {{agency_name}}, and I can connect you to a person at any time.",
+      "when": "first turn after confirming the right person, and whenever asked; never deny being AI"
+    },
+    "recording_notice": {
+      "text": "This call is being recorded.",
+      "when": "start of every call, before substantive conversation; required regardless of state"
+    },
+    "artificial_voice_identification": {
+      "text": "This call is from {{agency_name}}. You can reach us at {{agency_phone}}.",
+      "source": "47 CFR 64.1200(b)",
+      "note": "Counsel to confirm placement relative to third-party disclosure risk"
+    },
+    "initial_communication": {
+      "text": "{{agency_name}} is a debt collector. This is an attempt to collect a debt, and any information obtained will be used for that purpose.",
+      "source": "15 U.S.C. 1692e(11); 12 CFR 1006.18(e)(1); Tex. Fin. Code 392.304(a)(5)(A)",
+      "when": "immediately after identity verification, before any debt detail"
+    },
+    "subsequent_communication": {
+      "text": "This call is from a debt collector.",
+      "source": "12 CFR 1006.18(e)(2); Tex. Fin. Code 392.304(a)(5)(B)"
+    },
+    "time_barred": {
+      "text": "Because of the age of this debt, {{current_creditor}} will not sue you for it.",
+      "when": "if time_barred = true, before payment discussion",
+      "source": "12 CFR 1006.26(b); Tex. Fin. Code 392.307"
+    }
+  },
+  "identity_verification": {
+    "required_before_any_debt_disclosure": true,
+    "factors": [
+      "date_of_birth",
+      "zip_code"
+    ],
+    "consumer_must_state_values": true,
+    "agent_never_reads_values": true,
+    "max_attempts": 2,
+    "never_request": [
+      "ssn",
+      "ssn_last4",
+      "full_account_number",
+      "card_number",
+      "bank_account_number",
+      "routing_number",
+      "cvv",
+      "pin",
+      "password"
+    ]
+  },
+  "banned_phrases": [
+    "arrest",
+    "jail",
+    "prison",
+    "warrant",
+    "police",
+    "criminal",
+    "fraud charges",
+    "sheriff",
+    "we will sue",
+    "we're going to sue",
+    "file a lawsuit",
+    "take you to court",
+    "legal action will be taken",
+    "judgment against you",
+    "garnish",
+    "garnishment",
+    "seize",
+    "repossess",
+    "lien on your house",
+    "levy",
+    "our attorney",
+    "our lawyer",
+    "legal department",
+    "law office",
+    "the attorney reviewing your file",
+    "attorney's fees will be added",
+    "final notice",
+    "last chance",
+    "today only",
+    "expires today",
+    "your credit will be ruined",
+    "destroy your credit",
+    "we will remove it from your credit report",
+    "this will fix your credit",
+    "we'll contact your employer",
+    "we'll tell your family",
+    "your boss",
+    "government",
+    "federal agency",
+    "IRS",
+    "court order",
+    "you have no choice",
+    "you must pay now",
+    "you're required to pay today",
+    "deadbeat",
+    "liar",
+    "irresponsible",
+    "shame",
+    "stupid"
+  ],
+  "banned_phrase_exceptions": {
+    "note": "A banned term may be spoken ONLY when quoting a counsel-approved statement returned verbatim by get_legal_status_statement() or get_required_disclosure(), e.g., 'will not sue you' in the time-barred disclosure, or 'final' when the offer record says expires_at = today and that is true.",
+    "allowed_verbatim_sources": [
+      "get_required_disclosure",
+      "get_legal_status_statement",
+      "get_offers.expiration_statement"
+    ]
+  },
+  "prohibited_claims": [
+    {
+      "rule": "No threat of any action not intended or not legally permitted",
+      "source": "15 U.S.C. 1692e(5); Tex. Fin. Code 392.301(a)(8)"
+    },
+    {
+      "rule": "No false representation of attorney involvement",
+      "source": "15 U.S.C. 1692e(3); Tex. Fin. Code 392.304(a)(16)-(17)"
+    },
+    {
+      "rule": "No implication of government affiliation",
+      "source": "15 U.S.C. 1692e(1); Tex. Fin. Code 392.304(a)(9)"
+    },
+    {
+      "rule": "No threat of arrest or criminal prosecution for nonpayment",
+      "source": "15 U.S.C. 1692e(4), (7); Tex. Fin. Code 392.301(a)(2), (5), (6)"
+    },
+    {
+      "rule": "No misstatement of amount, character, or legal status of the debt",
+      "source": "15 U.S.C. 1692e(2)(A); Tex. Fin. Code 392.304(a)(8)"
+    },
+    {
+      "rule": "No suit or threat of suit on time-barred debt",
+      "source": "12 CFR 1006.26(b); Tex. Fin. Code 392.307(c)"
+    },
+    {
+      "rule": "No unauthorized fees (no convenience fees by default)",
+      "source": "15 U.S.C. 1692f(1); 12 CFR 1006.22(b); Tex. Fin. Code 392.303(a)(2)"
+    },
+    {
+      "rule": "No obscene, profane, or abusive language",
+      "source": "15 U.S.C. 1692d(2); 12 CFR 1006.14(d); Tex. Fin. Code 392.302(1)"
+    },
+    {
+      "rule": "No disclosure to third parties",
+      "source": "15 U.S.C. 1692c(b); 12 CFR 1006.6(d)"
+    },
+    {
+      "rule": "No pretending to be human; no false names",
+      "source": "15 U.S.C. 1692e(10), (14); FCC 24-17; Tex. Fin. Code 392.304(a)(1)"
+    }
+  ],
+  "stop_triggers": [
+    {
+      "intent": "request_human",
+      "action": "transfer_to_human",
+      "immediate": true
+    },
+    {
+      "intent": "stop_calling",
+      "action": "record_revocation(voice); end collection discussion; offer written cease info",
+      "immediate": true
+    },
+    {
+      "intent": "attorney_representation",
+      "action": "capture attorney contact; flag ATTORNEY_REP; end",
+      "immediate": true
+    },
+    {
+      "intent": "bankruptcy",
+      "action": "capture case info; flag BANKRUPTCY; end",
+      "immediate": true
+    },
+    {
+      "intent": "dispute",
+      "action": "record_dispute; stop payment requests this call unless consumer asks",
+      "immediate": true
+    },
+    {
+      "intent": "deceased",
+      "action": "flag DECEASED_REPORTED; estate flow; no debt disclosure to caller",
+      "immediate": true
+    },
+    {
+      "intent": "military_service",
+      "action": "flag SCRA_REVIEW; pause",
+      "immediate": true
+    },
+    {
+      "intent": "identity_theft",
+      "action": "record_dispute(type=id_theft); flag ID_THEFT_REVIEW",
+      "immediate": true
+    },
+    {
+      "intent": "wrong_number",
+      "action": "apologize; flag WRONG_NUMBER; suppress number all channels",
+      "immediate": true
+    },
+    {
+      "intent": "self_harm_or_crisis",
+      "action": "read crisis message (911 / 988); flag WELFARE_CONCERN; transfer to supervisor",
+      "immediate": true
+    },
+    {
+      "intent": "inconvenient_time",
+      "action": "set_contact_preferences; end",
+      "immediate": true
+    },
+    {
+      "intent": "complaint_or_regulator_mention",
+      "action": "transfer_to_human(supervisor)",
+      "immediate": true
+    }
+  ],
+  "payments": {
+    "voice_capture_of_payment_data": "forbidden",
+    "approved_methods": [
+      "dtmf_masked_ivr",
+      "secure_payment_link",
+      "portal"
+    ],
+    "pause_recording_and_transcription_during_non_masked_capture": true,
+    "agent_receives_only": [
+      "status",
+      "last4",
+      "confirmation_number"
+    ],
+    "convenience_fee_default": 0,
+    "recurring_requires_written_authorization_copy": "12 CFR 1005.10(b)",
+    "postdated_over_5_days_notice": "3-10 business days before deposit (15 U.S.C. 1692f(2))"
+  },
+  "transcript_redaction": {
+    "regex_redact": [
+      "\\b\\d{13,19}\\b",
+      "\\b\\d{3}-?\\d{2}-?\\d{4}\\b",
+      "\\b\\d{9}\\b"
+    ],
+    "redact_tokens_after_intents": [
+      "card",
+      "account number",
+      "routing",
+      "social security"
+    ]
+  },
+  "negotiation_limits": {
+    "source": "settlement-matrix.json",
+    "never_exceed_floor": true,
+    "require_offer_record_before_stating_deadline": true
+  },
+  "escalation": {
+    "confidence_threshold": 0.7,
+    "max_consecutive_unrecognized_turns": 2,
+    "max_payment_asks_per_call": 2
+  },
+  "logging": {
+    "log_disclosures_given": true,
+    "log_verification_result": true,
+    "log_every_guardrail_trip": true,
+    "retention_years_minimum": 3,
+    "retention_source": "12 CFR 1006.100"
+  },
+  "legal_citations": [
+    "15 U.S.C. 1692b-1692f",
+    "12 CFR 1006.6",
+    "12 CFR 1006.14",
+    "12 CFR 1006.18",
+    "12 CFR 1006.26",
+    "47 U.S.C. 227",
+    "47 CFR 64.1200",
+    "FCC 24-17",
+    "Tex. Fin. Code 392.301-392.304, 392.307"
+  ],
+  "needs_counsel_review": true
+}

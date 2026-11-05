@@ -195,7 +195,7 @@ export default function BulkEmailPage() {
           return payload.campaign;
         });
         setNotice(
-          `Sent ${sent.delivered} · skipped seed ${sent.skipped} · failed ${sent.failed}. From ${sent.fromEmail}.`,
+          `Sent ${sent.delivered} · skipped ${sent.skipped} (seed, suppression, or do-not-email) · failed ${sent.failed}. From ${sent.fromEmail}.`,
         );
         await refresh();
       }

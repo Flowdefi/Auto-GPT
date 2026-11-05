@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
 import { requireSeat } from "@/server/api-guard";
 import { loadDb, mutate, nextId } from "@/server/db";
+import { emailBlockReason } from "@/server/email-block";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -9,8 +10,8 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const gate = await requireSeat(request);
   if (!gate.ok) return gate.response;
-  const workspaceId = new URL(request.url).searchParams.get("workspace");
-  if (!isWorkspaceId(workspaceId ?? undefined)) {
+  const workspaceId = new URL(request.url).searchParams.get("workspace") ?? undefined;
+  if (!isWorkspaceId(workspaceId)) {
     return NextResponse.json({ error: "workspace required" }, { status: 400 });
   }
   const db = loadDb();
@@ -21,7 +22,9 @@ export async function GET(request: Request) {
       return {
         ...list,
         count: members.length,
-        sendable: members.filter((member) => member.subscribed && !member.seedLocked).length,
+        sendable: members.filter(
+          (member) => member.subscribed && !member.seedLocked && !emailBlockReason(workspaceId, member.email),
+        ).length,
         locked: members.filter((member) => member.seedLocked).length,
       };
     });
@@ -47,6 +50,18 @@ export async function POST(request: Request) {
   const email = body.email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+  }
+  const blocked = emailBlockReason(body.workspaceId, email);
+  if (blocked) {
+    return NextResponse.json(
+      {
+        error:
+          blocked === "do_not_email"
+            ? "This contact is marked do not email"
+            : "This address is on the suppression list",
+      },
+      { status: 409 },
+    );
   }
   const db = loadDb();
   const list = db.lists.find((row) => row.id === body.listId && row.workspaceId === body.workspaceId);

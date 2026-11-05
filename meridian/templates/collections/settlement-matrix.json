@@ -1,0 +1,285 @@
+{
+  "_notice": "DEFAULTS ONLY. Every value marked is_default=true is a placeholder the OWNER must set. Not legal advice. Requires counsel review before use.",
+  "version": "1.0.0",
+  "currency": "USD",
+  "global_rules": {
+    "never_below_floor_without_human_approval": {
+      "value": true,
+      "is_default": true
+    },
+    "human_approval_role": {
+      "value": "settlement_manager",
+      "is_default": true
+    },
+    "offer_validity_days": {
+      "value": 30,
+      "is_default": true,
+      "note": "Offers must have a real expiration recorded in CRM; Evory non-renewal language used"
+    },
+    "grace_days_missed_payment": {
+      "value": 10,
+      "is_default": true
+    },
+    "min_monthly_payment": {
+      "value": 25.0,
+      "is_default": true
+    },
+    "max_short_term_installments": {
+      "value": 6,
+      "is_default": true
+    },
+    "max_long_term_months": {
+      "value": 24,
+      "is_default": true
+    },
+    "convenience_fee_enabled": {
+      "value": false,
+      "is_default": true,
+      "note": "Keep false unless counsel confirms fee is expressly authorized by agreement or law (15 USC 1692f(1); Tex. Fin. Code 392.303(a)(2))"
+    },
+    "interest_accrual_after_placement": {
+      "value": false,
+      "is_default": true,
+      "note": "If enabled, validation/itemization and 'balance may increase' language must change; counsel review"
+    },
+    "client_approval_required_portfolios": {
+      "value": [],
+      "is_default": true,
+      "note": "For contingency clients: list portfolio IDs whose contracts require client sign-off per offer"
+    }
+  },
+  "tiers": [
+    {
+      "tier_id": "T1_fresh_low",
+      "match": {
+        "months_since_chargeoff": [
+          0,
+          12
+        ],
+        "balance": [
+          0,
+          1000
+        ]
+      },
+      "opening_offer_pct": {
+        "value": 90,
+        "is_default": true
+      },
+      "step_down_pct": {
+        "value": 5,
+        "is_default": true
+      },
+      "floor_pct": {
+        "value": 75,
+        "is_default": true
+      },
+      "short_term_plan_floor_pct": {
+        "value": 85,
+        "is_default": true
+      },
+      "long_term_plan_floor_pct": {
+        "value": 95,
+        "is_default": true
+      }
+    },
+    {
+      "tier_id": "T2_fresh_high",
+      "match": {
+        "months_since_chargeoff": [
+          0,
+          12
+        ],
+        "balance": [
+          1000.01,
+          999999999
+        ]
+      },
+      "opening_offer_pct": {
+        "value": 85,
+        "is_default": true
+      },
+      "step_down_pct": {
+        "value": 5,
+        "is_default": true
+      },
+      "floor_pct": {
+        "value": 65,
+        "is_default": true
+      },
+      "short_term_plan_floor_pct": {
+        "value": 75,
+        "is_default": true
+      },
+      "long_term_plan_floor_pct": {
+        "value": 90,
+        "is_default": true
+      }
+    },
+    {
+      "tier_id": "T3_aged",
+      "match": {
+        "months_since_chargeoff": [
+          12.01,
+          36
+        ],
+        "balance": [
+          0,
+          999999999
+        ]
+      },
+      "opening_offer_pct": {
+        "value": 70,
+        "is_default": true
+      },
+      "step_down_pct": {
+        "value": 5,
+        "is_default": true
+      },
+      "floor_pct": {
+        "value": 50,
+        "is_default": true
+      },
+      "short_term_plan_floor_pct": {
+        "value": 60,
+        "is_default": true
+      },
+      "long_term_plan_floor_pct": {
+        "value": 75,
+        "is_default": true
+      }
+    },
+    {
+      "tier_id": "T4_old",
+      "match": {
+        "months_since_chargeoff": [
+          36.01,
+          9999
+        ],
+        "balance": [
+          0,
+          999999999
+        ],
+        "time_barred": false
+      },
+      "opening_offer_pct": {
+        "value": 55,
+        "is_default": true
+      },
+      "step_down_pct": {
+        "value": 5,
+        "is_default": true
+      },
+      "floor_pct": {
+        "value": 35,
+        "is_default": true
+      },
+      "short_term_plan_floor_pct": {
+        "value": 45,
+        "is_default": true
+      },
+      "long_term_plan_floor_pct": {
+        "value": 60,
+        "is_default": true
+      }
+    },
+    {
+      "tier_id": "T5_time_barred",
+      "match": {
+        "time_barred": true
+      },
+      "opening_offer_pct": {
+        "value": 40,
+        "is_default": true
+      },
+      "step_down_pct": {
+        "value": 5,
+        "is_default": true
+      },
+      "floor_pct": {
+        "value": 25,
+        "is_default": true
+      },
+      "short_term_plan_floor_pct": {
+        "value": 30,
+        "is_default": true
+      },
+      "long_term_plan_floor_pct": {
+        "value": 40,
+        "is_default": true
+      },
+      "required_templates": [
+        "LTR-060 or LTR-061 (TX)"
+      ],
+      "litigation_references_allowed": false
+    },
+    {
+      "tier_id": "HARDSHIP",
+      "match": {
+        "hardship_reported": true
+      },
+      "applies_on_top_of_base_tier": true,
+      "additional_discount_pct_points": {
+        "value": 10,
+        "is_default": true
+      },
+      "absolute_floor_pct": {
+        "value": 20,
+        "is_default": true
+      },
+      "min_monthly_payment": {
+        "value": 10.0,
+        "is_default": true
+      },
+      "max_long_term_months": {
+        "value": 36,
+        "is_default": true
+      },
+      "documentation_required": {
+        "value": false,
+        "is_default": true,
+        "note": "Do not require medical records"
+      }
+    }
+  ],
+  "portfolio_overrides": [
+    {
+      "portfolio_id": "{{portfolio_id}}",
+      "seller_or_client": "{{client_name}}",
+      "floor_pct_override": {
+        "value": null,
+        "is_default": true
+      },
+      "notes": "Set per purchase agreement or client placement contract"
+    }
+  ],
+  "tier_resolution": "First matching tier in list order; HARDSHIP modifies the resolved base tier; portfolio_overrides win over tiers.",
+  "needs_counsel_review": true,
+  "contact_policy": {
+    "max_call_attempts_per_debt_per_7_days": {
+      "value": 5,
+      "is_default": true,
+      "legal_ceiling": 7,
+      "source": "12 CFR 1006.14(b)(2)"
+    },
+    "max_sms_per_debt_per_7_days": {
+      "value": 3,
+      "is_default": true
+    },
+    "max_email_per_debt_per_7_days": {
+      "value": 3,
+      "is_default": true
+    },
+    "calling_window_local": {
+      "value": [
+        "08:00",
+        "21:00"
+      ],
+      "is_default": true,
+      "source": "12 CFR 1006.6(b)(1)"
+    },
+    "texas_bond_on_file_required": {
+      "value": true,
+      "source": "Tex. Fin. Code 392.101"
+    }
+  }
+}

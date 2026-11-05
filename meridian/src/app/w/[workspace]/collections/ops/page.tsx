@@ -1,0 +1,82 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Card, PageHeader } from "@/components/meridian/legacy";
+import { useActiveWorkspace } from "@/lib/use-workspace";
+
+interface Metrics {
+  blockedByReason: Record<string, number>;
+  callConnectRate: number | null;
+  recoveryByPortfolio: { portfolioId: string; collectedCents: number; balanceCents: number }[];
+  jobLagSeconds: number;
+  errorRate: number;
+  dailyOutboundCap: number;
+  blockInbound: boolean;
+  maxDiscountPercent: number;
+  maxPlanMonths: number;
+}
+
+interface Digest {
+  id: string;
+  at: string;
+  summary: string;
+  delivery: string;
+  recipientCount: number;
+}
+
+export default function OpsPage() {
+  const { workspaceId } = useActiveWorkspace();
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [digests, setDigests] = useState<Digest[]>([]);
+
+  useEffect(() => {
+    void fetch("/api/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ op: "ops", workspaceId }),
+    })
+      .then((response) => response.json())
+      .then((body: { metrics?: Metrics; digests?: Digest[] }) => {
+        setMetrics(body.metrics ?? null);
+        setDigests(body.digests ?? []);
+      })
+      .catch(() => undefined);
+  }, [workspaceId]);
+
+  return (
+    <div>
+      <PageHeader eyebrow="Compliance" title="Operations" subtitle={`Counts for ${workspaceId} only. Labels are reason codes, portfolio ids, and rates. Sandbox stores the weekly digest and does not send email. A compliance seat with no workspace is counted on every digest. A seat limited to one workspace is counted only there.`} />
+      {metrics ? (
+        <div className="mb-4 grid gap-3">
+          <Card className="p-4 text-sm">
+            <div className="font-semibold">Sends blocked by reason</div>
+            <p className="mt-2">{Object.entries(metrics.blockedByReason).map(([code, count]) => `${code} ${count}`).join(" · ") || "None recorded"}</p>
+            {metrics.blockedByReason.time_barred ? <p className="mt-2">time_barred is the limitations-date hold. The notice is still a draft for counsel.</p> : null}
+          </Card>
+          <Card className="p-4 text-sm">
+            <div className="font-semibold">Limits for this workspace</div>
+            <p className="mt-2">Daily cap {metrics.dailyOutboundCap}. Inbound block {metrics.blockInbound ? "on" : "off"}. Discount {metrics.maxDiscountPercent}%. Plan length {metrics.maxPlanMonths} months.</p>
+          </Card>
+          <Card className="p-4 text-sm">
+            <p>Call connect rate {metrics.callConnectRate === null ? "—" : metrics.callConnectRate}</p>
+            <p>Job lag {metrics.jobLagSeconds} seconds · error rate {metrics.errorRate}</p>
+          </Card>
+          <Card className="p-4 text-sm">
+            <div className="font-semibold">Recovery by portfolio</div>
+            {metrics.recoveryByPortfolio.slice(0, 8).map((row) => (
+              <p key={row.portfolioId}>{row.portfolioId}: ${(row.collectedCents / 100).toFixed(2)} posted · ${(row.balanceCents / 100).toFixed(2)} still on file</p>
+            ))}
+          </Card>
+        </div>
+      ) : null}
+      <div className="grid gap-3">
+        {digests.map((digest) => (
+          <Card key={digest.id} className="p-4 text-sm">
+            <div className="font-semibold">{digest.delivery} · {digest.recipientCount} compliance seats · {digest.at.slice(0, 10)}</div>
+            <p className="mt-2">{digest.summary}</p>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}

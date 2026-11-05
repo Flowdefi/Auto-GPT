@@ -1,3 +1,33 @@
+import type {
+  ChannelMessage,
+  CollectionTemplate,
+  TemplateApproval,
+  ComplianceEvent,
+  ConsumerConsent,
+  DncEntry,
+  PortfolioAccount,
+  StateEligibility,
+  VoiceCall,
+  VoiceSettings,
+  VoiceLimits,
+  CollectorTask,
+  DraftReply,
+  ConsumerPayment,
+  ImportAudit,
+  OperatorRole,
+  PortalSession,
+  ClientGrant,
+} from "@/lib/collections/types";
+import type { Complaint } from "@/lib/collections/complaints";
+import type { CollectionJob, CollectionSequence } from "@/lib/collections/jobs";
+import type { RecordingRule } from "@/lib/collections/recording";
+import type { SolRule } from "@/lib/collections/sol";
+import type { AgencyBrand } from "@/lib/brand";
+import type { AgentPresence, ComplianceDigest, DialAttempt, DialCampaign, MailJob, TrainingPass } from "@/lib/collections/desk";
+import type { PortfolioBook, ScrubEvent, SettlementCase, TabletopRun } from "@/lib/collections/launch";
+import type { Metro2Signoff } from "@/lib/collections/metro2";
+import type { SettlementMatrix } from "@/lib/collections/template-library";
+
 export type WorkspaceId = "triton" | "aether";
 
 export interface EmailList {
@@ -77,11 +107,19 @@ export interface MailEvent {
   url?: string;
 }
 
+export type SuppressionReason =
+  | "unsubscribe"
+  | "bounce"
+  | "complaint"
+  | "manual"
+  | "do_not_email"
+  | "invalid_email";
+
 export interface Suppression {
   id: string;
   workspaceId: WorkspaceId;
   email: string;
-  reason: "unsubscribe" | "bounce" | "complaint" | "manual";
+  reason: SuppressionReason;
   at: string;
 }
 
@@ -139,6 +177,23 @@ export interface CrmCompany {
   lifecycle: string;
   score: number;
   notes: string;
+  companyType?: string;
+  debtRoles?: string[];
+  targetAccount?: boolean;
+  website?: string;
+  linkedin?: string;
+  phone?: string;
+  description?: string;
+  additionalPreferences?: string;
+  street?: string;
+  zip?: string;
+  country?: string;
+  yearFounded?: string;
+  leadStatus?: string;
+  ownerName?: string;
+  closeDate?: string | null;
+  hubspotRecordId?: string;
+  contactCount?: number;
   enrichedAt?: string;
   enrichment?: Record<string, unknown>;
   createdAt: string;
@@ -160,6 +215,34 @@ export interface CrmContact {
   state: string;
   tags: string[];
   lastActivityAt: string;
+  mobile?: string;
+  website?: string;
+  street?: string;
+  zip?: string;
+  country?: string;
+  linkedin?: string;
+  leadType?: string;
+  stage?: string;
+  leadSource?: string;
+  ownerName?: string;
+  assetClassPreference?: string[];
+  budget?: string;
+  paperAgePreference?: string;
+  coverage?: string;
+  buyingStates?: string[];
+  collectOrLitigate?: string;
+  ndaSigned?: string | null;
+  closedDeal?: boolean | string | null;
+  deskReplied?: boolean;
+  emailStatus?: string;
+  doNotEmail?: boolean;
+  hubspotRecordId?: string;
+  messageSummary?: string;
+  notes?: string;
+  source?: string;
+  removalReason?: string;
+  prospectSegment?: string;
+  sizeSignal?: string;
   enrichedAt?: string;
   enrichment?: Record<string, unknown>;
   createdAt: string;
@@ -451,6 +534,59 @@ export interface DatabaseFile {
   briefs: SeoBrief[];
   segments: Segment[];
   aiAudit: AiAuditEntry[];
+  /** Workspaces whose demo CRM rows were purged and must not be reseeded. */
+  demoPurgedWorkspaces?: WorkspaceId[];
+  stateEligibility?: StateEligibility[];
+  portfolioAccounts?: PortfolioAccount[];
+  consents?: ConsumerConsent[];
+  dncEntries?: DncEntry[];
+  voiceCalls?: VoiceCall[];
+  channelMessages?: ChannelMessage[];
+  complianceEvents?: ComplianceEvent[];
+  collectionTemplates?: CollectionTemplate[];
+  /** Per-agency send approval and counsel sign-off. The legacy flags on each template remain the Triton copy. */
+  templateApprovals?: Partial<Record<WorkspaceId, Record<string, TemplateApproval>>>;
+  settlementMatrix?: SettlementMatrix;
+  /** Per-agency settlement authority. The legacy field remains the Triton copy. */
+  settlementMatrices?: Partial<Record<WorkspaceId, SettlementMatrix>>;
+  voiceSettings?: VoiceSettings;
+  /** Per-agency cap, inbound block, discount, and plan length. The legacy voice settings remain the Triton copy. */
+  voiceLimitsByWorkspace?: Partial<Record<WorkspaceId, VoiceLimits>>;
+  collectorTasks?: CollectorTask[];
+  draftReplies?: DraftReply[];
+  consumerPayments?: ConsumerPayment[];
+  importAudits?: ImportAudit[];
+  operatorRoles?: OperatorRole[];
+  portalSessions?: PortalSession[];
+  jobs?: CollectionJob[];
+  sequences?: CollectionSequence[];
+  solRules?: SolRule[];
+  /** Per-agency limitations. The legacy field remains the Triton copy. */
+  solTables?: Partial<Record<WorkspaceId, SolRule[]>>;
+  agencyBrand?: AgencyBrand;
+  /** Per-agency brand. The legacy field remains the Triton copy used by the public site. */
+  agencyBrands?: Partial<Record<WorkspaceId, AgencyBrand>>;
+  agentPresence?: AgentPresence[];
+  dialCampaigns?: DialCampaign[];
+  dialAttempts?: DialAttempt[];
+  mailJobs?: MailJob[];
+  trainingPasses?: TrainingPass[];
+  complianceDigests?: ComplianceDigest[];
+  portfolioBooks?: PortfolioBook[];
+  scrubEvents?: ScrubEvent[];
+  settlementCases?: SettlementCase[];
+  frozenWorkspaces?: WorkspaceId[];
+  /** Per-agency sandbox clear for the reassigned-number check. Absent means Triton uses the legacy voice setting and Aether stays unknown. */
+  rndSandboxClearByWorkspace?: Partial<Record<WorkspaceId, boolean>>;
+  tabletopRuns?: TabletopRun[];
+  clientGrants?: ClientGrant[];
+  complaints?: Complaint[];
+  recordingRules?: RecordingRule[];
+  /** Per-agency recording consent. The legacy field remains the Triton copy. */
+  recordingTables?: Partial<Record<WorkspaceId, RecordingRule[]>>;
+  metro2Approval?: Metro2Signoff;
+  /** Per-agency Metro 2 sign-off. The legacy field remains the Triton copy. */
+  metro2Approvals?: Partial<Record<WorkspaceId, Metro2Signoff>>;
 }
 
 export function emptyDb(): DatabaseFile {
@@ -483,5 +619,20 @@ export function emptyDb(): DatabaseFile {
     briefs: [],
     segments: [],
     aiAudit: [],
+    demoPurgedWorkspaces: [],
+    stateEligibility: [],
+    portfolioAccounts: [],
+    consents: [],
+    dncEntries: [],
+    voiceCalls: [],
+    channelMessages: [],
+    complianceEvents: [],
+    collectionTemplates: [],
+    collectorTasks: [],
+    draftReplies: [],
+    consumerPayments: [],
+    importAudits: [],
+    operatorRoles: [],
+    portalSessions: [],
   };
 }

@@ -8,7 +8,16 @@
     "build": "next build",
     "start": "next start --port 3000 --hostname 0.0.0.0",
     "lint": "next lint",
-    "license:mint": "node scripts/mint-license.mjs"
+    "typecheck": "tsc --noEmit",
+    "license:mint": "node scripts/mint-license.mjs",
+    "test:collections": "tsx --test src/lib/collections/compliance.test.ts src/lib/collections/templates.test.ts src/lib/collections/platform.test.ts src/lib/collections/closing.test.ts src/lib/collections/hardening.test.ts src/lib/collections/readiness.test.ts src/lib/collections/agency.test.ts src/lib/collections/launch.test.ts src/lib/hosts.test.ts src/lib/collections/desk-loop.test.ts src/lib/collections/matrix-guard.test.ts src/lib/collections/gates.test.ts src/lib/collections/tenant-settings.test.ts src/lib/collections/template-scope.test.ts src/lib/collections/metro-scope.test.ts src/lib/collections/voice-limits.test.ts src/lib/collections/mail-hold.test.ts src/lib/collections/portal-hold.test.ts src/lib/collections/report-csv.test.ts src/lib/collections/portal-copy.test.ts",
+    "bench:import": "tsx scripts/bench-import.ts",
+    "scan:secrets": "node scripts/scan-secrets.mjs",
+    "test:e2e": "playwright test",
+    "jobs:run": "tsx scripts/run-jobs.ts",
+    "jobs:worker": "tsx scripts/jobs-worker.ts",
+    "import:csv": "tsx scripts/import-csv.ts",
+    "purge:demo": "tsx scripts/purge-demo.ts"
   },
   "dependencies": {
     "@capacitor/app": "^7.1.2",
@@ -37,9 +46,10 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "fflate": "^0.8.3",
     "lucide-react": "^0.511.0",
     "motion": "^13.4.0",
-    "next": "^15.3.2",
+    "next": "15.5.29",
     "next-themes": "^0.4.6",
     "radix-ui": "^1.6.7",
     "react": "^19.1.0",
@@ -59,9 +69,17 @@
     "autoprefixer": "^10.4.21",
     "eslint": "^9.26.0",
     "eslint-config-next": "^15.3.2",
-    "postcss": "^8.5.3",
-    "sharp": "^0.35.4",
+    "postcss": "8.5.32",
+    "sharp": "0.35.5",
     "tailwindcss": "^4.3.3",
+    "@playwright/test": "^1.55.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.8.3"
+  },
+  "overrides": {
+    "sharp": "0.35.5",
+    "postcss": "8.5.32",
+    "brace-expansion": "1.1.21",
+    "source-map-js": "1.2.2"
   }
 }
