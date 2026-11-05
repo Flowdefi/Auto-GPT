@@ -296,6 +296,7 @@ export interface InboxMessage {
   providerId: string;
   mailbox: string;
   direction: "inbound" | "outbound";
+  folder?: "inbox" | "sentitems" | "drafts";
   from: string;
   fromName: string;
   to: string[];
@@ -309,14 +310,87 @@ export interface InboxMessage {
   companyId?: string;
   matchedBy?: "email" | "domain" | "none";
   hasAttachments: boolean;
+  webLink?: string;
+  isDraft?: boolean;
 }
 
 export interface MailboxSyncState {
   mailbox: string;
   deltaLink?: string;
+  folderDeltas?: Partial<Record<"inbox" | "sentitems", string>>;
   lastSyncAt?: string;
+  lastContactSyncAt?: string;
   lastError?: string;
   messageCount: number;
+}
+
+export const DESK_ACTIVITY_TYPES = [
+  "inbound_inquiry",
+  "draft_created",
+  "reply_sent",
+  "nda_sent",
+  "nda_signed",
+  "file_shared",
+  "call",
+  "note",
+] as const;
+
+export type DeskActivityType = (typeof DESK_ACTIVITY_TYPES)[number];
+
+export interface DeskActivity {
+  id: string;
+  workspaceId: WorkspaceId;
+  type: DeskActivityType;
+  subject: string;
+  body: string;
+  at: string;
+  contactId?: string;
+  companyId?: string;
+  leadId?: string;
+  outlookMessageId?: string;
+  outlookConversationId?: string;
+  link?: string;
+  source: "api" | "graph";
+}
+
+export interface InventoryFileLink {
+  id: string;
+  name: string;
+  webUrl?: string;
+  driveItemId?: string;
+}
+
+export interface DriveLink {
+  id: string;
+  workspaceId: WorkspaceId;
+  target: "inventory" | "deal" | "contact";
+  targetId: string;
+  name: string;
+  webUrl?: string;
+  driveItemId?: string;
+  at: string;
+}
+
+export interface DeskInventoryItem {
+  id: string;
+  workspaceId: WorkspaceId;
+  name: string;
+  sellerName: string;
+  sellerCompanyId: string;
+  kind: string;
+  faceValue: number;
+  askingPrice: number;
+  accountCount: number;
+  avgBalance: number;
+  vintage: string;
+  chargeOff: string;
+  states: string[];
+  notes: string;
+  status: "intake" | "listed" | "in_market" | "awarded" | "closed";
+  fileLinks: InventoryFileLink[];
+  dealIds: string[];
+  buyerContactIds: string[];
+  createdAt: string;
 }
 
 export interface AutomationWorkflow {
@@ -587,6 +661,9 @@ export interface DatabaseFile {
   metro2Approval?: Metro2Signoff;
   /** Per-agency Metro 2 sign-off. The legacy field remains the Triton copy. */
   metro2Approvals?: Partial<Record<WorkspaceId, Metro2Signoff>>;
+  crmActivities?: DeskActivity[];
+  inventoryItems?: DeskInventoryItem[];
+  driveLinks?: DriveLink[];
 }
 
 export function emptyDb(): DatabaseFile {
@@ -634,5 +711,8 @@ export function emptyDb(): DatabaseFile {
     importAudits: [],
     operatorRoles: [],
     portalSessions: [],
+    crmActivities: [],
+    inventoryItems: [],
+    driveLinks: [],
   };
 }

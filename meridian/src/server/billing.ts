@@ -2,6 +2,7 @@ import { createHmac } from "crypto";
 import { LIFETIME_PRICE_CENTS, LIFETIME_PRICE_USD, LICENSE_KEY_PREFIX } from "@/lib/commerce";
 import { hashSecret, keyPrefix, mintLicenseKey, randomId, safeEqual } from "./auth-crypto";
 import { accountByEmail, accountById, markAccountActive, type Account } from "./auth";
+import { selfHosted } from "./self-host";
 import { publicBaseUrl } from "./mailer";
 import { sqliteAll, sqliteGet, sqliteRun } from "./sqlite";
 
@@ -259,7 +260,8 @@ export function billingStatus(account: Account) {
   return {
     priceUsd: LIFETIME_PRICE_USD,
     label: "Lifetime seat — one operator, forever",
-    licensed: licenses.some((row) => Boolean(row.redeemedAt)),
+    licensed: selfHosted() || licenses.some((row) => Boolean(row.redeemedAt)),
+    selfHosted: selfHosted(),
     polar: polarConfigured(),
     licenses: licenses.map((row) => ({
       id: row.id,
