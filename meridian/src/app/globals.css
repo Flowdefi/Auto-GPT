@@ -232,6 +232,16 @@
     padding-right: var(--safe-r);
   }
 
+  main .grid > * {
+    min-width: 0;
+  }
+
+  main pre,
+  main code {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
   .no-select {
     -webkit-user-select: none;
     user-select: none;

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { CompanyForm } from "@/components/crm/company-form";
+import { ServerTimeline } from "@/components/crm/server-timeline";
 import { saveRemoteCompany, useCrmDirectory } from "@/components/crm/use-crm";
 import { Button, Card, PageHeader } from "@/components/meridian/legacy";
 import { contactName, money } from "@/lib/format";
@@ -159,6 +160,10 @@ export default function CompanyRecordPage() {
           ))}
         </Card>
       ) : null}
+      <Card className="mt-4 p-5">
+        <div className="font-semibold">Activity</div>
+        <ServerTimeline workspaceId={workspaceId} companyId={record.id} />
+      </Card>
       {enrichment ? (
         <Card className="mt-4 p-5 text-sm">
           <div className="font-semibold">Public enrichment</div>
