@@ -4,9 +4,10 @@ import { scheduleSteps } from "./jobs";
 import { modelFormPdf } from "./model-form-pdf";
 import { mergeContext } from "./template-library";
 import { solFor } from "./sol";
-import { importPortfolio, saveSolRules, validationPdfBase64 } from "../../server/collections/service";
+import { importPortfolio, saveSolRules, setOperatorRole, validationPdfBase64 } from "../../server/collections/service";
 import { enrollSequence, purgeExpiredIdentifiers, runDueJobs, saveSequence } from "../../server/collections/runner";
-import { createStripeCheckout, deliverAllowedChannel, deliverSms } from "../../server/collections/providers";
+import { createStripeCheckout, deliverAllowedChannel, deliverEmail, deliverSms } from "../../server/collections/providers";
+import { writeComplianceDigest } from "../../server/collections/observe";
 import { brandFor } from "../../server/brand";
 import { applySmsKeyword, reconcileProviderPayment } from "../../server/collections/webhooks";
 import { roleRequiresMfa } from "../../server/mfa-policy";
@@ -179,6 +180,69 @@ test("live stripe checkout refuses example.test and omits the account reference"
     assert.equal(body.includes("ACCT-900"), false);
     assert.equal(body.includes("example.test"), false);
     assert.equal(result.sandbox, false);
+  } finally {
+    restore();
+  }
+});
+
+test("live mail refuses an example.test from address", async () => {
+  const previous = {
+    deliver: process.env.MERIDIAN_CHANNEL_DELIVER,
+    email: process.env.MERIDIAN_EMAIL_PROVIDER,
+    key: process.env.SENDGRID_API_KEY,
+    from: process.env.SENDGRID_FROM,
+    digest: process.env.MERIDIAN_COMPLIANCE_DIGEST,
+    resend: process.env.RESEND_API_KEY,
+  };
+  const restore = () => {
+    const pairs: Array<[string, string | undefined]> = [
+      ["MERIDIAN_CHANNEL_DELIVER", previous.deliver],
+      ["MERIDIAN_EMAIL_PROVIDER", previous.email],
+      ["SENDGRID_API_KEY", previous.key],
+      ["SENDGRID_FROM", previous.from],
+      ["MERIDIAN_COMPLIANCE_DIGEST", previous.digest],
+      ["RESEND_API_KEY", previous.resend],
+    ];
+    for (const [name, value] of pairs) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  };
+  process.env.MERIDIAN_CHANNEL_DELIVER = "live";
+  process.env.MERIDIAN_EMAIL_PROVIDER = "sendgrid";
+  process.env.SENDGRID_API_KEY = "SG.example";
+  process.env.SENDGRID_FROM = "compliance@example.test";
+  process.env.MERIDIAN_COMPLIANCE_DIGEST = "enabled";
+  process.env.RESEND_API_KEY = "re_example";
+  let called = false;
+  try {
+    await assert.rejects(
+      () => deliverEmail({ to: "ada@collect.example", subject: "Notice", body: "Hello" }, async () => {
+        called = true;
+        return { ok: true, status: 202, json: async () => ({}), text: async () => "" };
+      }),
+      /example\.test/,
+    );
+    assert.equal(called, false);
+    const digest = await writeComplianceDigest("triton", new Date(), async () => {
+      called = true;
+      return { ok: true };
+    });
+    assert.equal(called, false);
+    assert.equal(digest.delivery, "live_unconfigured");
+    process.env.SENDGRID_FROM = "compliance@collect.example";
+    setOperatorRole("digest-seat@collect.example", "compliance");
+    let body = "";
+    const sent = await writeComplianceDigest("triton", new Date(), async (_url, init) => {
+      called = true;
+      body = String(init?.body ?? "");
+      return { ok: true };
+    });
+    assert.equal(called, true);
+    assert.equal(sent.delivery, "live_sent");
+    assert.match(body, /compliance@collect\.example/);
+    assert.equal(body.includes("example.test"), false);
+    assert.equal(sent.summary.includes("@"), false);
   } finally {
     restore();
   }

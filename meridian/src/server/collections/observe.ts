@@ -4,6 +4,7 @@ import { reasonCode } from "@/lib/collections/reason-code";
 import { loadDb, mutate, nextId } from "@/server/db";
 import { voiceSettingsFor } from "@/server/collections/service";
 import { emitCounter } from "@/server/otel";
+import { liveFromAddress } from "@/server/collections/providers";
 
 export function deskMetrics(workspaceId: WorkspaceId) {
   const db = loadDb();
@@ -80,14 +81,22 @@ export async function writeComplianceDigest(
   const connect = metrics.callConnectRate === null ? "no placed calls" : String(metrics.callConnectRate);
   const summary = `Weekly compliance digest for ${workspaceId}. Blocked sends by reason: ${blocked}. Call connect rate: ${connect}. Job lag seconds: ${metrics.jobLagSeconds}. Error rate: ${metrics.errorRate}. Portfolios in the recovery rollup: ${metrics.recoveryByPortfolio.length}. Compliance seats on file: ${recipients.length}. ${limits} No consumer name, phone, or account number is included.`;
   const liveRequested = process.env.MERIDIAN_COMPLIANCE_DIGEST === "enabled" && process.env.MERIDIAN_CHANNEL_DELIVER === "live";
+  let from = "";
+  if (liveRequested) {
+    try {
+      from = liveFromAddress(process.env.SENDGRID_FROM, "Digest from address");
+    } catch {
+      from = "";
+    }
+  }
   let delivery: ComplianceDigest["delivery"] = "sandbox";
-  if (liveRequested && process.env.RESEND_API_KEY && recipients.length > 0) {
+  if (liveRequested && process.env.RESEND_API_KEY && recipients.length > 0 && from) {
     try {
       const response = await fetchImpl("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: process.env.SENDGRID_FROM || "compliance@example.test",
+          from,
           to: recipients,
           subject: digestSubject(workspaceId),
           text: summary,

@@ -69,13 +69,21 @@ export async function deliverSms(input: { to: string; body: string }, fetchImpl:
   return { provider: "telnyx", providerId: payload.data?.id ?? "telnyx", sandbox: false };
 }
 
+export function liveFromAddress(value: string | undefined, label: string): string {
+  const email = value?.trim() ?? "";
+  const host = email.split("@")[1]?.toLowerCase() ?? "";
+  if (!email.includes("@") || !host) throw new Error(`${label} is missing.`);
+  if (host === "example.test" || host.endsWith(".example.test")) throw new Error(`${label} will not use example.test.`);
+  return email;
+}
+
 export async function deliverEmail(input: { to: string; subject: string; body: string }, fetchImpl: FetchLike = fetch): Promise<DeliveryResult> {
   const provider = emailProvider();
   if (!liveDeliveryEnabled() || provider === "sandbox") return sandboxId("email");
   if (provider === "sendgrid") {
     const key = process.env.SENDGRID_API_KEY;
-    const from = process.env.SENDGRID_FROM;
-    if (!key || !from) throw new Error("SendGrid keys are missing");
+    if (!key) throw new Error("SendGrid keys are missing");
+    const from = liveFromAddress(process.env.SENDGRID_FROM, "SendGrid from address");
     const response = await fetchImpl("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -85,8 +93,8 @@ export async function deliverEmail(input: { to: string; subject: string; body: s
     return { provider: "sendgrid", providerId: response.status === 202 ? "sendgrid_accepted" : "sendgrid", sandbox: false };
   }
   const token = process.env.POSTMARK_SERVER_TOKEN;
-  const from = process.env.POSTMARK_FROM;
-  if (!token || !from) throw new Error("Postmark keys are missing");
+  if (!token) throw new Error("Postmark keys are missing");
+  const from = liveFromAddress(process.env.POSTMARK_FROM, "Postmark from address");
   const response = await fetchImpl("https://api.postmarkapp.com/email", {
     method: "POST",
     headers: { "X-Postmark-Server-Token": token, "Content-Type": "application/json" },

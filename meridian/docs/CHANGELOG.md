@@ -31,6 +31,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 - Letter merge no longer invents example.test, a collector name, or a $25 plan minimum. A saved agency domain is still used for the portal link.
 - The validation PDF says its Spanish request line is an ASCII draft and is not the CFPB Spanish model form.
 - Live Stripe checkout uses MERIDIAN_PUBLIC_URL for the return page, refuses example.test, and does not send the account reference. Sandbox checkout still stays on the local payment page.
+- Live SendGrid, Postmark, and the weekly digest refuse a from address on example.test. Sandbox mail does not call the provider.
 
 ## Consumer, client, and public surfaces
 
