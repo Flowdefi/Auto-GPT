@@ -37,7 +37,7 @@ import type {
 } from "@/lib/collections/types";
 import type { WorkspaceId } from "@/lib/types";
 import { modelFormPdf } from "@/lib/collections/model-form-pdf";
-import { defaultSolTable, limitationsDatePassed, timeBarredSolicitation, type SolRule } from "@/lib/collections/sol";
+import { TIME_BARRED_HOLD, defaultSolTable, limitationsDatePassed, timeBarredSolicitation, type SolRule } from "@/lib/collections/sol";
 import { validationEndDate } from "@/lib/collections/validation-period";
 import { decryptSecret, encryptSecret, sha256Hex } from "@/server/auth-crypto";
 import { brandFor } from "@/server/brand";
@@ -542,7 +542,7 @@ export async function sendChannel(input: {
     const blocked = storeMessage(
       input,
       "blocked",
-      "Limitations date on file is in the past. This payment or settlement message stays held. Use the counsel-reviewed time-barred notice.",
+      TIME_BARRED_HOLD,
       null,
     );
     logEvent(input.workspaceId, input.channel, input.accountId, false, blocked.reason ?? "time-barred");
@@ -880,6 +880,7 @@ export async function approveDraft(workspaceId: WorkspaceId, draftId: string, ap
 export function setupPaymentPlan(workspaceId: WorkspaceId, accountId: string, months: number, installmentCents: number): PortfolioAccount {
   const account = accounts(workspaceId).find((item) => item.id === accountId);
   if (!account) throw new Error("Account not found");
+  if (limitationsDatePassed(account.solExpiresOn, new Date().toISOString())) throw new Error(TIME_BARRED_HOLD);
   const decision = gateFor(workspaceId, account, "payment_portal");
   logEvent(workspaceId, "payment_portal", accountId, decision.allowed, decision.reason);
   if (!decision.allowed) throw new Error(decision.reason);
@@ -1135,6 +1136,7 @@ export function validationPdfBase64(workspaceId: WorkspaceId, accountId: string)
 export async function sandboxPayment(workspaceId: WorkspaceId, accountId: string, amountCents: number): Promise<ConsumerPayment> {
   const account = accounts(workspaceId).find((item) => item.id === accountId);
   if (!account) throw new Error("Account not found");
+  if (limitationsDatePassed(account.solExpiresOn, new Date().toISOString())) throw new Error(TIME_BARRED_HOLD);
   const decision = gateFor(workspaceId, account, "payment_portal");
   logEvent(workspaceId, "payment_portal", accountId, decision.allowed, decision.reason);
   if (!decision.allowed) throw new Error(decision.reason);

@@ -91,6 +91,9 @@ export function defaultSolTable(): SolRule[] {
   });
 }
 
+export const TIME_BARRED_HOLD =
+  "Limitations date on file is in the past. This payment or settlement message stays held. Use the counsel-reviewed time-barred notice.";
+
 /** True only when a calculated limitations date is already in the past. A blank date is not treated as past. */
 export function limitationsDatePassed(solExpiresOn: string | null | undefined, at: string): boolean {
   const onFile = solExpiresOn?.slice(0, 10);

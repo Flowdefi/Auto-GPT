@@ -1,6 +1,6 @@
 import type { WorkspaceId } from "@/lib/types";
 import type { MailJob } from "@/lib/collections/desk";
-import { limitationsDatePassed, timeBarredSolicitation } from "@/lib/collections/sol";
+import { TIME_BARRED_HOLD, limitationsDatePassed, timeBarredSolicitation } from "@/lib/collections/sol";
 import { textPdf } from "@/lib/collections/text-pdf";
 import { loadDb, mutate, nextId } from "@/server/db";
 import { sendChannel, renderTemplatePreview, syncCollectionTemplates, templateForWorkspace } from "./service";
@@ -15,7 +15,7 @@ export function queueLetter(workspaceId: WorkspaceId, accountId: string, templat
   const account = (loadDb().portfolioAccounts ?? []).find((item) => item.id === accountId && item.workspaceId === workspaceId);
   if (!account) throw new Error("Account not found");
   const preview = renderTemplatePreview(workspaceId, templateId, accountId);
-  const holdReason = "Limitations date on file is in the past. This payment or settlement message stays held. Use the counsel-reviewed time-barred notice.";
+  const holdReason = TIME_BARRED_HOLD;
   const timeBarred = limitationsDatePassed(account.solExpiresOn, new Date().toISOString()) && timeBarredSolicitation(template.id, preview.body);
   const pdf = Buffer.from(textPdf(preview.subject || template.id, timeBarred ? holdReason : preview.body)).toString("base64");
   let status: MailJob["status"] = "queued";

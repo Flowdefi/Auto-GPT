@@ -9,7 +9,8 @@ import { withinCallingWindow } from "./time";
 import type { PortfolioAccount, VoiceSettings } from "./types";
 import { totp, verifyTotp } from "../../server/totp";
 import { queueLetter } from "../../server/collections/letters";
-import { importPortfolio, sendChannel, setTemplateApproval, setupPaymentPlan, syncCollectionTemplates, templateForWorkspace } from "../../server/collections/service";
+import { postAchPayment } from "../../server/collections/payments";
+import { importPortfolio, sandboxPayment, sendChannel, setTemplateApproval, setupPaymentPlan, syncCollectionTemplates, templateForWorkspace } from "../../server/collections/service";
 import { loadDb, mutate } from "../../server/db";
 import { emptyTranscript, redactSensitive, stepCall } from "./voice";
 
@@ -305,4 +306,31 @@ test("sandbox payment plan stays inside the balance and the month cap", () => {
   assert.throws(() => setupPaymentPlan("triton", ohio.id, 40, 2000), /1 to/);
   assert.throws(() => setupPaymentPlan("triton", ohio.id, 4, 5000), /cannot exceed/);
   if (california) assert.throws(() => setupPaymentPlan("triton", california.id, 2, 1000), /not eligible/);
+});
+
+test("the portal does not take a plan or a payment after the limitations date", async () => {
+  const stamp = Date.now().toString(36);
+  const ref = `HOLD-${stamp}`;
+  const imported = importPortfolio({
+    workspaceId: "triton",
+    csv: `account_ref,consumer_name,consumer_state,zip,last4,balance\n${ref},Example Planner,OH,44101,1111,40.00\n`,
+  });
+  const account = imported.accounts.find((item) => item.accountRef === ref);
+  assert.ok(account);
+  const prior = account.solExpiresOn ?? null;
+  mutate((db) => {
+    db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) => (item.id === account.id ? { ...item, solExpiresOn: "2020-01-01" } : item));
+  });
+  try {
+    assert.throws(() => setupPaymentPlan("triton", account.id, 2, 1000), /counsel-reviewed time-barred notice/);
+    await assert.rejects(sandboxPayment("triton", account.id, 1000), /counsel-reviewed time-barred notice/);
+    await assert.rejects(
+      postAchPayment({ workspaceId: "triton", accountId: account.id, amountCents: 1000, recurring: false, accepted: true }),
+      /counsel-reviewed time-barred notice/,
+    );
+  } finally {
+    mutate((db) => {
+      db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) => (item.id === account.id ? { ...item, solExpiresOn: prior } : item));
+    });
+  }
 });

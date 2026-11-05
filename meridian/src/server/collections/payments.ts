@@ -1,5 +1,6 @@
 import type { WorkspaceId } from "@/lib/types";
 import type { ComplianceEvent, ConsumerPayment } from "@/lib/collections/types";
+import { TIME_BARRED_HOLD, limitationsDatePassed } from "@/lib/collections/sol";
 import { loadDb, mutate, nextId } from "@/server/db";
 import { logEvent } from "@/server/log";
 import { createStripeCheckout } from "./providers";
@@ -30,6 +31,7 @@ export async function postAchPayment(input: {
   if (!Number.isInteger(input.amountCents) || input.amountCents < 100) throw new Error("Amount must be at least one dollar.");
   const account = (loadDb().portfolioAccounts ?? []).find((item) => item.id === input.accountId && item.workspaceId === input.workspaceId);
   if (!account) throw new Error("Account not found");
+  if (limitationsDatePassed(account.solExpiresOn, new Date().toISOString())) throw new Error(TIME_BARRED_HOLD);
   const decision = gateFor(input.workspaceId, account, "payment_portal");
   if (!decision.allowed) throw new Error(decision.reason);
   if (input.amountCents > account.balanceCents) throw new Error("Amount cannot exceed the balance");

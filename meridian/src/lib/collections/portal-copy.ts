@@ -42,6 +42,7 @@ export interface PortalCopy {
   eachPayment: string;
   savePlan: string;
   pay: string;
+  timeBarredHold: string;
   receipt: string;
   noCard: string;
   dispute: string;
@@ -98,6 +99,7 @@ export const portalCopy: Record<PortalLang, PortalCopy> = {
     eachPayment: "Each payment in dollars",
     savePlan: "Save test-mode plan",
     pay: "Pay $25.00 in test mode",
+    timeBarredHold: "The limitations date on file is in the past. A payment plan and a payment page are not offered here. A collector has to use the counsel-reviewed time-barred notice. This sentence is a draft.",
     receipt: "Test payment",
     noCard: "No card was collected.",
     dispute: "Dispute",
@@ -147,6 +149,7 @@ export const portalCopy: Record<PortalLang, PortalCopy> = {
     eachPayment: "Cada pago en dólares",
     savePlan: "Guardar el plan de prueba",
     pay: "Pagar $25.00 en modo de prueba",
+    timeBarredHold: "La fecha de prescripción en el expediente ya pasó. Aquí no se ofrece un plan de pago ni una página de pago. Un cobrador tiene que usar el aviso revisado por un abogado. Esta frase es un borrador.",
     receipt: "Pago de prueba",
     noCard: "No se recopiló ninguna tarjeta.",
     dispute: "Disputa",

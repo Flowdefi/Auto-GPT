@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { usePortalCopy } from "@/components/collect/portal-frame";
+import { limitationsDatePassed } from "@/lib/collections/sol";
 import type { ConsumerPayment, PortfolioAccount } from "@/lib/collections/types";
 
 function money(cents: number | undefined): string {
@@ -154,6 +155,10 @@ export default function CollectAccountPage() {
         {copy.download}
       </button>
       {account.disputeDeadline ? <p className="text-sm">{copy.periodEnds} {account.disputeDeadline}.</p> : null}
+      {limitationsDatePassed(account.solExpiresOn, new Date().toISOString()) ? (
+        <p className="mt-6 text-sm leading-6">{copy.timeBarredHold} {copy.counsel}</p>
+      ) : (
+      <>
       <form onSubmit={(event) => void savePlan(event)} className="mt-6 grid gap-2">
         <h2 className="font-semibold">{copy.planTitle}</h2>
         <p className="text-sm">{copy.planBody}</p>
@@ -187,6 +192,8 @@ export default function CollectAccountPage() {
         <button className="min-h-11 rounded-xl border border-[#1c2430] px-4" type="submit" disabled={!authorized}>Authorize test debit</button>
         {proof ? <p role="status">Authorization proof {proof} is stored. The copy is the text above.</p> : null}
       </form>
+      </>
+      )}
       {receipt ? <p className="mt-3 text-sm" role="status">{copy.receipt} {receipt.providerId} {money(receipt.amountCents)}. {copy.noCard}</p> : null}
       <form onSubmit={(event) => void sendDispute(event)} className="mt-8 grid gap-2">
         <label className="grid gap-1 text-sm" htmlFor="dispute-text">
