@@ -9,11 +9,11 @@ RUN apt-get -y install git chromium-driver
 RUN apt-get update \
     && apt-get install -y wget gnupg2 libgtk-3-0 libdbus-glib-1-2 dbus-x11 xvfb ca-certificates
 
-# Install Firefox / Chromium
-RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y chromium firefox-esr
+# Install Firefox / Chromium from Debian. apt-key is not in current images,
+# and the Google Chrome apt repo is not used by this image.
+RUN apt-get update \
+    && apt-get install -y chromium firefox-esr \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables
 ENV PIP_NO_CACHE_DIR=yes \

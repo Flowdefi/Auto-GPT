@@ -108,7 +108,9 @@ export function voiceSettingsFor(workspaceId: WorkspaceId): VoiceSettings {
   const inherited = workspaceId === "triton" ? base : defaultVoiceSettings();
   return {
     ...base,
-    killSwitch: Boolean(base.killSwitch) || frozen,
+    // Freeze is the workspace list. The legacy voiceSettings.killSwitch
+    // value applied to every workspace and stayed on after the desk lift.
+    killSwitch: frozen,
     rndSandboxClear,
     blockInbound: limits?.blockInbound ?? inherited.blockInbound,
     dailyOutboundCap: limits?.dailyOutboundCap ?? inherited.dailyOutboundCap,

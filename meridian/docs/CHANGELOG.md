@@ -4,6 +4,8 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 
 ## Eligibility, import, and the gate
 
+- A new database no longer starts with the outbound kill switch on for every workspace. The desk freeze still applies only to the workspace that was frozen.
+
 - Portfolio import from CSV, xlsx, and fixed-width, with column mapping, dedupe, chain of title, charge-off, and Reg F itemization. A 100,000-row synthetic file imported in 1.7 seconds.
 - State table for all 50 states and D.C. Collection is limited to the no-license states plus Texas. Uncertain rows stay ineligible. Texas is the Tex. Fin. Code § 392.101 bond.
 - The compliance gate blocks outreach and the payment portal for ineligible, ceased, disputed, bankrupt, deceased, military, and attorney-represented accounts.
