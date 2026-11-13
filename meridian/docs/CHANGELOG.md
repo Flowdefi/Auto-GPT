@@ -4,6 +4,8 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 
 ## Eligibility, import, and the gate
 
+- `ai.debtmarket.net` answers from Workers AI because the desk has no xAI key. Education bands, face-and-percent math, the 90-day window, and the seller snapshot list run locally. The page does not send mail, place a call, or store the question.
+
 - A new database no longer starts with the outbound kill switch on for every workspace. The desk freeze still applies only to the workspace that was frozen.
 
 - Portfolio import from CSV, xlsx, and fixed-width, with column mapping, dedupe, chain of title, charge-off, and Reg F itemization. A 100,000-row synthetic file imported in 1.7 seconds.
