@@ -1,11 +1,19 @@
 services:
   meridian:
     build: .
+    # Publish 3000, the port next start listens on inside the container.
+    # The meridian-crm cloudflared ingress should keep targeting http://127.0.0.1:3000.
+    # Set MERIDIAN_BIND_PORT only if that tunnel already uses a different host port.
     ports:
-      - "3000:3000"
+      - "${MERIDIAN_BIND_PORT:-3000}:3000"
+    command: ["node", "scripts/docker-entry.mjs"]
     environment:
       MERIDIAN_PUBLIC_URL: ${MERIDIAN_PUBLIC_URL:-http://localhost:3000}
+      MERIDIAN_ADMIN_URL: ${MERIDIAN_ADMIN_URL:-}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      MERIDIAN_OWNER_EMAIL: ${MERIDIAN_OWNER_EMAIL:-}
+      MERIDIAN_OWNER_PASSWORD: ${MERIDIAN_OWNER_PASSWORD:-}
+      MERIDIAN_AGENCY_NAME: ${MERIDIAN_AGENCY_NAME:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       AGENTMAIL_API_KEY: ${AGENTMAIL_API_KEY:-}
       AGENTMAIL_INBOX_TRITON: ${AGENTMAIL_INBOX_TRITON:-portfolios@agentmail.to}
@@ -20,11 +28,28 @@ services:
       MERIDIAN_MODEL: ${MERIDIAN_MODEL:-qwen2.5:14b}
       MERIDIAN_FAST_MODEL: ${MERIDIAN_FAST_MODEL:-llama3.2:3b}
       MERIDIAN_EMBED_MODEL: ${MERIDIAN_EMBED_MODEL:-nomic-embed-text}
-      MERIDIAN_AUTH_SECRET: ${MERIDIAN_AUTH_SECRET:-}
+      MERIDIAN_AUTH_SECRET: ${MERIDIAN_AUTH_SECRET:-demo-only-not-a-real-secret-32chars}
+      MERIDIAN_SECRET_KEY: ${MERIDIAN_SECRET_KEY:-demo-only-not-a-real-secret-32chars}
+      MERIDIAN_SEED_DEMO: ${MERIDIAN_SEED_DEMO:-false}
+      MERIDIAN_COLLECTIONS_DEMO: ${MERIDIAN_COLLECTIONS_DEMO:-true}
+      MERIDIAN_CHANNEL_DELIVER: ${MERIDIAN_CHANNEL_DELIVER:-sandbox}
+      MERIDIAN_VOICE_LIVE: ${MERIDIAN_VOICE_LIVE:-}
       POLAR_ACCESS_TOKEN: ${POLAR_ACCESS_TOKEN:-}
       POLAR_PRODUCT_ID: ${POLAR_PRODUCT_ID:-}
       POLAR_WEBHOOK_SECRET: ${POLAR_WEBHOOK_SECRET:-}
       POLAR_SERVER: ${POLAR_SERVER:-production}
+    volumes:
+      - meridian-data:/app/data
+    restart: unless-stopped
+  jobs:
+    build: .
+    command: ["npm", "run", "jobs:worker"]
+    environment:
+      MERIDIAN_AUTH_SECRET: ${MERIDIAN_AUTH_SECRET:-demo-only-not-a-real-secret-32chars}
+      MERIDIAN_SECRET_KEY: ${MERIDIAN_SECRET_KEY:-demo-only-not-a-real-secret-32chars}
+      MERIDIAN_CHANNEL_DELIVER: sandbox
+      MERIDIAN_JOB_INTERVAL_SECONDS: ${MERIDIAN_JOB_INTERVAL_SECONDS:-60}
+      MERIDIAN_SEED_DEMO: "false"
     volumes:
       - meridian-data:/app/data
     restart: unless-stopped

@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "crypto";
 import type { WorkspaceId } from "@/lib/types";
 import { workspaceOf } from "@/lib/workspaces";
 import { loadDb, mutate, nextId } from "./db";
+import { emailBlockReason } from "./email-block";
 import type { BulkCampaign, EmailListMember, OutboundMessage } from "./models";
 import { resolveProviderSecret } from "./secrets";
 
@@ -49,20 +50,23 @@ export function tokenFor(email: string, campaignId: string): string {
     .slice(0, 32);
 }
 
-function isSuppressed(workspaceId: WorkspaceId, email: string): boolean {
-  const db = loadDb();
-  return db.suppressions.some(
-    (row) => row.workspaceId === workspaceId && row.email === email.toLowerCase(),
-  );
-}
-
 export function eligibleMembers(listId: string, workspaceId: WorkspaceId): EmailListMember[] {
   const db = loadDb();
   return db.members.filter(
     (member) =>
       member.listId === listId &&
       member.subscribed &&
-      !isSuppressed(workspaceId, member.email),
+      !emailBlockReason(workspaceId, member.email),
+  );
+}
+
+export function blockedListMembers(listId: string, workspaceId: WorkspaceId): EmailListMember[] {
+  const db = loadDb();
+  return db.members.filter(
+    (member) =>
+      member.listId === listId &&
+      member.subscribed &&
+      Boolean(emailBlockReason(workspaceId, member.email)),
   );
 }
 
@@ -89,6 +93,7 @@ export async function sendCampaign(campaignId: string, options: SendOptions = {}
   if (campaign.status === "sent") return campaign;
 
   const members = eligibleMembers(campaign.listId, campaign.workspaceId);
+  const denied = blockedListMembers(campaign.listId, campaign.workspaceId);
   const cap = options.frequencyCap ?? 3;
   const capped = members.filter(
     (member) => !member.seedLocked && recentSendCount(campaign.workspaceId, member.email) >= cap,
@@ -107,7 +112,24 @@ export async function sendCampaign(campaignId: string, options: SendOptions = {}
     if (!current) return;
     current.status = "sending";
     current.intended = sendable.length;
-    current.skipped = locked.length + capped.length;
+    current.skipped = locked.length + capped.length + denied.length;
+    for (const member of denied) {
+      const already = state.messages.some(
+        (message) => message.campaignId === campaignId && message.to === member.email,
+      );
+      if (already) continue;
+      const reason = emailBlockReason(campaign.workspaceId, member.email) ?? "suppressed";
+      state.messages.push({
+        id: nextId("om"),
+        campaignId,
+        workspaceId: campaign.workspaceId,
+        to: member.email,
+        subject: campaign.subject,
+        status: "suppressed",
+        error: reason === "do_not_email" ? "Contact is marked do not email" : "Suppression list",
+        unsubscribeToken: tokenFor(member.email, campaignId),
+      });
+    }
     for (const member of members) {
       const already = state.messages.some(
         (message) => message.campaignId === campaignId && message.to === member.email,
@@ -169,6 +191,16 @@ async function deliverOne(
   member: EmailListMember,
   message: OutboundMessage,
 ): Promise<void> {
+  const blocked = emailBlockReason(campaign.workspaceId, member.email);
+  if (blocked) {
+    mutate((state) => {
+      const row = state.messages.find((item) => item.id === message.id);
+      if (!row) return;
+      row.status = "suppressed";
+      row.error = blocked === "do_not_email" ? "Contact is marked do not email" : "Suppression list";
+    });
+    return;
+  }
   const ctx = contextFor(member, campaign, message.unsubscribeToken);
   const html = withTracking(merge(campaign.html, ctx), message.id);
   const text = merge(campaign.text, ctx);
@@ -185,8 +217,9 @@ async function deliverOne(
       text,
       unsubscribeUrl: ctx.unsubscribeUrl,
       unsubscribeToken: message.unsubscribeToken,
-      campaignId: campaign.id,
-    });
+    campaignId: campaign.id,
+    workspaceId: campaign.workspaceId,
+  });
     mutate((state) => {
       const row = state.messages.find((item) => item.id === message.id);
       if (!row) return;
@@ -214,6 +247,14 @@ export async function sendTest(
   text: string,
   previewText: string,
 ): Promise<{ id: string; provider: string }> {
+  const blocked = emailBlockReason(workspaceId, to);
+  if (blocked) {
+    throw new Error(
+      blocked === "do_not_email"
+        ? "Refusing to send: contact is marked do not email"
+        : "Refusing to send: address is suppressed",
+    );
+  }
   const from = fromAddress(workspaceId);
   const member: EmailListMember = {
     id: "test",
@@ -245,6 +286,7 @@ export async function sendTest(
     unsubscribeUrl: ctx.unsubscribeUrl,
     unsubscribeToken: token,
     campaignId: "test",
+    workspaceId,
   });
   mutate((state) => {
     state.messages.push({
@@ -274,6 +316,7 @@ interface TransportInput {
   unsubscribeUrl: string;
   unsubscribeToken: string;
   campaignId: string;
+  workspaceId: WorkspaceId;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -328,6 +371,14 @@ async function sendViaAgentmail(input: TransportInput): Promise<{ id: string; pr
 }
 
 async function transportSend(input: TransportInput): Promise<{ id: string; provider: string }> {
+  const blocked = emailBlockReason(input.workspaceId, input.to);
+  if (blocked) {
+    throw new Error(
+      blocked === "do_not_email"
+        ? `Refusing to send to ${input.to}: contact is marked do not email`
+        : `Refusing to send to ${input.to}: address is suppressed`,
+    );
+  }
   const resendKey = resolveProviderSecret("RESEND_API_KEY") ?? process.env.RESEND_API_KEY;
   if (resendKey) {
     const response = await fetch("https://api.resend.com/emails", {

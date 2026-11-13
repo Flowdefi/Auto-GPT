@@ -10,6 +10,7 @@ import type {
   ActivityType,
   AiMessage,
   AppState,
+  Company,
   Contact,
   Deal,
   Task,
@@ -37,6 +38,9 @@ interface Store extends AppState {
   addTicket: (ticket: Omit<Ticket, "id" | "createdAt">) => void;
   setTicketStatus: (ticketId: string, status: Ticket["status"]) => void;
   addContact: (contact: Omit<Contact, "id" | "lastActivityAt" | "score">) => void;
+  updateContact: (contactId: string, patch: Partial<Contact>) => void;
+  addCompany: (company: Omit<Company, "id" | "score"> & { score?: number }) => void;
+  updateCompany: (companyId: string, patch: Partial<Company>) => void;
   markConversationRead: (conversationId: string) => void;
   replyConversation: (conversationId: string, body: string) => void;
   pushAi: (message: Omit<AiMessage, "id" | "at">) => void;
@@ -194,6 +198,49 @@ export const useMeridian = create<Store>()(
                   },
                   ...workspace.contacts,
                 ],
+              },
+            },
+          };
+        }),
+      updateContact: (contactId, patch) =>
+        set((state) => {
+          const workspace = state.data[state.workspaceId];
+          return {
+            data: {
+              ...state.data,
+              [state.workspaceId]: {
+                ...workspace,
+                contacts: workspace.contacts.map((contact) =>
+                  contact.id === contactId ? { ...contact, ...patch } : contact,
+                ),
+              },
+            },
+          };
+        }),
+      addCompany: (company) =>
+        set((state) => {
+          const workspace = state.data[state.workspaceId];
+          return {
+            data: {
+              ...state.data,
+              [state.workspaceId]: {
+                ...workspace,
+                companies: [{ ...company, id: id("co"), score: company.score ?? 0 }, ...workspace.companies],
+              },
+            },
+          };
+        }),
+      updateCompany: (companyId, patch) =>
+        set((state) => {
+          const workspace = state.data[state.workspaceId];
+          return {
+            data: {
+              ...state.data,
+              [state.workspaceId]: {
+                ...workspace,
+                companies: workspace.companies.map((company) =>
+                  company.id === companyId ? { ...company, ...patch } : company,
+                ),
               },
             },
           };

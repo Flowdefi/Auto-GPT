@@ -1,0 +1,3 @@
+# Run due collection jobs every five minutes. The worker in docker-compose is the other option.
+# Install with: crontab -l | cat - meridian/scripts/jobs.cron | crontab -
+*/5 * * * * cd /app && /usr/local/bin/npm run jobs:run >> /var/log/meridian-jobs.log 2>&1
