@@ -4,7 +4,7 @@ Capabilities added to the Meridian collections desk on this pull request. The de
 
 ## Eligibility, import, and the gate
 
-- `ai.debtmarket.net` answers from Workers AI because the desk has no xAI key. Education bands, face-and-percent math, the 90-day window, and the seller snapshot list run locally. The page does not send mail, place a call, or store the question.
+- `ai.debtmarket.net` is the live text desk. Workers AI Llama 3.2 answers open questions because the 3.1 instruct binding is deprecated and the desk has no xAI key. Education bands, face-and-percent math, the 90-day window, the seller snapshot list, and the masked-file description run locally. The page does not send mail, place a call, or store the question.
 
 - A new database no longer starts with the outbound kill switch on for every workspace. The desk freeze still applies only to the workspace that was frozen.
 

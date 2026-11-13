@@ -4,7 +4,7 @@
  * This host uses Workers AI and local desk math instead, and it stores nothing.
  */
 
-export const MODEL = "@cf/meta/llama-3.1-8b-instruct";
+export const MODEL = "@cf/meta/llama-3.2-3b-instruct";
 
 export const BANDS = [
   ["Credit card", "3–8%"],
@@ -157,6 +157,9 @@ export function localReply(text) {
     const math = pricePool({ face, percent });
     if (!math.error) return `${math.cash.toLocaleString("en-US", { style: "currency", currency: "USD" })} is ${math.percentOfFace}% of ${math.face.toLocaleString("en-US")} face. ${math.note}`;
   }
+  if (value.toLowerCase().includes("masked")) {
+    return "A masked file is a review file with account-level detail removed. It is not a consumer working tape. An NDA comes before it. A price in that conversation is not an offer.";
+  }
   if (/\bnda|snapshot|seller\b/i.test(value)) {
     const intake = sellerIntake();
     return `A snapshot should include ${intake.beforeFile.join(", ")}. ${intake.then} ${intake.note}`;
@@ -225,7 +228,8 @@ export default {
       const last = messages.filter((item) => item && item.role === "user").at(-1);
       const asked = redact(last?.content || "");
       if (!asked) return json({ error: "Say what you need." }, 400);
-      if (screen(asked) === "consumer") return json({ reply: localReply(asked), source: "local", stored: false });
+      const local = localReply(asked);
+      if (!local.startsWith("I can walk through")) return json({ reply: local, source: "local", stored: false });
       const context = pluginContext(asked);
       const reply = await modelReply(env, asked, context);
       return json({ reply: reply.text, source: reply.source, stored: false });

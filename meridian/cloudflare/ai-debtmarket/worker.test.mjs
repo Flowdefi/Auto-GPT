@@ -36,6 +36,12 @@ test("a consumer question and an identifier stay off the model path", () => {
   assert.equal(reply.includes("4111"), false);
 });
 
+test("a masked file stays a review file and not a consumer tape", () => {
+  const reply = localReply("What is a masked file?");
+  assert.match(reply, /not a consumer working tape/);
+  assert.match(reply, /NDA/);
+});
+
 test("seller intake and bands answer without a model", () => {
   assert.match(localReply("what does a seller snapshot need"), /Creditor/);
   assert.match(localReply("show the education bands"), /Credit card/);
