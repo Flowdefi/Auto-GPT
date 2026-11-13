@@ -6,6 +6,7 @@ import {
   SESSION_HOURS,
 } from "@/lib/commerce";
 import { hashPassword, hashSecret, keyPrefix, mintApiKey, randomId, signPayload, verifyPassword, verifySignedPayload } from "./auth-crypto";
+import { selfHosted } from "./self-host";
 import { clientIp } from "./rate-limit";
 import { enterAccountContext, masterSecret } from "./secrets";
 import { sqliteAll, sqliteGet, sqliteReady, sqliteRun } from "./sqlite";
@@ -89,6 +90,7 @@ export function accountByEmail(email: string): Account | null {
 }
 
 export function accountHasSeat(accountId: string): boolean {
+  if (selfHosted()) return true;
   const row = sqliteGet(
     "SELECT id FROM licenses WHERE account_id = ? AND redeemed_at IS NOT NULL LIMIT 1",
     accountId,
@@ -278,21 +280,26 @@ export async function seatFromNextCookies(): Promise<Seat | null> {
   return seatFromCookie(jar.get(SESSION_COOKIE)?.value);
 }
 
-export function createApiKey(accountId: string, name: string): { id: string; key: string; prefix: string } {
+export function createApiKey(
+  accountId: string,
+  name: string,
+  workspaceId?: string,
+): { id: string; key: string; prefix: string; workspaceId?: string } {
   if (!accountHasSeat(accountId)) throw new Error("Buy a lifetime seat before creating API keys");
   const label = name.trim().slice(0, 60) || "Default";
   const key = mintApiKey();
   const id = randomId("key");
   sqliteRun(
-    "INSERT INTO api_keys (id, account_id, name, key_hash, key_prefix, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO api_keys (id, account_id, name, key_hash, key_prefix, created_at, workspace_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
     id,
     accountId,
     label,
     hashSecret(key),
     keyPrefix(key, 16),
     new Date().toISOString(),
+    workspaceId ?? null,
   );
-  return { id, key, prefix: keyPrefix(key, 16) };
+  return { id, key, prefix: keyPrefix(key, 16), workspaceId };
 }
 
 export function listApiKeys(accountId: string): Array<{

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isWorkspaceId } from "@/lib/workspace-id";
 import { requireSeat } from "@/server/api-guard";
 import { createApiKey, listApiKeys, revokeApiKey } from "@/server/auth";
 import { clientIp, rateLimited, tooMany } from "@/server/rate-limit";
@@ -16,14 +17,15 @@ export async function POST(request: Request) {
   if (rateLimited(`keys:${clientIp(request)}`, 10, 60_000)) return tooMany();
   const gate = await requireSeat(request);
   if (!gate.ok) return gate.response;
-  let body: { name?: string };
+  let body: { name?: string; workspaceId?: string };
   try {
-    body = (await request.json()) as { name?: string };
+    body = (await request.json()) as { name?: string; workspaceId?: string };
   } catch {
     return NextResponse.json({ error: "Unreadable body" }, { status: 400 });
   }
   try {
-    const created = createApiKey(gate.account.id, body.name ?? "Default");
+    const workspaceId = isWorkspaceId(body.workspaceId) ? body.workspaceId : undefined;
+    const created = createApiKey(gate.account.id, body.name ?? "Default", workspaceId);
     return NextResponse.json({
       id: created.id,
       prefix: created.prefix,

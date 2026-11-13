@@ -43,6 +43,10 @@ function open(): SqliteHandle | null {
     handle.exec("PRAGMA foreign_keys = ON;");
     const schema = readFileSync(path.join(process.cwd(), "src/server/schema.sql"), "utf8");
     handle.exec(schema);
+    const columns = handle.prepare("PRAGMA table_info(api_keys)").all();
+    if (!columns.some((column) => String(column.name) === "workspace_id")) {
+      handle.exec("ALTER TABLE api_keys ADD COLUMN workspace_id TEXT");
+    }
     available = true;
     return handle;
   } catch (error) {

@@ -16,6 +16,76 @@ interface PlatformSnapshot {
   counts: { leads: number; inbox: number; submissions: number; workflows: number };
 }
 
+function OneDriveCard({ workspaceId }: { workspaceId: string }) {
+  const [notice, setNotice] = useState<string | null>(null);
+  const [items, setItems] = useState<Array<{ id: string; name: string; webUrl?: string; folder: boolean }>>([]);
+  const [target, setTarget] = useState("inventory");
+  const [targetId, setTargetId] = useState("");
+
+  async function browse(itemId?: string) {
+    const response = await fetch("/api/outlook", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId, action: "drive", itemId }),
+    });
+    const body = (await response.json()) as { items?: typeof items; hint?: string; error?: string; configured?: boolean };
+    setItems(body.items ?? []);
+    setNotice(body.error ?? (body.configured === false ? body.hint ?? "Graph is not configured" : null));
+  }
+
+  async function attach(item: { id: string; name: string; webUrl?: string }) {
+    if (!targetId.trim()) {
+      setNotice("Enter the portfolio, deal, or contact id first.");
+      return;
+    }
+    const response = await fetch("/api/outlook", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workspaceId,
+        action: "attach",
+        target,
+        targetId: targetId.trim(),
+        name: item.name,
+        webUrl: item.webUrl,
+        driveItemId: item.id,
+      }),
+    });
+    const body = (await response.json()) as { error?: string };
+    setNotice(body.error ?? `Attached ${item.name}`);
+  }
+
+  return (
+    <Card className="p-5 lg:col-span-2">
+      <div className="font-semibold">OneDrive</div>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Files from the mailbox owner&apos;s drive. Attaching stores the web link and Graph id. Nothing is downloaded onto this server. If Microsoft credentials are empty, this list stays empty.
+      </p>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <select className="min-h-11 rounded-xl border bg-transparent px-3 text-sm" value={target} onChange={(event) => setTarget(event.target.value)} aria-label="Attach target">
+          <option value="inventory">Portfolio</option>
+          <option value="deal">Deal</option>
+          <option value="contact">Contact</option>
+        </select>
+        <input className="min-h-11 flex-1 rounded-xl border bg-transparent px-3 text-sm" placeholder="Record id" value={targetId} onChange={(event) => setTargetId(event.target.value)} aria-label="Record id" />
+        <Button tone="soft" onClick={() => void browse()}>Browse drive</Button>
+      </div>
+      <ul className="mt-3 space-y-2 text-sm">
+        {items.map((item) => (
+          <li key={item.id} className="flex flex-wrap items-center justify-between gap-2">
+            <span className="min-w-0 break-words">{item.folder ? "Folder · " : ""}{item.name}</span>
+            <span className="flex gap-2">
+              {item.folder ? <Button tone="soft" onClick={() => void browse(item.id)}>Open</Button> : null}
+              <Button tone="soft" onClick={() => void attach(item)}>Attach</Button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {notice ? <p className="mt-2 text-xs text-muted-foreground">{notice}</p> : null}
+    </Card>
+  );
+}
+
 export default function IntegrationsPage() {
   const { workspaceId, config } = useActiveWorkspace();
   const [data, setData] = useState<PlatformSnapshot | null>(null);
@@ -69,9 +139,13 @@ export default function IntegrationsPage() {
             Synced threads {data?.counts.inbox ?? 0} · website submissions {data?.counts.submissions ?? 0}
           </p>
           <Button className="mt-3" disabled={busy === "outlook"} onClick={() => void syncOutlook()}>
-            {busy === "outlook" ? "Syncing…" : "Sync mailbox"}
+            {busy === "outlook" ? "Syncing…" : "Sync inbox, sent, drafts, contacts"}
           </Button>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Nightly: <code>npm run graph:sync -- triton</code> with <code>MERIDIAN_API_KEY</code> and <code>MERIDIAN_PUBLIC_URL</code>.
+          </p>
         </Card>
+        <OneDriveCard workspaceId={workspaceId} />
 
         <Card className="p-5">
           <div className="flex items-center justify-between gap-2">
