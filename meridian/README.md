@@ -180,6 +180,42 @@ The consumer portal is public at `/collect`. Lookup uses a reference number, the
 
 Put counsel-reviewed Markdown templates in `templates/collections/` and use **Sync templates**. Nothing in that folder is sent until `counselReviewed: true`. The public repo must stay free of real debtor files.
 
+## Self-hosted desk
+
+`MERIDIAN_SELF_HOSTED=true` skips the Polar seat check for signed-in operators and for `mk_live_` API keys. Create a key after the first account exists:
+
+```bash
+MERIDIAN_SELF_HOSTED=true npm run key:create -- --workspace triton --name email-bot
+```
+
+The plaintext key is printed once. Send it as `Authorization: Bearer mk_live_…`.
+
+```bash
+curl -sS -H "Authorization: Bearer $MERIDIAN_API_KEY" \
+  "http://127.0.0.1:3000/api/contacts?email=ada@example.test"
+
+curl -sS -X POST http://127.0.0.1:3000/api/activities \
+  -H "Authorization: Bearer $MERIDIAN_API_KEY" \
+  -H "content-type: application/json" \
+  -d '{"contactEmail":"ada@example.test","contactName":"Ada Example","company":"Example Seller","type":"note","subject":"Desk note","body":"Synthetic"}'
+```
+
+Activities upsert the contact and a lead, append to the contact and company timelines, and do not change `doNotEmail`. The same `outlookMessageId` and `type` is stored once.
+
+Portfolios live at `/w/triton/marketplace`. Import a CSV or xlsx sales list there. Headers such as issuer, asset class, face value, # accts, avg balance, asking price, charge-off dates, and states are mapped by name.
+
+Microsoft Graph stays idle until `MS_TENANT_ID`, `MS_CLIENT_ID`, and `MS_CLIENT_SECRET` are set. Sync reads Inbox, Sent Items, and Drafts (drafts keep an Open in Outlook link) and upserts mailbox contacts without changing `doNotEmail`. Integrations has the OneDrive browser. A nightly cron can run:
+
+```bash
+MERIDIAN_API_KEY=mk_live_… MERIDIAN_PUBLIC_URL=https://desk.example npm run graph:sync -- triton
+```
+
+SQLite backup, keeping the newest 14 files:
+
+```bash
+bash scripts/backup-db.sh /var/backups/meridian
+```
+
 ## Environment
 
 Copy `.env.example` to `.env.local` (dev) or `.env` (Compose). Empty values are fine until you use that feature.
@@ -188,6 +224,9 @@ Copy `.env.example` to `.env.local` (dev) or `.env` (Compose). Empty values are 
 | --- | --- | --- |
 | `MERIDIAN_AUTH_SECRET` | Production | Session signing secret, 32+ characters |
 | `MERIDIAN_SECRET_KEY` | Production if you store BYOK secrets | Encryption key for provider secrets |
+| `MERIDIAN_SELF_HOSTED` | No | `true` bypasses the paid seat and Polar. Unset stays on the license check |
+| `MERIDIAN_API_KEY` | For `npm run graph:sync` | `mk_live_` key. Not read by the app itself |
+| `MERIDIAN_SQLITE` | No | Override path for `scripts/backup-db.sh`. Default is `data/meridian.db` |
 | `MERIDIAN_SEED_DEMO` | No | `false` disables `seedCrmRecords` and `seedDemoLeads`. Unset/`true` seeds demo data. Compose defaults to `false` |
 | `MERIDIAN_CHANNEL_DELIVER` | No | `sandbox` records collection attempts locally. `live` is refused |
 | `MERIDIAN_PUBLIC_URL` | Recommended | Public origin for unsubscribe and tracking links |

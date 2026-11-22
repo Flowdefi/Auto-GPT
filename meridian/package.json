@@ -17,7 +17,10 @@
     "jobs:run": "tsx scripts/run-jobs.ts",
     "jobs:worker": "tsx scripts/jobs-worker.ts",
     "import:csv": "tsx scripts/import-csv.ts",
-    "purge:demo": "tsx scripts/purge-demo.ts"
+    "purge:demo": "tsx scripts/purge-demo.ts",
+    "key:create": "tsx scripts/create-key.ts",
+    "graph:sync": "bash scripts/graph-sync.sh",
+    "test:desk": "tsx --test src/server/desk.test.ts"
   },
   "dependencies": {
     "@capacitor/app": "^7.1.2",

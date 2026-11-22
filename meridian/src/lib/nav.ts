@@ -22,7 +22,7 @@ export function navFor(workspaceId: WorkspaceId): NavItem[] {
     { href: `${base}/sales/deals`, label: "Deals", hub: "sales", icon: "Briefcase", group: "Revenue", mobile: true },
     { href: `${base}/sales/forecast`, label: "Forecast", hub: "sales", icon: "TrendingUp", group: "Revenue" },
     { href: `${base}/sales/sequences`, label: "Sequences", hub: "sales", icon: "ListChecks", group: "Revenue" },
-    { href: `${base}/marketplace`, label: inventory, hub: "marketplace", icon: "Layers", group: "Revenue" },
+    { href: `${base}/marketplace`, label: inventory, hub: "marketplace", icon: "Layers", group: "Revenue", mobile: true },
 
     { href: `${base}/marketing/bulk`, label: "Email blast", hub: "marketing", icon: "Send", group: "Marketing" },
     { href: `${base}/marketing/campaigns`, label: "Campaigns", hub: "marketing", icon: "Megaphone", group: "Marketing" },

@@ -315,7 +315,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 )}
               >
                 <NavIcon name={item.icon} className="size-5" />
-                {item.label}
+                <span className="max-w-full truncate px-1">{item.label}</span>
               </Link>
             );
           })}

@@ -1,13 +1,14 @@
 import type { WorkspaceId } from "@/lib/types";
-import { domainOf, findCompanyByDomain, findContactByEmail, isFreeMailDomain } from "./crm";
+import { appendLinkedActivity } from "./activities";
+import { domainOf, findCompanyByDomain, findContactByEmail, isFreeMailDomain, upsertContact } from "./crm";
 import { loadDb, mutate, nextId } from "./db";
-import type { InboxMessage } from "./models";
+import type { DeskActivityType, InboxMessage, MailboxSyncState } from "./models";
 import { resolveProviderSecret } from "./secrets";
 import { runAutomations } from "./workflow";
 
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const SELECT =
-  "id,conversationId,subject,bodyPreview,receivedDateTime,from,sender,toRecipients,ccRecipients,hasAttachments,isDraft,body";
+  "id,conversationId,subject,bodyPreview,receivedDateTime,sentDateTime,from,sender,toRecipients,ccRecipients,hasAttachments,isDraft,body,webLink";
 
 export interface OutlookConfig {
   tenantId: string;
@@ -39,10 +40,14 @@ export function outlookStatus(): {
   return {
     configured: Boolean(config),
     mailboxes: config?.mailboxes ?? ["portfolios@debtmarket.net"],
-    scopesNeeded: ["Mail.ReadBasic.All or Mail.Read (application)", "User.Read.All (optional, for names)"],
+    scopesNeeded: [
+      "Mail.Read (application)",
+      "Contacts.Read (application)",
+      "Files.Read.All (application)",
+    ],
     hint: config
-      ? "App-only credentials present. Run a sync to pull the mailbox delta."
-      : "Set MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, and MS_MAILBOXES. Grant admin consent for Mail.Read (application) and scope it with an application access policy.",
+      ? "App-only credentials present. Sync pulls Inbox, Sent Items, Drafts, and mailbox contacts."
+      : "Set MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, and MS_MAILBOXES. Grant admin consent for Mail.Read, Contacts.Read, and Files.Read.All, then scope mail with an application access policy. The desk still runs when these are empty.",
   };
 }
 
@@ -94,6 +99,8 @@ interface GraphMessage {
   hasAttachments?: boolean;
   isDraft?: boolean;
   body?: { content?: string; contentType?: string };
+  webLink?: string;
+  sentDateTime?: string;
   "@removed"?: unknown;
 }
 
@@ -151,11 +158,34 @@ export interface SyncResult {
   error?: string;
 }
 
+type MailFolder = "inbox" | "sentitems" | "drafts";
+
+function activityTypeFor(folder: MailFolder): DeskActivityType {
+  switch (folder) {
+    case "inbox":
+      return "inbound_inquiry";
+    case "sentitems":
+      return "reply_sent";
+    case "drafts":
+      return "draft_created";
+    default: {
+      const exhaustive: never = folder;
+      return exhaustive;
+    }
+  }
+}
+
+function savedDelta(state: MailboxSyncState | undefined, folder: "inbox" | "sentitems"): string | undefined {
+  if (folder === "inbox") return state?.folderDeltas?.inbox ?? state?.deltaLink;
+  return state?.folderDeltas?.sentitems;
+}
+
 export async function syncMailbox(
   workspaceId: WorkspaceId,
   mailbox: string,
-  options: { maxPages?: number } = {},
+  options: { maxPages?: number; folder?: "inbox" | "sentitems" } = {},
 ): Promise<SyncResult> {
+  const folder = options.folder ?? "inbox";
   const config = outlookConfig();
   const result: SyncResult = {
     mailbox,
@@ -175,8 +205,8 @@ export async function syncMailbox(
   const state = loadDb().mailboxes.find((row) => row.mailbox === mailbox);
 
   let url =
-    state?.deltaLink ??
-    `${GRAPH}/users/${encodeURIComponent(mailbox)}/mailFolders/Inbox/messages/delta?$select=${SELECT}`;
+    savedDelta(state, folder) ??
+    `${GRAPH}/users/${encodeURIComponent(mailbox)}/mailFolders/${folder}/messages/delta?$select=${SELECT}`;
 
   const maxPages = options.maxPages ?? 5;
   let deltaLink: string | undefined;
@@ -194,7 +224,9 @@ export async function syncMailbox(
       // Graph expired our sync state; restart a full delta round.
       mutate((db) => {
         const row = db.mailboxes.find((item) => item.mailbox === mailbox);
-        if (row) row.deltaLink = undefined;
+        if (!row) return;
+        row.folderDeltas = { ...row.folderDeltas, [folder]: undefined };
+        if (folder === "inbox") row.deltaLink = undefined;
       });
       result.error = "Sync state expired (410). Re-run to start a fresh delta.";
       return result;
@@ -233,7 +265,8 @@ export async function syncMailbox(
     if (!from) continue;
 
     const mailboxLower = mailbox.toLowerCase();
-    const direction: InboxMessage["direction"] = from === mailboxLower ? "outbound" : "inbound";
+    const direction: InboxMessage["direction"] =
+      folder === "sentitems" || from === mailboxLower ? "outbound" : "inbound";
     const counterparty = direction === "inbound" ? from : to[0] ?? "";
     if (!counterparty) continue;
 
@@ -257,11 +290,14 @@ export async function syncMailbox(
         preview: message.bodyPreview?.slice(0, 280) ?? "",
         body: body.slice(0, 8000),
         conversationId: message.conversationId ?? message.id,
-        receivedAt: message.receivedDateTime ?? new Date().toISOString(),
+        receivedAt: message.receivedDateTime ?? message.sentDateTime ?? new Date().toISOString(),
         contactId: match.contactId,
         companyId: match.companyId,
         matchedBy: match.matchedBy,
         hasAttachments: Boolean(message.hasAttachments),
+        folder,
+        webLink: message.webLink,
+        isDraft: Boolean(message.isDraft),
       };
 
       if (existing) {
@@ -280,6 +316,21 @@ export async function syncMailbox(
     });
 
     result.stored += 1;
+    if (stored.contactId) {
+      appendLinkedActivity({
+        workspaceId,
+        contactId: stored.contactId,
+        companyId: stored.companyId,
+        type: activityTypeFor(folder),
+        subject: stored.subject,
+        body: stored.preview,
+        outlookMessageId: message.id,
+        outlookConversationId: stored.conversationId,
+        link: message.webLink,
+        occurredAt: stored.receivedAt,
+        source: "graph",
+      });
+    }
 
     if (direction === "inbound" && match.contactId) {
       const lead = loadDb().leads.find(
@@ -309,7 +360,8 @@ export async function syncMailbox(
       const row = db.mailboxes.find((item) => item.mailbox === mailbox);
       const entry = {
         mailbox,
-        deltaLink,
+        deltaLink: folder === "inbox" ? deltaLink : row?.deltaLink,
+        folderDeltas: { ...(row?.folderDeltas ?? {}), [folder]: deltaLink },
         lastSyncAt: new Date().toISOString(),
         lastError: undefined,
         messageCount: (row?.messageCount ?? 0) + result.stored,
@@ -320,6 +372,205 @@ export async function syncMailbox(
   }
 
   return result;
+}
+
+export async function syncDrafts(workspaceId: WorkspaceId, mailbox: string): Promise<SyncResult> {
+  const config = outlookConfig();
+  const result: SyncResult = { mailbox, fetched: 0, stored: 0, associated: 0, leadsTouched: 0, deltaSaved: false };
+  if (!config) {
+    result.error = "Microsoft Graph credentials are not configured";
+    return result;
+  }
+  const token = await accessToken(config);
+  const response = await fetch(
+    `${GRAPH}/users/${encodeURIComponent(mailbox)}/mailFolders/drafts/messages?$top=50&$select=${SELECT}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!response.ok) {
+    result.error = `Graph ${response.status}: ${(await response.text()).slice(0, 300)}`;
+    return result;
+  }
+  const payload = (await response.json()) as { value?: GraphMessage[] };
+  const messages = payload.value ?? [];
+  result.fetched = messages.length;
+  for (const message of messages) {
+    const to = addressesOf(message.toRecipients);
+    const counterparty = to[0] ?? "";
+    const match = counterparty ? associate(workspaceId, counterparty) : { matchedBy: "none" as const };
+    if (match.contactId || match.companyId) result.associated += 1;
+    const subject = message.subject ?? "(no subject)";
+    const preview = message.bodyPreview?.slice(0, 280) ?? "";
+    const receivedAt = message.sentDateTime ?? message.receivedDateTime ?? new Date().toISOString();
+    mutate((db) => {
+      const existing = db.inbox.find((row) => row.providerId === message.id);
+      const record: InboxMessage = {
+        id: existing?.id ?? nextId("im"),
+        workspaceId,
+        providerId: message.id,
+        mailbox,
+        direction: "outbound",
+        folder: "drafts",
+        from: mailbox.toLowerCase(),
+        fromName: "",
+        to,
+        cc: addressesOf(message.ccRecipients),
+        subject,
+        preview,
+        body: "",
+        conversationId: message.conversationId ?? message.id,
+        receivedAt,
+        contactId: match.contactId,
+        companyId: match.companyId,
+        matchedBy: match.matchedBy,
+        hasAttachments: Boolean(message.hasAttachments),
+        webLink: message.webLink,
+        isDraft: true,
+      };
+      if (existing) Object.assign(existing, record);
+      else db.inbox.unshift(record);
+    });
+    result.stored += 1;
+    if (match.contactId) {
+      appendLinkedActivity({
+        workspaceId,
+        contactId: match.contactId,
+        companyId: match.companyId,
+        type: activityTypeFor("drafts"),
+        subject,
+        body: preview,
+        outlookMessageId: message.id,
+        outlookConversationId: message.conversationId,
+        link: message.webLink,
+        occurredAt: receivedAt,
+        source: "graph",
+      });
+    }
+  }
+  return result;
+}
+
+export interface ContactSyncResult {
+  mailbox: string;
+  fetched: number;
+  upserted: number;
+  error?: string;
+}
+
+export async function syncMailboxContacts(workspaceId: WorkspaceId, mailbox: string): Promise<ContactSyncResult> {
+  const config = outlookConfig();
+  const result: ContactSyncResult = { mailbox, fetched: 0, upserted: 0 };
+  if (!config) {
+    result.error = "Microsoft Graph credentials are not configured";
+    return result;
+  }
+  const token = await accessToken(config);
+  let url: string | undefined =
+    `${GRAPH}/users/${encodeURIComponent(mailbox)}/contacts?$top=100&$select=displayName,emailAddresses,companyName,jobTitle,mobilePhone`;
+  for (let page = 0; page < 5 && url; page += 1) {
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) {
+      result.error = `Graph ${response.status}: ${(await response.text()).slice(0, 300)}`;
+      return result;
+    }
+    const payload = (await response.json()) as {
+      value?: Array<{
+        displayName?: string;
+        companyName?: string;
+        jobTitle?: string;
+        mobilePhone?: string;
+        emailAddresses?: Array<{ address?: string }>;
+      }>;
+      "@odata.nextLink"?: string;
+    };
+    for (const person of payload.value ?? []) {
+      const address = person.emailAddresses?.find((entry) => entry.address?.includes("@"))?.address?.toLowerCase().trim();
+      if (!address) continue;
+      result.fetched += 1;
+      const prior = findContactByEmail(workspaceId, address);
+      const priorFlag = prior?.doNotEmail === true;
+      const parts = (person.displayName ?? "").trim().split(/\s+/);
+      const saved = upsertContact({
+        workspaceId,
+        email: address,
+        firstName: parts[0],
+        lastName: parts.slice(1).join(" ") || undefined,
+        companyName: person.companyName,
+        phone: person.mobilePhone,
+        title: person.jobTitle,
+      });
+      if (prior && saved.contact.doNotEmail !== priorFlag) {
+        mutate((db) => {
+          const row = db.contacts.find((contact) => contact.id === saved.contact.id);
+          if (row) row.doNotEmail = priorFlag;
+        });
+      }
+      result.upserted += 1;
+    }
+    url = payload["@odata.nextLink"];
+  }
+  mutate((db) => {
+    const row = db.mailboxes.find((item) => item.mailbox === mailbox);
+    if (row) row.lastContactSyncAt = new Date().toISOString();
+    else {
+      db.mailboxes.push({
+        mailbox,
+        messageCount: 0,
+        lastContactSyncAt: new Date().toISOString(),
+      });
+    }
+  });
+  return result;
+}
+
+export interface DriveEntry {
+  id: string;
+  name: string;
+  webUrl?: string;
+  folder: boolean;
+  size?: number;
+}
+
+export async function listDrive(
+  mailbox: string,
+  itemId?: string,
+): Promise<{ configured: boolean; hint: string; items: DriveEntry[]; error?: string }> {
+  const config = outlookConfig();
+  if (!config) {
+    return {
+      configured: false,
+      hint: outlookStatus().hint,
+      items: [],
+    };
+  }
+  const token = await accessToken(config);
+  const path = itemId
+    ? `/users/${encodeURIComponent(mailbox)}/drive/items/${encodeURIComponent(itemId)}/children`
+    : `/users/${encodeURIComponent(mailbox)}/drive/root/children`;
+  const response = await fetch(`${GRAPH}${path}?$top=50&$select=id,name,webUrl,size,folder,file`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    return {
+      configured: true,
+      hint: outlookStatus().hint,
+      items: [],
+      error: `Graph ${response.status}: ${(await response.text()).slice(0, 300)}`,
+    };
+  }
+  const payload = (await response.json()) as {
+    value?: Array<{ id: string; name?: string; webUrl?: string; size?: number; folder?: unknown }>;
+  };
+  return {
+    configured: true,
+    hint: outlookStatus().hint,
+    items: (payload.value ?? []).map((item) => ({
+      id: item.id,
+      name: item.name ?? "Untitled",
+      webUrl: item.webUrl,
+      folder: Boolean(item.folder),
+      size: item.size,
+    })),
+  };
 }
 
 export async function syncAll(workspaceId: WorkspaceId): Promise<SyncResult[]> {
@@ -339,7 +590,10 @@ export async function syncAll(workspaceId: WorkspaceId): Promise<SyncResult[]> {
   }
   const results: SyncResult[] = [];
   for (const mailbox of config.mailboxes) {
-    results.push(await syncMailbox(workspaceId, mailbox));
+    results.push(await syncMailbox(workspaceId, mailbox, { folder: "inbox" }));
+    results.push(await syncMailbox(workspaceId, mailbox, { folder: "sentitems" }));
+    results.push(await syncDrafts(workspaceId, mailbox));
+    await syncMailboxContacts(workspaceId, mailbox);
   }
   return results;
 }

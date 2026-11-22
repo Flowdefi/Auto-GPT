@@ -8,6 +8,7 @@ services:
       - "${MERIDIAN_BIND_PORT:-3000}:3000"
     command: ["node", "scripts/docker-entry.mjs"]
     environment:
+      MERIDIAN_SELF_HOSTED: ${MERIDIAN_SELF_HOSTED:-false}
       MERIDIAN_PUBLIC_URL: ${MERIDIAN_PUBLIC_URL:-http://localhost:3000}
       MERIDIAN_ADMIN_URL: ${MERIDIAN_ADMIN_URL:-}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}

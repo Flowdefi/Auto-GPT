@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { ContactForm } from "@/components/crm/contact-form";
+import { ServerTimeline } from "@/components/crm/server-timeline";
 import { saveRemoteContact, useCrmDirectory } from "@/components/crm/use-crm";
 import { Timeline } from "@/components/tables";
 import { Badge, Button, Card, PageHeader } from "@/components/meridian/legacy";
@@ -157,6 +158,7 @@ export default function ContactRecordPage() {
                 meta: when(activity.at),
               }))}
             />
+            <ServerTimeline workspaceId={workspaceId} contactId={record.id} />
           </Card>
         </div>
         <div className="space-y-4">
