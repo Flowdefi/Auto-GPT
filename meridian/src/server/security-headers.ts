@@ -2,8 +2,12 @@
 
 export const ROBOTS_TAG = "noindex, nofollow, noarchive, nosnippet";
 
-export const SECURITY_HEADERS: Array<{ key: string; value: string }> = [
+export const ROBOTS_NOINDEX: Array<{ key: string; value: string }> = [
   { key: "X-Robots-Tag", value: ROBOTS_TAG },
+];
+
+/** Hardening headers for every path. Indexing is applied per-route so /agency can stay public. */
+export const SECURITY_HEADERS: Array<{ key: string; value: string }> = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -37,9 +41,22 @@ export function noStorePath(pathname: string): boolean {
   return (
     pathname.startsWith("/api/") ||
     pathname.startsWith("/w/") ||
+    pathname.startsWith("/collect/") ||
+    pathname === "/collect" ||
+    pathname.startsWith("/pay/") ||
     pathname === "/login" ||
     pathname === "/signup" ||
     pathname === "/billing" ||
     pathname === "/pricing"
+  );
+}
+
+export function noIndexPath(pathname: string): boolean {
+  if (pathname === "/agency" || pathname.startsWith("/agency/")) return false;
+  if (pathname === "/robots.txt" || pathname === "/sitemap.xml") return false;
+  return (
+    noStorePath(pathname) ||
+    pathname === "/" ||
+    pathname.startsWith("/u/")
   );
 }

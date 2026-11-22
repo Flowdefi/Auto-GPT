@@ -1,8 +1,9 @@
 import type { WorkspaceId } from "@/lib/types";
 import { isWorkspaceId } from "@/lib/workspace-id";
 import type { ActivityKind } from "./activity-kinds";
-import { logActivity } from "./activities";
+import { recordActivity } from "./activities";
 import { listCompanies, listContacts, saveContact } from "./crm-store";
+import type { DeskActivityType } from "./models";
 import { emailBlockReason } from "./email-block";
 import { accessToken, outlookConfig, syncMailbox, type OutlookConfig } from "./outlook";
 
@@ -97,6 +98,44 @@ function channelFor(folder: string, from: string, mailbox: string): ActivityKind
   return "inbound";
 }
 
+function deskTypeFor(kind: ActivityKind): DeskActivityType {
+  switch (kind) {
+    case "inbound":
+      return "inbound_inquiry";
+    case "outbound":
+      return "reply_sent";
+    case "draft":
+      return "draft_created";
+    case "nda":
+      return "nda_sent";
+    case "note":
+      return "note";
+    default: {
+      const neverKind: never = kind;
+      return neverKind;
+    }
+  }
+}
+
+function defaultSubject(kind: ActivityKind): string {
+  switch (kind) {
+    case "inbound":
+      return "Inbound email";
+    case "outbound":
+      return "Outbound email";
+    case "draft":
+      return "Draft email";
+    case "nda":
+      return "NDA";
+    case "note":
+      return "Note";
+    default: {
+      const neverKind: never = kind;
+      return neverKind;
+    }
+  }
+}
+
 async function syncFolder(
   workspaceId: WorkspaceId,
   token: string,
@@ -132,22 +171,20 @@ async function syncFolder(
         if (!counterparty) continue;
         const names = splitName(counterparty.name);
         try {
-          const logged = logActivity({
+          const logged = recordActivity({
             workspaceId,
-            kind,
-            email: counterparty.address,
-            firstName: names.firstName,
-            lastName: names.lastName,
-            subject: message.subject,
+            contactEmail: counterparty.address,
+            contactName: [names.firstName, names.lastName].filter(Boolean).join(" ") || counterparty.name,
+            type: deskTypeFor(kind),
+            subject: message.subject?.trim() || defaultSubject(kind),
             body: message.bodyPreview,
-            at: message.receivedDateTime || message.sentDateTime,
-            externalId: `graph:${mailbox}:${message.id}`,
+            occurredAt: message.receivedDateTime || message.sentDateTime,
+            outlookMessageId: message.id,
             source: "graph",
-            userId: "graph",
           });
           result.logged += 1;
           if (logged.createdContact) result.createdContacts += 1;
-          if (logged.suppressed) result.skippedSuppressed += 1;
+          if (logged.doNotEmail && !logged.createdContact) result.skippedSuppressed += 1;
         } catch (error) {
           result.error = error instanceof Error ? error.message : "Could not log a message";
         }

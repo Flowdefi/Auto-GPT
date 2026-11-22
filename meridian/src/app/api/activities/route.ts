@@ -1,64 +1,78 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
+import { isDeskActivityType, listActivities, recordActivity } from "@/server/activities";
 import { requireSeat } from "@/server/api-guard";
-import { listActivities, logActivity } from "@/server/activities";
-import type { WorkspaceId } from "@/lib/types";
+import { clientIp, rateLimited, tooMany } from "@/server/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-function workspaceOf(value: unknown): WorkspaceId | null {
-  if (value === undefined || value === null || value === "") return "triton";
-  const text = typeof value === "string" ? value : "";
-  return isWorkspaceId(text) ? text : null;
-}
 
 export async function GET(request: Request) {
   const gate = await requireSeat(request);
   if (!gate.ok) return gate.response;
   const url = new URL(request.url);
-  const workspaceId = workspaceOf(url.searchParams.get("workspace"));
-  if (!workspaceId) return NextResponse.json({ error: "workspace must be triton or aether" }, { status: 400 });
-  const activities = listActivities(workspaceId, {
-    contactId: url.searchParams.get("contactId") ?? undefined,
-    companyId: url.searchParams.get("companyId") ?? undefined,
-    dealId: url.searchParams.get("dealId") ?? undefined,
-    email: url.searchParams.get("email") ?? undefined,
+  const workspaceId = url.searchParams.get("workspace") ?? undefined;
+  if (!isWorkspaceId(workspaceId)) {
+    return NextResponse.json({ error: "workspace required" }, { status: 400 });
+  }
+  return NextResponse.json({
+    ok: true,
+    activities: listActivities(workspaceId, {
+      contactId: url.searchParams.get("contactId") ?? undefined,
+      companyId: url.searchParams.get("companyId") ?? undefined,
+    }),
   });
-  return NextResponse.json({ ok: true, activities });
 }
 
 export async function POST(request: Request) {
+  if (rateLimited(`activities:${clientIp(request)}`, 60, 60_000)) return tooMany();
   const gate = await requireSeat(request);
   if (!gate.ok) return gate.response;
-  let body: Record<string, unknown>;
+  let body: {
+    workspaceId?: string;
+    contactEmail?: string;
+    contactName?: string;
+    company?: string;
+    type?: string;
+    kind?: string;
+    subject?: string;
+    body?: string;
+    outlookMessageId?: string;
+    outlookConversationId?: string;
+    link?: string;
+    occurredAt?: string;
+    email?: string;
+  };
   try {
-    body = (await request.json()) as Record<string, unknown>;
+    body = (await request.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "Unreadable body" }, { status: 400 });
   }
-  const workspaceId = workspaceOf(body.workspaceId ?? body.workspace);
-  if (!workspaceId) return NextResponse.json({ error: "workspace must be triton or aether" }, { status: 400 });
+  const workspaceId = isWorkspaceId(body.workspaceId) ? body.workspaceId : "triton";
+  const type = body.type ?? body.kind;
+  if (!type || !isDeskActivityType(type)) {
+    return NextResponse.json({ error: "type is not a known activity" }, { status: 400 });
+  }
+  if (body.occurredAt && Number.isNaN(Date.parse(body.occurredAt))) {
+    return NextResponse.json({ error: "occurredAt is not a date" }, { status: 400 });
+  }
   try {
-    const result = logActivity({
+    const result = recordActivity({
       workspaceId,
-      kind: body.kind ?? body.type ?? body.direction,
-      subject: typeof body.subject === "string" ? body.subject : undefined,
-      body: typeof body.body === "string" ? body.body : undefined,
-      at: typeof body.at === "string" ? body.at : undefined,
-      email: typeof body.email === "string" ? body.email : undefined,
-      contactId: typeof body.contactId === "string" ? body.contactId : undefined,
-      companyId: typeof body.companyId === "string" ? body.companyId : undefined,
-      dealId: typeof body.dealId === "string" ? body.dealId : undefined,
-      firstName: typeof body.firstName === "string" ? body.firstName : undefined,
-      lastName: typeof body.lastName === "string" ? body.lastName : undefined,
-      externalId: typeof body.externalId === "string" ? body.externalId : undefined,
-      source: typeof body.source === "string" ? body.source : "api",
-      userId: gate.account.id,
-      allowCreate: body.createContact === false || body.allowCreate === false ? false : true,
+      contactEmail: body.contactEmail ?? body.email ?? "",
+      contactName: body.contactName,
+      company: body.company,
+      type,
+      subject: body.subject ?? "",
+      body: body.body,
+      outlookMessageId: body.outlookMessageId,
+      outlookConversationId: body.outlookConversationId,
+      link: body.link,
+      occurredAt: body.occurredAt,
+      source: "api",
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Could not log activity" }, { status: 400 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Could not record activity" }, { status: 400 });
   }
 }

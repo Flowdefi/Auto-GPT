@@ -34,11 +34,19 @@ export default function InventoryRecordPage() {
     void fetch(`/api/inventory?workspace=${workspaceId}`)
       .then(async (response) => {
         if (!response.ok) throw new Error("Could not load portfolios");
-        return (await response.json()) as { items?: InventoryItem[]; companies?: Option[]; deals?: Option[] };
+        return (await response.json()) as {
+          items?: InventoryItem[];
+          portfolios?: InventoryItem[];
+          companies?: Option[];
+          deals?: Option[];
+        };
       })
       .then((body) => {
         if (cancelled) return;
-        const found = (body.items ?? []).find((row) => row.id === params.id) ?? null;
+        const found =
+          (body.portfolios ?? []).find((row) => row.id === params.id) ??
+          (body.items ?? []).find((row) => row.id === params.id) ??
+          null;
         setCompanies(body.companies ?? []);
         setDeals(body.deals ?? []);
         setItem(found);

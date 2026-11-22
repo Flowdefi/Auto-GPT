@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
 import { clientIp, rateLimited, tooMany } from "@/server/rate-limit";
-import { fileDispute, openPortal, portalAccount, sandboxPayment } from "@/server/collections/service";
+import { fileComplaint } from "@/server/collections/complaint-store";
+import { postAchPayment } from "@/server/collections/payments";
+import { ensureValidationNotice, fileDispute, openPortal, portalAccount, sandboxPayment, setupPaymentPlan, validationPdfBase64 } from "@/server/collections/service";
+import { assertSameOrigin } from "@/server/security";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,6 +25,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (rateLimited(`portal:${clientIp(request)}`, 30, 60_000)) return tooMany();
+  try {
+    assertSameOrigin(request);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Cross-site request blocked" }, { status: 403 });
+  }
   const body = (await request.json()) as {
     op?: string;
     workspaceId?: string;
@@ -30,6 +38,10 @@ export async function POST(request: Request) {
     zip?: string;
     text?: string;
     amountCents?: number;
+    months?: number;
+    recurring?: boolean;
+    accepted?: boolean;
+    summary?: string;
   };
   try {
     if (body.op === "lookup") {
@@ -45,10 +57,33 @@ export async function POST(request: Request) {
     if (body.op === "dispute") {
       return NextResponse.json({ account: fileDispute(account.workspaceId, account.id, body.text ?? "I dispute this debt") });
     }
+    if (body.op === "ach") {
+      const payment = await postAchPayment({
+        workspaceId: account.workspaceId,
+        accountId: account.id,
+        amountCents: body.amountCents ?? Math.min(account.balanceCents, 2500),
+        recurring: Boolean(body.recurring),
+        accepted: Boolean(body.accepted),
+      });
+      return NextResponse.json({ payment, account: portalAccount(tokenFrom(request)) });
+    }
+    if (body.op === "complaint") {
+      const complaint = fileComplaint(account.workspaceId, { channel: "portal", accountRef: account.accountRef, summary: body.summary ?? body.text, rootCause: "other" });
+      return NextResponse.json({ complaintId: complaint.id, responseDueAt: complaint.responseDueAt });
+    }
     if (body.op === "pay") {
-      const payment = sandboxPayment(account.workspaceId, account.id, body.amountCents ?? account.balanceCents);
+      const payment = await sandboxPayment(account.workspaceId, account.id, body.amountCents ?? account.balanceCents);
       const paid = portalAccount(tokenFrom(request));
       return NextResponse.json({ payment, account: paid });
+    }
+    if (body.op === "plan") {
+      const updated = setupPaymentPlan(account.workspaceId, account.id, body.months ?? 0, body.amountCents ?? 0);
+      return NextResponse.json({ account: updated });
+    }
+    if (body.op === "notice") {
+      const updated = ensureValidationNotice(account.workspaceId, account.id);
+      const pdfBase64 = validationPdfBase64(account.workspaceId, account.id);
+      return NextResponse.json({ account: updated, pdfBase64 });
     }
     return NextResponse.json({ error: "Unknown op" }, { status: 400 });
   } catch (error) {

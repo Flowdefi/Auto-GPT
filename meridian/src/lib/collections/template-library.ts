@@ -159,6 +159,22 @@ export function loadSettlementMatrix(root = LIBRARY): SettlementMatrix {
   return raw;
 }
 
+export function validateSettlementMatrix(matrix: SettlementMatrix): void {
+  for (const tier of matrix.tiers) {
+    const opening = tier.opening_offer_pct?.value;
+    const floor = tier.floor_pct?.value;
+    if (opening !== undefined && (!Number.isFinite(opening) || opening < 0 || opening > 100)) {
+      throw new Error(`Opening percent for ${tier.tier_id} must be between 0 and 100`);
+    }
+    if (floor !== undefined && (!Number.isFinite(floor) || floor < 0 || floor > 100)) {
+      throw new Error(`Floor percent for ${tier.tier_id} must be between 0 and 100`);
+    }
+    if (opening !== undefined && floor !== undefined && floor > opening) {
+      throw new Error(`Floor percent for ${tier.tier_id} cannot be above the opening percent`);
+    }
+  }
+}
+
 export function clearMatrixDefaults(matrix: SettlementMatrix): SettlementMatrix {
   const next = structuredClone(matrix);
   const visit = (value: unknown): void => {
@@ -190,6 +206,7 @@ export function settlementOffer(account: PortfolioAccount, matrix: SettlementMat
   const timeBarred = Boolean(account.solExpiresOn && account.solExpiresOn < now.toISOString().slice(0, 10));
   const base = matrix.tiers.find((tier) => {
     if (tier.applies_on_top_of_base_tier) return false;
+    if (timeBarred && tier.match.time_barred !== true) return false;
     if (tier.match.time_barred === true) return timeBarred;
     if (tier.match.time_barred === false && timeBarred) return false;
     const monthRange = tier.match.months_since_chargeoff;
@@ -234,6 +251,7 @@ export interface MergeContext {
 export function mergeContext(input: {
   account: PortfolioAccount;
   agencyName: string;
+  domain?: string;
   now?: Date;
   matrix?: SettlementMatrix;
   extra?: Record<string, MergeValue>;
@@ -244,36 +262,39 @@ export function mergeContext(input: {
   const end = mailed ? validationEndDate(mailed) : null;
   const offer = input.matrix ? settlementOffer(input.account, input.matrix, now) : null;
   const firstName = input.account.consumerName.split(/\s+/)[0];
+  const paymentsKnown = input.account.paymentsSinceItemizationCents != null || input.account.creditsSinceItemizationCents != null;
   const paymentsCredits = (input.account.paymentsSinceItemizationCents ?? 0) + (input.account.creditsSinceItemizationCents ?? 0);
+  const host = input.domain?.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "") ?? "";
+  const site = host ? `https://${host}` : "";
   const values: Record<string, MergeValue> = {
     agency_name: input.agencyName,
     agency_name_caps: input.agencyName.toUpperCase(),
     agency_legal_name: input.agencyName,
-    agency_mailing_address: "PO Box 100, Example City, OH 44101",
-    agency_phone: "1-800-555-0199",
-    agency_hours: "weekdays 9 a.m. to 5 p.m. Eastern",
-    agency_website: "https://example.test",
-    agency_email: "consumer@example.test",
-    portal_url: `https://example.test/collect`,
-    dispute_portal_url: "https://example.test/collect",
-    email_optout_link: "https://example.test/u/example-token",
+    agency_mailing_address: "not supplied",
+    agency_phone: "not supplied",
+    agency_hours: "not supplied",
+    agency_website: site || "not supplied",
+    agency_email: "not supplied",
+    portal_url: site ? `${site}/collect` : "not supplied",
+    dispute_portal_url: site ? `${site}/collect` : "not supplied",
+    email_optout_link: "not supplied",
     account_ref: input.account.accountRef,
-    account_last4: input.account.last4 || "0000",
-    account_type: "credit card",
+    account_last4: input.account.last4 || "not supplied",
+    account_type: "not supplied",
     consumer_name: input.account.consumerName,
-    consumer_first_name: firstName || "Example",
+    consumer_first_name: firstName || "not supplied",
     consumer_state: input.account.state,
-    consumer_mailing_address: `1 Example Street\n${input.account.state} ${input.account.zip}`,
-    current_creditor: input.account.sellerName || "Example Creditor",
-    original_creditor: input.account.originalCreditor || "Example Bank",
-    creditor_on_itemization_date: input.account.originalCreditor || "Example Bank",
+    consumer_mailing_address: [input.account.state, input.account.zip].filter(Boolean).join(" ") || "not supplied",
+    current_creditor: input.account.sellerName || "not supplied",
+    original_creditor: input.account.originalCreditor || "not supplied",
+    creditor_on_itemization_date: input.account.originalCreditor || "not supplied",
     current_balance: money(input.account.balanceCents),
-    amount_on_itemization_date: money(input.account.itemizationAmountCents),
-    interest_since_itemization: "0.00",
-    fees_since_itemization: money(input.account.feesSinceItemizationCents),
-    payments_credits_since_itemization: money(paymentsCredits),
-    itemization_date: input.account.itemizationDate || today,
-    itemization_date_basis: "charge-off",
+    amount_on_itemization_date: input.account.itemizationAmountCents == null ? "not supplied" : money(input.account.itemizationAmountCents),
+    interest_since_itemization: input.account.interestSinceItemizationCents == null ? "not supplied" : money(input.account.interestSinceItemizationCents),
+    fees_since_itemization: input.account.feesSinceItemizationCents == null ? "not supplied" : money(input.account.feesSinceItemizationCents),
+    payments_credits_since_itemization: paymentsKnown ? money(paymentsCredits) : "not supplied",
+    itemization_date: input.account.itemizationDate || "not supplied",
+    itemization_date_basis: "not supplied",
     notice_date: mailed ? mailed.slice(0, 10) : today,
     letter_date: today,
     message_date: today,
@@ -281,8 +302,8 @@ export function mergeContext(input: {
     within_validation_period: end ? withinValidationPeriod(mailed, today) : false,
     time_barred: Boolean(input.account.solExpiresOn && input.account.solExpiresOn < today),
     accepts_electronic_disputes: true,
-    collector_name: "Example Collector",
-    ai_agent_name: "Example Assistant",
+    collector_name: "not supplied",
+    ai_agent_name: "not supplied",
     is_ai_agent: false,
     settlement_amount: offer ? money(offer.openingCents) : "",
     offer_expiration_date: "",
@@ -294,7 +315,7 @@ export function mergeContext(input: {
     values.offer_expiration_date = expiration.toISOString().slice(0, 10);
     values.lump_sum_amount = money(offer.openingCents);
     values.settlement_amount = money(offer.openingCents);
-    values.min_plan_payment = "25.00";
+    values.min_plan_payment = "not supplied";
   }
   return { values, validationEnd: end, offer };
 }

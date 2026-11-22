@@ -1,6 +1,7 @@
 import type {
   ChannelMessage,
   CollectionTemplate,
+  TemplateApproval,
   ComplianceEvent,
   ConsumerConsent,
   DncEntry,
@@ -8,13 +9,23 @@ import type {
   StateEligibility,
   VoiceCall,
   VoiceSettings,
+  VoiceLimits,
   CollectorTask,
   DraftReply,
   ConsumerPayment,
   ImportAudit,
   OperatorRole,
   PortalSession,
+  ClientGrant,
 } from "@/lib/collections/types";
+import type { Complaint } from "@/lib/collections/complaints";
+import type { CollectionJob, CollectionSequence } from "@/lib/collections/jobs";
+import type { RecordingRule } from "@/lib/collections/recording";
+import type { SolRule } from "@/lib/collections/sol";
+import type { AgencyBrand } from "@/lib/brand";
+import type { AgentPresence, ComplianceDigest, DialAttempt, DialCampaign, MailJob, TrainingPass } from "@/lib/collections/desk";
+import type { PortfolioBook, ScrubEvent, SettlementCase, TabletopRun } from "@/lib/collections/launch";
+import type { Metro2Signoff } from "@/lib/collections/metro2";
 import type { SettlementMatrix } from "@/lib/collections/template-library";
 
 export type WorkspaceId = "triton" | "aether";
@@ -285,6 +296,7 @@ export interface InboxMessage {
   providerId: string;
   mailbox: string;
   direction: "inbound" | "outbound";
+  folder?: "inbox" | "sentitems" | "drafts";
   from: string;
   fromName: string;
   to: string[];
@@ -298,14 +310,87 @@ export interface InboxMessage {
   companyId?: string;
   matchedBy?: "email" | "domain" | "none";
   hasAttachments: boolean;
+  webLink?: string;
+  isDraft?: boolean;
 }
 
 export interface MailboxSyncState {
   mailbox: string;
   deltaLink?: string;
+  folderDeltas?: Partial<Record<"inbox" | "sentitems", string>>;
   lastSyncAt?: string;
+  lastContactSyncAt?: string;
   lastError?: string;
   messageCount: number;
+}
+
+export const DESK_ACTIVITY_TYPES = [
+  "inbound_inquiry",
+  "draft_created",
+  "reply_sent",
+  "nda_sent",
+  "nda_signed",
+  "file_shared",
+  "call",
+  "note",
+] as const;
+
+export type DeskActivityType = (typeof DESK_ACTIVITY_TYPES)[number];
+
+export interface DeskActivity {
+  id: string;
+  workspaceId: WorkspaceId;
+  type: DeskActivityType;
+  subject: string;
+  body: string;
+  at: string;
+  contactId?: string;
+  companyId?: string;
+  leadId?: string;
+  outlookMessageId?: string;
+  outlookConversationId?: string;
+  link?: string;
+  source: "api" | "graph";
+}
+
+export interface InventoryFileLink {
+  id: string;
+  name: string;
+  webUrl?: string;
+  driveItemId?: string;
+}
+
+export interface DriveLink {
+  id: string;
+  workspaceId: WorkspaceId;
+  target: "inventory" | "deal" | "contact";
+  targetId: string;
+  name: string;
+  webUrl?: string;
+  driveItemId?: string;
+  at: string;
+}
+
+export interface DeskInventoryItem {
+  id: string;
+  workspaceId: WorkspaceId;
+  name: string;
+  sellerName: string;
+  sellerCompanyId: string;
+  kind: string;
+  faceValue: number;
+  askingPrice: number;
+  accountCount: number;
+  avgBalance: number;
+  vintage: string;
+  chargeOff: string;
+  states: string[];
+  notes: string;
+  status: "intake" | "listed" | "in_market" | "awarded" | "closed";
+  fileLinks: InventoryFileLink[];
+  dealIds: string[];
+  buyerContactIds: string[];
+  createdAt: string;
 }
 
 export interface AutomationWorkflow {
@@ -533,14 +618,52 @@ export interface DatabaseFile {
   channelMessages?: ChannelMessage[];
   complianceEvents?: ComplianceEvent[];
   collectionTemplates?: CollectionTemplate[];
+  /** Per-agency send approval and counsel sign-off. The legacy flags on each template remain the Triton copy. */
+  templateApprovals?: Partial<Record<WorkspaceId, Record<string, TemplateApproval>>>;
   settlementMatrix?: SettlementMatrix;
+  /** Per-agency settlement authority. The legacy field remains the Triton copy. */
+  settlementMatrices?: Partial<Record<WorkspaceId, SettlementMatrix>>;
   voiceSettings?: VoiceSettings;
+  /** Per-agency cap, inbound block, discount, and plan length. The legacy voice settings remain the Triton copy. */
+  voiceLimitsByWorkspace?: Partial<Record<WorkspaceId, VoiceLimits>>;
   collectorTasks?: CollectorTask[];
   draftReplies?: DraftReply[];
   consumerPayments?: ConsumerPayment[];
   importAudits?: ImportAudit[];
   operatorRoles?: OperatorRole[];
   portalSessions?: PortalSession[];
+  jobs?: CollectionJob[];
+  sequences?: CollectionSequence[];
+  solRules?: SolRule[];
+  /** Per-agency limitations. The legacy field remains the Triton copy. */
+  solTables?: Partial<Record<WorkspaceId, SolRule[]>>;
+  agencyBrand?: AgencyBrand;
+  /** Per-agency brand. The legacy field remains the Triton copy used by the public site. */
+  agencyBrands?: Partial<Record<WorkspaceId, AgencyBrand>>;
+  agentPresence?: AgentPresence[];
+  dialCampaigns?: DialCampaign[];
+  dialAttempts?: DialAttempt[];
+  mailJobs?: MailJob[];
+  trainingPasses?: TrainingPass[];
+  complianceDigests?: ComplianceDigest[];
+  portfolioBooks?: PortfolioBook[];
+  scrubEvents?: ScrubEvent[];
+  settlementCases?: SettlementCase[];
+  frozenWorkspaces?: WorkspaceId[];
+  /** Per-agency sandbox clear for the reassigned-number check. Absent means Triton uses the legacy voice setting and Aether stays unknown. */
+  rndSandboxClearByWorkspace?: Partial<Record<WorkspaceId, boolean>>;
+  tabletopRuns?: TabletopRun[];
+  clientGrants?: ClientGrant[];
+  complaints?: Complaint[];
+  recordingRules?: RecordingRule[];
+  /** Per-agency recording consent. The legacy field remains the Triton copy. */
+  recordingTables?: Partial<Record<WorkspaceId, RecordingRule[]>>;
+  metro2Approval?: Metro2Signoff;
+  /** Per-agency Metro 2 sign-off. The legacy field remains the Triton copy. */
+  metro2Approvals?: Partial<Record<WorkspaceId, Metro2Signoff>>;
+  crmActivities?: DeskActivity[];
+  inventoryItems?: DeskInventoryItem[];
+  driveLinks?: DriveLink[];
 }
 
 export function emptyDb(): DatabaseFile {
@@ -588,5 +711,8 @@ export function emptyDb(): DatabaseFile {
     importAudits: [],
     operatorRoles: [],
     portalSessions: [],
+    crmActivities: [],
+    inventoryItems: [],
+    driveLinks: [],
   };
 }

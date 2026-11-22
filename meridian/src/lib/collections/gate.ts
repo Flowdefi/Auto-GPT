@@ -24,12 +24,16 @@ export interface GateContext {
   lastConversationAt: string | null;
   /** Result of the reassigned-numbers hook. Unknown blocks cell AI calls. */
   reassigned: "ok" | "reassigned" | "unknown";
+  /** DMDC SCRA result. Active blocks. Unknown blocks only when the DMDC adapter is selected. */
+  scra?: "active" | "inactive" | "unknown";
   channel: CollectionChannel;
   /** Voicemail body, when channel is voicemail_drop. */
   voicemailBody?: string;
   campaignSentToday: number;
   /** When set, an acknowledgment for this exact status may pass the hold. */
   statusResponse?: AccountStatus | null;
+  /** True when this account's stored email is on the workspace suppression list. */
+  emailSuppressed?: boolean;
 }
 
 const OUTBOUND = new Set<CollectionChannel>([
@@ -52,6 +56,12 @@ const CLOSED_STATUSES = new Set<PortfolioAccount["status"]>([
   "military",
 ]);
 
+function scraUnknownBlocks(): boolean {
+  if (process.env.MERIDIAN_SCRA_BLOCK_UNKNOWN === "false") return false;
+  if (process.env.MERIDIAN_SCRA_BLOCK_UNKNOWN === "true") return true;
+  return process.env.MERIDIAN_SCRA_PROVIDER === "dmdc";
+}
+
 function block(reason: string, citation: string, needsCounselReview = false): GateDecision {
   return { allowed: false, reason, citation, needsCounselReview };
 }
@@ -69,15 +79,29 @@ const DEBT_WORDS = /\b(debt|owe|owing|balance|past due|collection|collector|deli
 
 export function evaluateGate(ctx: GateContext): GateDecision {
   const { channel, settings, account } = ctx;
-  const outbound = OUTBOUND.has(channel) || channel === "payment_portal";
 
-  if (settings.killSwitch && outbound) {
-    return block("Outbound kill switch is on.", "Owner control. Inbound answering stays available unless block-inbound is also on.");
+  const scra = ctx.scra ?? "unknown";
+  if (OUTBOUND.has(channel) && scra === "active") {
+    return block(
+      "SCRA check returned active duty. Collection contact is stopped.",
+      "50 U.S.C. § 3937 and 50 U.S.C. § 3911. Counsel must confirm the current sections before relying on a status result.",
+      true,
+    );
+  }
+  if (OUTBOUND.has(channel) && scra !== "inactive" && scraUnknownBlocks()) {
+    return block(
+      "SCRA status is unknown, so contact is blocked. An unknown result is not a clearance.",
+      "DMDC SCRA. Unknown stays blocked when the DMDC adapter is selected.",
+      true,
+    );
+  }
+  if (settings.killSwitch && OUTBOUND.has(channel)) {
+    return block("Outbound kill switch is on.", "Owner control. Inbound answering and a consumer-started payment stay available.");
   }
   if (settings.blockInbound && channel === "voice_inbound") {
     return block("Inbound voice is switched off.", "Owner control.");
   }
-  if (outbound && ctx.campaignSentToday >= settings.dailyOutboundCap) {
+  if (OUTBOUND.has(channel) && ctx.campaignSentToday >= settings.dailyOutboundCap) {
     return block(`Daily outbound cap of ${settings.dailyOutboundCap} is reached.`, "Owner control.");
   }
   if (!account) {
@@ -194,6 +218,24 @@ export function evaluateGate(ctx: GateContext): GateDecision {
 
   if (channel === "sms" && !hasConsent(ctx, "sms")) {
     return block("SMS needs stored prior express consent.", "47 U.S.C. § 227. Confirm the campaign's consent standard with counsel.", true);
+  }
+  if (channel === "sms") {
+    const zone = consumerTimeZone(account.state, account.zip);
+    if ("error" in zone) return block(zone.error, "12 CFR § 1006.6. Local time is not guessed.", true);
+    if (!withinCallingWindow(ctx.now, zone.zone)) {
+      return block(
+        `Outside 8:00 a.m.–9:00 p.m. in ${zone.zone}.`,
+        "12 CFR § 1006.6. The call window is also applied to SMS. Counsel should confirm that reading. The 9:00 p.m. boundary is enforced as blocked at 9:00 p.m. local.",
+        true,
+      );
+    }
+  }
+  if (channel === "email" && ctx.emailSuppressed) {
+    return block(
+      "This email is suppressed after a bounce or unsubscribe.",
+      "Consumer opt-out. This block is a draft control for counsel review.",
+      true,
+    );
   }
   if (channel === "email" && !hasConsent(ctx, "email")) {
     return block(

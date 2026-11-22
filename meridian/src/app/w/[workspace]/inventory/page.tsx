@@ -20,10 +20,10 @@ export default function InventoryPage() {
     void fetch(`/api/inventory?workspace=${workspaceId}`)
       .then(async (response) => {
         if (!response.ok) throw new Error("Could not load portfolios");
-        return (await response.json()) as { items?: Row[] };
+        return (await response.json()) as { items?: Row[]; portfolios?: Row[] };
       })
       .then((body) => {
-        if (!cancelled) setItems(body.items ?? []);
+        if (!cancelled) setItems(body.portfolios ?? body.items ?? []);
       })
       .catch((error: unknown) => {
         if (!cancelled) setNotice(error instanceof Error ? error.message : "Could not load portfolios");

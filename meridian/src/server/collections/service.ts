@@ -1,10 +1,13 @@
-import { requiresAllPartyRecording, emptyTranscript, rulesSummary, stepCall, type ConsumerTurn } from "@/lib/collections/voice";
+import { composeConsumerDraft } from "@/lib/collections/drafting";
+import { buildMetro2, type Metro2Signoff } from "@/lib/collections/metro2";
+import { defaultRecordingTable, requiresAllPartyRecording, type RecordingRule } from "@/lib/collections/recording";
+import { emptyTranscript, rulesSummary, stepCall, type ConsumerTurn } from "@/lib/collections/voice";
 import { evaluateGate, type GateContext } from "@/lib/collections/gate";
-import { classifyInbound, draftConsumerReply } from "@/lib/collections/inbox";
 import { filterVoiceUtterance, loadVoiceGuardrails } from "@/lib/collections/guardrails";
 import { disputeDeadline, validationNotice } from "@/lib/collections/notice";
 import {
   clearMatrixDefaults,
+  validateSettlementMatrix,
   loadSettlementMatrix,
   loadTemplateFiles,
   mergeContext,
@@ -21,6 +24,9 @@ import type {
   CollectionChannel,
   CollectionTemplate,
   CollectionsRole,
+  OperatorRole,
+  TemplateApproval,
+  VoiceLimits,
   ConsumerConsent,
   ConsumerPayment,
   DraftReply,
@@ -30,11 +36,23 @@ import type {
   VoiceSettings,
 } from "@/lib/collections/types";
 import type { WorkspaceId } from "@/lib/types";
-import { workspaceOf } from "@/lib/workspaces";
+import { VALIDATION_LIMITATIONS_NOTE, modelFormPdf } from "@/lib/collections/model-form-pdf";
+import { REPORT_DRAFT_LABEL } from "@/lib/collections/report-csv";
+import { TIME_BARRED_HOLD, defaultSolTable, limitationsDatePassed, timeBarredSolicitation, type SolRule } from "@/lib/collections/sol";
+import { validationEndDate } from "@/lib/collections/validation-period";
 import { decryptSecret, encryptSecret, sha256Hex } from "@/server/auth-crypto";
+import { brandFor } from "@/server/brand";
+import { defaultVoiceSettings } from "@/server/collections/defaults";
 import { loadDb, mutate, nextId } from "@/server/db";
+import { logEvent as logLine, redactIdentifiers } from "@/server/log";
+import { scanUpload, scanXlsx } from "@/server/security";
 import { masterSecret } from "@/server/secrets";
+import { completeFast } from "@/server/ai/complete";
 import { publicBaseUrl } from "@/server/mailer";
+import { sqliteAll, sqliteGet } from "@/server/sqlite";
+import { createStripeCheckout, deliverAllowedChannel, type FetchLike } from "@/server/collections/providers";
+import { checkReassignedNumber, checkScraStatus } from "@/server/collections/scrub";
+import { emailIsSuppressed } from "@/server/collections/webhooks";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -44,18 +62,26 @@ function accounts(workspaceId: WorkspaceId): PortfolioAccount[] {
 
 export function collectionSnapshot(workspaceId: WorkspaceId) {
   const db = loadDb();
+  const rows = accounts(workspaceId);
   return {
-    settings: db.voiceSettings,
+    settings: voiceSettingsFor(workspaceId),
     eligibility: (db.stateEligibility ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
-    accounts: accounts(workspaceId).map(publicAccount),
+    accounts: rows.slice(0, 200).map(publicAccount),
+    accountCount: rows.length,
+    quarantineCount: rows.filter((account) => account.status === "quarantined" || account.status === "returned").length,
     tasks: (db.collectorTasks ?? []).filter((task) => task.workspaceId === workspaceId && task.status === "open"),
     drafts: (db.draftReplies ?? []).filter((draft) => draft.workspaceId === workspaceId),
     payments: (db.consumerPayments ?? []).filter((payment) => payment.workspaceId === workspaceId),
     calls: (db.voiceCalls ?? []).filter((call) => call.workspaceId === workspaceId).slice(0, 30),
     messages: (db.channelMessages ?? []).filter((message) => message.workspaceId === workspaceId).slice(0, 30),
-    templates: syncCollectionTemplates(),
-    settlementMatrix: ensureSettlementMatrix(),
+    templates: syncCollectionTemplates().map((item) => templateForWorkspace(workspaceId, item)),
+    settlementMatrix: ensureSettlementMatrix(workspaceId),
     events: (db.complianceEvents ?? []).filter((event) => event.workspaceId === workspaceId).slice(0, 40),
+    sequences: (db.sequences ?? []).filter((item) => item.workspaceId === workspaceId),
+    jobs: (db.jobs ?? []).filter((job) => job.workspaceId === workspaceId).slice(0, 40),
+    solRules: ensureSolTable(workspaceId),
+    recordingRules: ensureRecordingTable(workspaceId),
+    metro2: metro2Status(workspaceId),
   };
 }
 
@@ -72,15 +98,63 @@ export function updateEligibility(code: string, patch: Partial<Pick<StateEligibi
   });
 }
 
-export function updateVoiceSettings(patch: Partial<VoiceSettings>): VoiceSettings {
-  return mutate((db) => {
-    const next = { ...db.voiceSettings! };
-    for (const [key, value] of Object.entries(patch) as Array<[keyof VoiceSettings, VoiceSettings[keyof VoiceSettings]]>) {
-      if (value !== undefined) next[key] = value as never;
-    }
-    db.voiceSettings = next;
-    return next;
+export function voiceSettingsFor(workspaceId: WorkspaceId): VoiceSettings {
+  const db = loadDb();
+  const base = db.voiceSettings ?? defaultVoiceSettings();
+  const frozen = (db.frozenWorkspaces ?? []).includes(workspaceId);
+  const scopedClear = db.rndSandboxClearByWorkspace?.[workspaceId];
+  const rndSandboxClear = scopedClear ?? (workspaceId === "triton" ? Boolean(base.rndSandboxClear) : false);
+  const limits = db.voiceLimitsByWorkspace?.[workspaceId];
+  const inherited = workspaceId === "triton" ? base : defaultVoiceSettings();
+  return {
+    ...base,
+    // Freeze is the workspace list. The legacy voiceSettings.killSwitch
+    // value applied to every workspace and stayed on after the desk lift.
+    killSwitch: frozen,
+    rndSandboxClear,
+    blockInbound: limits?.blockInbound ?? inherited.blockInbound,
+    dailyOutboundCap: limits?.dailyOutboundCap ?? inherited.dailyOutboundCap,
+    maxDiscountPercent: limits?.maxDiscountPercent ?? inherited.maxDiscountPercent,
+    maxPlanMonths: limits?.maxPlanMonths ?? inherited.maxPlanMonths,
+  };
+}
+
+export function saveVoiceLimits(workspaceId: WorkspaceId, patch: VoiceLimits): VoiceSettings {
+  const clean: VoiceLimits = {};
+  if (patch.blockInbound !== undefined) {
+    if (typeof patch.blockInbound !== "boolean") throw new Error("Inbound block must be true or false.");
+    clean.blockInbound = patch.blockInbound;
+  }
+  if (patch.dailyOutboundCap !== undefined) {
+    const cap = Math.floor(Number(patch.dailyOutboundCap));
+    if (!Number.isInteger(cap) || cap < 1 || cap > 10000) throw new Error("Daily outbound cap must be 1 to 10000.");
+    clean.dailyOutboundCap = cap;
+  }
+  if (patch.maxDiscountPercent !== undefined) {
+    const percent = Math.floor(Number(patch.maxDiscountPercent));
+    if (!Number.isInteger(percent) || percent < 0 || percent > 100) throw new Error("Discount percent must be 0 to 100.");
+    clean.maxDiscountPercent = percent;
+  }
+  if (patch.maxPlanMonths !== undefined) {
+    const months = Math.floor(Number(patch.maxPlanMonths));
+    if (!Number.isInteger(months) || months < 1 || months > 60) throw new Error("Plan length must be 1 to 60 months.");
+    clean.maxPlanMonths = months;
+  }
+  if (Object.keys(clean).length === 0) return voiceSettingsFor(workspaceId);
+  mutate((db) => {
+    const current = db.voiceLimitsByWorkspace?.[workspaceId] ?? {};
+    db.voiceLimitsByWorkspace = { ...(db.voiceLimitsByWorkspace ?? {}), [workspaceId]: { ...current, ...clean } };
+    if (workspaceId === "triton" && db.voiceSettings) db.voiceSettings = { ...db.voiceSettings, ...clean };
   });
+  return voiceSettingsFor(workspaceId);
+}
+
+export function setRndSandboxClear(workspaceId: WorkspaceId, enabled: boolean): VoiceSettings {
+  mutate((db) => {
+    db.rndSandboxClearByWorkspace = { ...(db.rndSandboxClearByWorkspace ?? {}), [workspaceId]: enabled };
+    if (workspaceId === "triton" && db.voiceSettings) db.voiceSettings.rndSandboxClear = enabled;
+  });
+  return voiceSettingsFor(workspaceId);
 }
 
 export function importPortfolio(input: {
@@ -91,7 +165,11 @@ export function importPortfolio(input: {
   widths?: WidthField[];
   mapping?: ColumnMapping;
   portfolioId?: string;
+  /** When set, every row must belong to this seller. */
+  sellerLock?: string;
 }) {
+  if (input.csv) scanUpload(input.csv);
+  if (input.xlsxBase64) scanXlsx(Uint8Array.from(Buffer.from(input.xlsxBase64, "base64")));
   const db = loadDb();
   const portfolioId = input.portfolioId || nextId("pf");
   const existing = new Set(accounts(input.workspaceId).map((account) => account.accountRef.toLowerCase()));
@@ -104,28 +182,35 @@ export function importPortfolio(input: {
     workspaceId: input.workspaceId,
     portfolioId,
     eligibility: db.stateEligibility ?? [],
+    solRules: ensureSolTable(input.workspaceId),
     existingRefs: existing,
     now: new Date().toISOString(),
     id: () => nextId("acct"),
   });
+  if (input.sellerLock) {
+    const lock = input.sellerLock.trim();
+    for (const account of result.accounts) {
+      if (account.sellerName && account.sellerName !== "Unknown seller" && account.sellerName !== lock) {
+        throw new Error("A client can place only its own accounts.");
+      }
+      account.sellerName = lock;
+    }
+  }
   const stored = result.accounts.map(sealAccount);
+  const tasks = stored
+    .filter((account) => account.status === "workable")
+    .map((account) => ({
+      id: nextId("task"),
+      workspaceId: input.workspaceId,
+      accountId: account.id,
+      title: "Send Reg F validation notice",
+      queue: "collector" as const,
+      status: "open" as const,
+      createdAt: account.importedAt,
+    }));
   mutate((state) => {
     state.portfolioAccounts = [...(state.portfolioAccounts ?? []), ...stored];
-    for (const account of stored) {
-      if (account.status !== "workable") continue;
-      state.collectorTasks = [
-        {
-          id: nextId("task"),
-          workspaceId: input.workspaceId,
-          accountId: account.id,
-          title: "Send Reg F validation notice",
-          queue: "collector",
-          status: "open",
-          createdAt: account.importedAt,
-        },
-        ...(state.collectorTasks ?? []),
-      ];
-    }
+    if (tasks.length > 0) state.collectorTasks = [...tasks, ...(state.collectorTasks ?? [])];
     state.importAudits = [
       {
         id: nextId("aud"),
@@ -139,7 +224,8 @@ export function importPortfolio(input: {
       ...(state.importAudits ?? []),
     ].slice(0, 200);
   });
-  return { ...result, portfolioId, accounts: stored.map(publicAccount) };
+  logLine("portfolio_import", { workspaceId: input.workspaceId, portfolioId, created: result.created, quarantined: result.quarantined });
+  return { ...result, portfolioId, accounts: stored.slice(0, 100).map(publicAccount), accountCount: stored.length };
 }
 
 function sealAccount(account: PortfolioAccount): PortfolioAccount {
@@ -152,11 +238,13 @@ function sealAccount(account: PortfolioAccount): PortfolioAccount {
   return next;
 }
 
-export function setOperatorRole(email: string, role: CollectionsRole): CollectionsRole {
+export function setOperatorRole(email: string, role: CollectionsRole, workspaceId?: WorkspaceId | null): CollectionsRole {
   const normalized = email.toLowerCase();
   mutate((db) => {
     const rest = (db.operatorRoles ?? []).filter((row) => row.email !== normalized);
-    db.operatorRoles = [...rest, { email: normalized, role }];
+    const next: OperatorRole = { email: normalized, role };
+    if (workspaceId) next.workspaceId = workspaceId;
+    db.operatorRoles = [...rest, next];
   });
   return role;
 }
@@ -220,7 +308,7 @@ function logEvent(workspaceId: WorkspaceId, channel: CollectionChannel, accountI
   });
 }
 
-function gateFor(
+export function gateFor(
   workspaceId: WorkspaceId,
   account: PortfolioAccount | null,
   channel: CollectionChannel,
@@ -236,9 +324,9 @@ function gateFor(
   }).length;
   const conversations = recent.filter((call) => call.disposition && call.disposition !== "blocked" && !call.blockedReason);
   const lastConversationAt = conversations[0]?.updatedAt ?? null;
-  const sentToday = (db.channelMessages ?? []).filter((message) => message.workspaceId === workspaceId && message.status === "sandbox_queued" && message.at.slice(0, 10) === now.toISOString().slice(0, 10)).length
+  const sentToday = (db.channelMessages ?? []).filter((message) => message.workspaceId === workspaceId && message.status !== "blocked" && message.at.slice(0, 10) === now.toISOString().slice(0, 10)).length
     + recent.filter((call) => call.direction === "outbound" && !call.blockedReason && call.createdAt.slice(0, 10) === now.toISOString().slice(0, 10)).length;
-  const settings = db.voiceSettings!;
+  const settings = voiceSettingsFor(workspaceId);
   const ctx: GateContext = {
     now,
     settings,
@@ -248,11 +336,13 @@ function gateFor(
     dnc: (db.dncEntries ?? []).filter((row) => row.workspaceId === workspaceId),
     outboundCallsIn7Days,
     lastConversationAt,
-    reassigned: settings.rndSandboxClear ? "ok" : "unknown",
+    reassigned: settings.rndSandboxClear ? "ok" : account?.rndStatus ?? "unknown",
+    scra: account?.scraStatus ?? "unknown",
     channel,
     voicemailBody,
     campaignSentToday: sentToday,
     statusResponse,
+    emailSuppressed: account ? emailIsSuppressed(workspaceId, account) : false,
   };
   return evaluateGate(ctx);
 }
@@ -276,8 +366,8 @@ export function startVoice(input: {
   const decision = gateFor(input.workspaceId, account, channel);
   logEvent(input.workspaceId, channel, account?.id ?? null, decision.allowed, decision.reason);
   const now = new Date().toISOString();
-  const agency = workspaceOf(input.workspaceId).legalName;
-  const allParty = account ? requiresAllPartyRecording(account.state) : true;
+  const agency = brandFor(input.workspaceId).name;
+  const allParty = account ? requiresAllPartyRecording(account.state, ensureRecordingTable(input.workspaceId)) : true;
   const transcript = emptyTranscript(agency, allParty, now);
   if (!decision.allowed) {
     const blocked: VoiceCall = {
@@ -338,14 +428,15 @@ export function turnVoice(workspaceId: WorkspaceId, callId: string, turn: Consum
   const transcript = open(call.transcriptCiphertext);
   const token = nextId("pay");
   const paymentUrl = `${publicBaseUrl()}/pay/sandbox/${token}`;
+  const safeTurn: ConsumerTurn = turn.type === "say" ? { ...turn, text: redactIdentifiers(turn.text) } : turn;
   let stepped = stepCall({
     transcript,
-    turn,
+    turn: safeTurn,
     account,
-    settings: db.voiceSettings!,
+    settings: voiceSettingsFor(workspaceId),
     at: new Date().toISOString(),
     paymentUrl,
-    agency: workspaceOf(workspaceId).legalName,
+    agency: brandFor(workspaceId).name,
   });
   const guardrail = filterVoiceUtterance(stepped.say, loadVoiceGuardrails());
   if (guardrail.blocked) {
@@ -385,6 +476,16 @@ export function turnVoice(workspaceId: WorkspaceId, callId: string, turn: Consum
         { id: nextId("dnc"), workspaceId, accountId: account.id, phoneLast4: account.phoneLast4, reason: "cease on call", at: new Date().toISOString() },
       ];
     }
+    if (account && (stepped.transferred || stepped.disposition === "hardship")) {
+      const title = stepped.transferred ? "Warm transfer from sandbox voice call" : "Review hardship noted on a call";
+      const already = (state.collectorTasks ?? []).some((task) => task.accountId === account.id && task.title === title && task.status === "open");
+      if (!already) {
+        state.collectorTasks = [
+          { id: nextId("task"), workspaceId, accountId: account.id, title, queue: "collector", status: "open", createdAt: new Date().toISOString() },
+          ...(state.collectorTasks ?? []),
+        ];
+      }
+    }
   });
   return { ...updated, say: stepped.say, transcript: stepped.transcript, paymentUrl: stepped.paymentUrl };
 }
@@ -411,15 +512,23 @@ function statusResponseFor(templateId: string | undefined): AccountStatus | null
   }
 }
 
-export function sendChannel(input: {
+export async function sendChannel(input: {
   workspaceId: WorkspaceId;
   accountId: string;
   channel: CollectionChannel;
   body: string;
   templateId?: string;
-}): ChannelMessage {
+  destination?: string;
+  fetchImpl?: FetchLike;
+}): Promise<ChannelMessage> {
   const account = accounts(input.workspaceId).find((item) => item.id === input.accountId) ?? null;
-  const template = (loadDb().collectionTemplates ?? []).find((item) => item.id === input.templateId);
+  if (account?.addressStatus === "returned" && input.channel === "letter") {
+    const blocked = storeMessage(input, "blocked", "Returned mail is on file. Letter sequences stay paused until the address is reviewed.", null);
+    logEvent(input.workspaceId, input.channel, input.accountId, false, blocked.reason ?? "returned mail");
+    return blocked;
+  }
+  const storedTemplate = (loadDb().collectionTemplates ?? []).find((item) => item.id === input.templateId);
+  const template = storedTemplate ? templateForWorkspace(input.workspaceId, storedTemplate) : undefined;
   if (template && !template.ownerApproved) {
     const blocked = storeMessage(input, "blocked", "Template stays disabled until an owner approves it for sending.", null);
     logEvent(input.workspaceId, input.channel, input.accountId, false, blocked.reason ?? "template");
@@ -430,10 +539,25 @@ export function sendChannel(input: {
     logEvent(input.workspaceId, input.channel, input.accountId, false, blocked.reason ?? "template");
     return blocked;
   }
+  if (
+    account &&
+    (input.channel === "sms" || input.channel === "email" || input.channel === "letter") &&
+    limitationsDatePassed(account.solExpiresOn, new Date().toISOString()) &&
+    timeBarredSolicitation(template?.id, input.body)
+  ) {
+    const blocked = storeMessage(
+      input,
+      "blocked",
+      TIME_BARRED_HOLD,
+      null,
+    );
+    logEvent(input.workspaceId, input.channel, input.accountId, false, blocked.reason ?? "time-barred");
+    return blocked;
+  }
   let rendered = input.body;
   if (template && account) {
-    const matrix = ensureSettlementMatrix();
-    const context = mergeContext({ account, agencyName: workspaceOf(input.workspaceId).legalName, matrix });
+    const matrix = ensureSettlementMatrix(account.workspaceId);
+    const context = mergeContext({ account, agencyName: brandFor(account.workspaceId).name, domain: brandFor(account.workspaceId).domain, matrix });
     const missing = missingInterpolations(`${template.subject}\n${template.body}`, context.values);
     if (missing.length > 0) {
       const blocked = storeMessage(input, "blocked", `Required merge fields are empty: ${missing.join(", ")}.`, null);
@@ -448,10 +572,10 @@ export function sendChannel(input: {
       now: new Date(),
       values: { ...context.values, subject_preview: renderMustache(template.subject, context.values) },
       offer: context.offer,
-      priorLetterAt: (loadDb().channelMessages ?? []).find((row) => row.accountId === account.id && row.channel === "letter" && row.status === "sandbox_queued")?.at ?? null,
+      priorLetterAt: (loadDb().channelMessages ?? []).find((row) => row.accountId === account.id && row.channel === "letter" && row.status !== "blocked")?.at ?? null,
       smsConsent: (loadDb().consents ?? []).some((row) => row.accountId === account.id && row.channel === "sms"),
       emailConsent: (loadDb().consents ?? []).some((row) => row.accountId === account.id && row.channel === "email"),
-      reassigned: loadDb().voiceSettings?.rndSandboxClear ? "ok" : "unknown",
+      reassigned: voiceSettingsFor(input.workspaceId).rndSandboxClear ? "ok" : "unknown",
     });
     if (rules.length > 0) {
       const blocked = storeMessage(input, "blocked", rules[0] ?? "Send rule blocked this template.", null);
@@ -460,6 +584,8 @@ export function sendChannel(input: {
     }
     rendered = [renderMustache(template.subject, context.values), renderMustache(template.body, context.values)].filter(Boolean).join("\n\n");
   }
+  rendered = draftDisclosure(input.channel, redactIdentifiers(rendered));
+  const outgoing = { ...input, body: rendered };
   const decision = gateFor(
     input.workspaceId,
     account,
@@ -468,11 +594,32 @@ export function sendChannel(input: {
     statusResponseFor(template?.id),
   );
   logEvent(input.workspaceId, input.channel, input.accountId, decision.allowed, decision.reason);
-  if (!decision.allowed) return storeMessage(input, "blocked", decision.reason, null);
-  if (process.env.MERIDIAN_CHANNEL_DELIVER === "live") {
-    throw new Error("Live email, SMS, voice, and mail delivery is disabled. Use sandbox mode.");
+  if (!decision.allowed) return storeMessage(outgoing, "blocked", decision.reason, null);
+  const delivered = await deliverAllowedChannel(
+    {
+      channel: input.channel,
+      to: input.destination ?? "",
+      subject: "Account notice",
+      body: rendered,
+      toName: account?.consumerName ?? "Consumer",
+    },
+    input.fetchImpl,
+  );
+  if (delivered) {
+    return storeMessage(outgoing, "provider_accepted", decision.reason, delivered.providerId, delivered.provider);
   }
-  return storeMessage({ ...input, body: rendered }, "sandbox_queued", decision.reason, `sandbox_${nextId("msg")}`);
+  return storeMessage(outgoing, "sandbox_queued", decision.reason, `sandbox_${nextId("msg")}`);
+}
+
+const DRAFT_MINI_MIRANDA =
+  "This is an attempt to collect a debt and any information obtained will be used for that purpose. This communication is from a debt collector. This sentence is a draft for counsel review.";
+
+/** Voicemail stays untouched. A limited-content message cannot mention the debt. */
+function draftDisclosure(channel: CollectionChannel, body: string): string {
+  if (channel !== "sms" && channel !== "email" && channel !== "letter") return body;
+  if (!body.trim()) return body;
+  if (/debt collector|cobrador de deudas/i.test(body)) return body;
+  return `${DRAFT_MINI_MIRANDA} ${body}`;
 }
 
 function storeMessage(
@@ -480,6 +627,7 @@ function storeMessage(
   status: ChannelMessage["status"],
   reason: string,
   providerId: string | null,
+  provider = "sandbox",
 ): ChannelMessage {
   const message: ChannelMessage = {
     id: nextId("ch"),
@@ -489,10 +637,10 @@ function storeMessage(
     status,
     reason,
     templateId: input.templateId ?? null,
-    provider: "sandbox",
+    provider,
     providerId,
     at: new Date().toISOString(),
-    bodyPreview: input.body?.slice(0, 500) ?? null,
+    bodyPreview: input.body ? redactIdentifiers(input.body).slice(0, 500) : null,
   };
   mutate((db) => {
     db.channelMessages = [message, ...(db.channelMessages ?? [])].slice(0, 400);
@@ -500,53 +648,86 @@ function storeMessage(
   return message;
 }
 
-export function ensureSettlementMatrix(): SettlementMatrix {
+export function ensureSettlementMatrix(workspaceId: WorkspaceId = "triton"): SettlementMatrix {
   const db = loadDb();
-  if (db.settlementMatrix?.customized) return db.settlementMatrix;
-  const seeded = loadSettlementMatrix();
-  mutate((state) => {
-    if (!state.settlementMatrix?.customized) state.settlementMatrix = seeded;
-  });
-  return loadDb().settlementMatrix ?? seeded;
+  const scoped = db.settlementMatrices?.[workspaceId];
+  if (scoped?.customized) return scoped;
+  if (!scoped && workspaceId === "triton" && db.settlementMatrix?.customized) return db.settlementMatrix;
+  return loadSettlementMatrix();
 }
 
-export function saveSettlementMatrix(matrix: SettlementMatrix, role: CollectionsRole): SettlementMatrix {
+export function saveSettlementMatrix(matrix: SettlementMatrix, role: CollectionsRole, workspaceId: WorkspaceId): SettlementMatrix {
   if (role !== "admin" && role !== "compliance") throw new Error("Only admin or compliance can edit settlement authority");
+  validateSettlementMatrix(matrix);
   const saved = clearMatrixDefaults(matrix);
+  saved.needs_counsel_review = true;
   mutate((db) => {
-    db.settlementMatrix = saved;
+    db.settlementMatrices = { ...(db.settlementMatrices ?? {}), [workspaceId]: saved };
+    if (workspaceId === "triton") db.settlementMatrix = saved;
   });
   return saved;
+}
+
+function approvalFor(workspaceId: WorkspaceId, template: CollectionTemplate, db = loadDb()): TemplateApproval {
+  const scoped = db.templateApprovals?.[workspaceId]?.[template.id];
+  if (scoped) return scoped;
+  if (workspaceId === "triton") return { ownerApproved: template.ownerApproved, counselReviewed: template.counselReviewed };
+  return { ownerApproved: false, counselReviewed: false };
+}
+
+function applyTemplateApproval(template: CollectionTemplate, approval: TemplateApproval): CollectionTemplate {
+  return {
+    ...template,
+    ownerApproved: approval.ownerApproved,
+    counselReviewed: approval.counselReviewed,
+    needsCounselReview: approval.counselReviewed ? false : true,
+  };
+}
+
+/** Send approval and the counsel flag for one workspace. Aether does not inherit Triton's approval. */
+export function templateForWorkspace(workspaceId: WorkspaceId, template: CollectionTemplate): CollectionTemplate {
+  return applyTemplateApproval(template, approvalFor(workspaceId, template));
 }
 
 export function setTemplateApproval(
   id: string,
   patch: { ownerApproved?: boolean; counselReviewed?: boolean },
   role: CollectionsRole,
+  workspaceId: WorkspaceId = "triton",
 ): CollectionTemplate {
   if (role !== "admin" && role !== "compliance") throw new Error("Only admin or compliance can approve a template");
   let updated: CollectionTemplate | undefined;
   mutate((db) => {
-    db.collectionTemplates = (db.collectionTemplates ?? []).map((item) => {
-      if (item.id !== id) return item;
-      updated = {
-        ...item,
-        ownerApproved: patch.ownerApproved ?? item.ownerApproved,
-        counselReviewed: patch.counselReviewed ?? item.counselReviewed,
-        needsCounselReview: patch.counselReviewed ? false : item.needsCounselReview,
-      };
-      return updated;
-    });
+    const item = (db.collectionTemplates ?? []).find((row) => row.id === id);
+    if (!item) return;
+    const current = approvalFor(workspaceId, item, db);
+    const next: TemplateApproval = {
+      ownerApproved: patch.ownerApproved ?? current.ownerApproved,
+      counselReviewed: patch.counselReviewed ?? current.counselReviewed,
+    };
+    db.templateApprovals = {
+      ...(db.templateApprovals ?? {}),
+      [workspaceId]: { ...(db.templateApprovals?.[workspaceId] ?? {}), [id]: next },
+    };
+    if (workspaceId === "triton") {
+      db.collectionTemplates = (db.collectionTemplates ?? []).map((row) =>
+        row.id === id
+          ? { ...row, ownerApproved: next.ownerApproved, counselReviewed: next.counselReviewed, needsCounselReview: next.counselReviewed ? false : row.needsCounselReview }
+          : row,
+      );
+    }
+    updated = applyTemplateApproval(item, next);
   });
   if (!updated) throw new Error("Template not found");
   return updated;
 }
 
 export function renderTemplatePreview(workspaceId: WorkspaceId, templateId: string, accountId: string) {
-  const template = (loadDb().collectionTemplates ?? []).find((item) => item.id === templateId);
+  const stored = (loadDb().collectionTemplates ?? []).find((item) => item.id === templateId);
   const account = accounts(workspaceId).find((item) => item.id === accountId);
-  if (!template || !account) throw new Error("Template and account are required");
-  const context = mergeContext({ account, agencyName: workspaceOf(workspaceId).legalName, matrix: ensureSettlementMatrix() });
+  if (!stored || !account) throw new Error("Template and account are required");
+  const template = templateForWorkspace(workspaceId, stored);
+  const context = mergeContext({ account, agencyName: brandFor(account.workspaceId).name, domain: brandFor(account.workspaceId).domain, matrix: ensureSettlementMatrix(account.workspaceId) });
   return {
     subject: renderMustache(template.subject, context.values),
     body: renderMustache(template.body, context.values),
@@ -606,7 +787,7 @@ export function issueValidation(workspaceId: WorkspaceId, accountId: string): Po
   logEvent(workspaceId, "letter", accountId, decision.allowed, decision.reason);
   if (!decision.allowed) throw new Error(decision.reason);
   const mailedAt = new Date().toISOString();
-  const notice = validationNotice(account, workspaceOf(workspaceId).legalName);
+  const notice = validationNotice(account, brandFor(workspaceId).name);
   const updated: PortfolioAccount = {
     ...account,
     validationMailedAt: mailedAt,
@@ -628,7 +809,7 @@ export function fileDispute(workspaceId: WorkspaceId, accountId: string, text: s
   const updated: PortfolioAccount = {
     ...account,
     status: "disputed",
-    quarantineReason: text.slice(0, 500),
+    quarantineReason: redactIdentifiers(text).slice(0, 500),
   };
   mutate((db) => {
     db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) => (item.id === accountId ? updated : item));
@@ -649,27 +830,48 @@ export function fileDispute(workspaceId: WorkspaceId, accountId: string, text: s
   return publicAccount(updated);
 }
 
-export function proposeDraft(workspaceId: WorkspaceId, accountId: string, inbound: string): DraftReply {
+export async function proposeDraft(workspaceId: WorkspaceId, accountId: string, inbound: string): Promise<DraftReply> {
   const account = accounts(workspaceId).find((item) => item.id === accountId);
   if (!account) throw new Error("Account not found");
-  const classification = classifyInbound(inbound);
-  const draft = draftConsumerReply({
-    classification,
-    firstName: account.consumerName.split(" ")[0] ?? "",
-    agency: workspaceOf(workspaceId).legalName,
-  });
+  const agency = brandFor(workspaceId).name;
+  const firstName = account.consumerName.split(" ")[0] ?? "";
+  const cleanInbound = redactIdentifiers(inbound).slice(0, 2000);
+  let modelText: string | null = null;
+  let model: string | null = null;
+  try {
+    const completed = await completeFast([
+      {
+        role: "system",
+        content:
+          "Classify one consumer collections message and draft a reply. Return JSON only: {\"classification\":\"dispute|cease|hardship|promise|bankruptcy|attorney|other\",\"draft\":\"...\"}. Do not threaten. Include that you are a debt collector. Do not include a Social Security number or a card number. The draft is not sent.",
+      },
+      { role: "user", content: cleanInbound },
+    ]);
+    modelText = completed?.text ?? null;
+    model = completed?.model ?? null;
+  } catch {
+    modelText = null;
+  }
+  const composed = composeConsumerDraft({ inbound: cleanInbound, firstName, agency, modelText, model });
   const decision = gateFor(workspaceId, account, "email");
+  const limitationsHold =
+    decision.allowed &&
+    limitationsDatePassed(account.solExpiresOn, new Date().toISOString()) &&
+    timeBarredSolicitation(undefined, composed.draft);
   const row: DraftReply = {
     id: nextId("draft"),
     workspaceId,
     accountId,
-    inbound: inbound.slice(0, 2000),
-    classification,
-    draft,
+    inbound: cleanInbound,
+    classification: composed.classification,
+    draft: redactIdentifiers(composed.draft),
     status: "pending_approval",
-    gateAllowed: decision.allowed,
-    gateReason: decision.reason,
+    gateAllowed: decision.allowed && !limitationsHold,
+    gateReason: limitationsHold ? TIME_BARRED_HOLD : decision.reason,
     createdAt: new Date().toISOString(),
+    draftSource: composed.source,
+    guardNote: composed.guardNote,
+    model: composed.model,
   };
   mutate((db) => {
     db.draftReplies = [row, ...(db.draftReplies ?? [])].slice(0, 200);
@@ -677,7 +879,7 @@ export function proposeDraft(workspaceId: WorkspaceId, accountId: string, inboun
   return row;
 }
 
-export function approveDraft(workspaceId: WorkspaceId, draftId: string, approve: boolean): DraftReply {
+export async function approveDraft(workspaceId: WorkspaceId, draftId: string, approve: boolean): Promise<DraftReply> {
   const db = loadDb();
   const draft = (db.draftReplies ?? []).find((item) => item.id === draftId && item.workspaceId === workspaceId);
   if (!draft) throw new Error("Draft not found");
@@ -691,36 +893,328 @@ export function approveDraft(workspaceId: WorkspaceId, draftId: string, approve:
   const account = accounts(workspaceId).find((item) => item.id === draft.accountId);
   const decision = gateFor(workspaceId, account ?? null, "email");
   if (!decision.allowed) throw new Error(decision.reason);
-  sendChannel({ workspaceId, accountId: draft.accountId, channel: "email", body: draft.draft });
-  const approved = { ...draft, status: "approved" as const, gateAllowed: true, gateReason: decision.reason };
+  const sent = await sendChannel({ workspaceId, accountId: draft.accountId, channel: "email", body: draft.draft });
+  if (sent.status === "blocked") {
+    const held = { ...draft, gateAllowed: false, gateReason: sent.reason ?? "blocked" };
+    mutate((state) => {
+      state.draftReplies = (state.draftReplies ?? []).map((item) => (item.id === draftId ? held : item));
+    });
+    throw new Error(sent.reason ?? "blocked");
+  }
+  const approved = { ...draft, status: "approved" as const, gateAllowed: true, gateReason: sent.reason ?? decision.reason };
   mutate((state) => {
     state.draftReplies = (state.draftReplies ?? []).map((item) => (item.id === draftId ? approved : item));
   });
   return approved;
 }
 
-export function sandboxPayment(workspaceId: WorkspaceId, accountId: string, amountCents: number): ConsumerPayment {
+export function refusePastLimitations(account: PortfolioAccount): void {
+  if (!limitationsDatePassed(account.solExpiresOn, new Date().toISOString())) return;
+  logEvent(account.workspaceId, "payment_portal", account.id, false, TIME_BARRED_HOLD);
+  throw new Error(TIME_BARRED_HOLD);
+}
+
+export function setupPaymentPlan(workspaceId: WorkspaceId, accountId: string, months: number, installmentCents: number): PortfolioAccount {
   const account = accounts(workspaceId).find((item) => item.id === accountId);
   if (!account) throw new Error("Account not found");
+  refusePastLimitations(account);
+  const decision = gateFor(workspaceId, account, "payment_portal");
+  logEvent(workspaceId, "payment_portal", accountId, decision.allowed, decision.reason);
+  if (!decision.allowed) throw new Error(decision.reason);
+  const maxMonths = voiceSettingsFor(workspaceId).maxPlanMonths;
+  if (!Number.isInteger(months) || months < 1 || months > maxMonths) {
+    throw new Error(`A plan must be 1 to ${maxMonths} months.`);
+  }
+  if (!Number.isInteger(installmentCents) || installmentCents < 100) {
+    throw new Error("Each installment must be at least $1.00.");
+  }
+  if (installmentCents * months > account.balanceCents) {
+    throw new Error("The plan total cannot exceed the current balance.");
+  }
+  const updated: PortfolioAccount = {
+    ...account,
+    paymentPlan: { months, installmentCents, createdAt: new Date().toISOString(), provider: "sandbox" },
+  };
+  mutate((db) => {
+    db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) => (item.id === accountId ? updated : item));
+  });
+  return publicAccount(updated);
+}
+
+export function ensureValidationNotice(workspaceId: WorkspaceId, accountId: string): PortfolioAccount {
+  const account = accounts(workspaceId).find((item) => item.id === accountId);
+  if (!account) throw new Error("Account not found");
+  if (account.validationNotice) return publicAccount(account);
+  return issueValidation(workspaceId, accountId);
+}
+
+export function completeTask(workspaceId: WorkspaceId, taskId: string, actor = "collector"): void {
+  mutate((db) => {
+    db.collectorTasks = (db.collectorTasks ?? []).map((task) =>
+      task.workspaceId === workspaceId && task.id === taskId ? { ...task, status: "done", completedBy: actor } : task,
+    );
+  });
+}
+
+function savedSol(workspaceId: WorkspaceId): SolRule[] {
+  const db = loadDb();
+  const scoped = db.solTables?.[workspaceId];
+  if (scoped && scoped.length > 0) return scoped;
+  if (workspaceId === "triton" && db.solRules?.length) return db.solRules;
+  return [];
+}
+
+export function ensureSolTable(workspaceId: WorkspaceId = "triton"): SolRule[] {
+  const saved = savedSol(workspaceId);
+  const byCode = new Map(saved.map((rule) => [rule.code, rule]));
+  const placeholder = (rule: SolRule | undefined) => !rule || (rule.years == null && rule.citation.startsWith("No reviewed limitations period"));
+  const table = defaultSolTable().map((rule) => (placeholder(byCode.get(rule.code)) ? rule : byCode.get(rule.code)!));
+  const changed = table.some((rule) => {
+    const prior = byCode.get(rule.code);
+    return !prior || prior.years !== rule.years || prior.citation !== rule.citation;
+  });
+  if (saved.length === 0 || changed) {
+    mutate((db) => {
+      db.solTables = { ...(db.solTables ?? {}), [workspaceId]: table };
+      if (workspaceId === "triton") db.solRules = table;
+    });
+  }
+  return table;
+}
+
+export function saveSolRules(rules: SolRule[], role: CollectionsRole, workspaceId: WorkspaceId = "triton"): SolRule[] {
+  if (role !== "admin" && role !== "compliance") throw new Error("Only admin or compliance can edit limitations");
+  const allowed = new Set(defaultSolTable().map((rule) => rule.code));
+  const clean = rules
+    .filter((rule) => allowed.has(rule.code))
+    .map((rule) => ({
+      code: rule.code,
+      years: rule.years == null || Number.isNaN(Number(rule.years)) ? null : Math.max(0, Math.floor(Number(rule.years))),
+      citation: String(rule.citation || "No reviewed limitations period for this state. Do not calculate a date.").slice(0, 500),
+      needsCounselReview: true,
+    }));
+  const table = defaultSolTable().map((rule) => clean.find((item) => item.code === rule.code) ?? rule);
+  mutate((db) => {
+    db.solTables = { ...(db.solTables ?? {}), [workspaceId]: table };
+    if (workspaceId === "triton") db.solRules = table;
+  });
+  return ensureSolTable(workspaceId);
+}
+
+function savedRecording(workspaceId: WorkspaceId): RecordingRule[] {
+  const db = loadDb();
+  const scoped = db.recordingTables?.[workspaceId];
+  if (scoped && scoped.length > 0) return scoped;
+  if (workspaceId === "triton" && db.recordingRules?.length) return db.recordingRules;
+  return [];
+}
+
+export function ensureRecordingTable(workspaceId: WorkspaceId = "triton"): RecordingRule[] {
+  const saved = savedRecording(workspaceId);
+  const byCode = new Map(saved.map((rule) => [rule.code, rule]));
+  const table = defaultRecordingTable().map((rule) => byCode.get(rule.code) ?? rule);
+  if (saved.length === 0) {
+    mutate((db) => {
+      if ((db.recordingTables?.[workspaceId]?.length ?? 0) > 0) return;
+      db.recordingTables = { ...(db.recordingTables ?? {}), [workspaceId]: table };
+      if (workspaceId === "triton" && !db.recordingRules?.length) db.recordingRules = table;
+    });
+  }
+  return table;
+}
+
+export function saveRecordingRules(rules: RecordingRule[], role: CollectionsRole, workspaceId: WorkspaceId = "triton"): RecordingRule[] {
+  if (role !== "admin" && role !== "compliance") throw new Error("Only admin or compliance can edit recording consent");
+  const allowed = new Set(defaultRecordingTable().map((rule) => rule.code));
+  const parties = new Set(["all", "one", "uncertain"]);
+  const clean = rules
+    .filter((rule) => allowed.has(rule.code) && parties.has(rule.party))
+    .map((rule) => ({
+      code: rule.code,
+      party: rule.party,
+      citation: String(rule.citation || "Counsel must confirm this state's recording rule.").slice(0, 500),
+      needsCounselReview: true as const,
+    }));
+  const table = defaultRecordingTable().map((rule) => clean.find((item) => item.code === rule.code) ?? rule);
+  mutate((db) => {
+    db.recordingTables = { ...(db.recordingTables ?? {}), [workspaceId]: table };
+    if (workspaceId === "triton") db.recordingRules = table;
+  });
+  return ensureRecordingTable(workspaceId);
+}
+
+export async function scrubAccount(workspaceId: WorkspaceId, accountId: string): Promise<PortfolioAccount> {
+  const account = accounts(workspaceId).find((item) => item.id === accountId);
+  if (!account) throw new Error("Account not found");
+  const consent = (loadDb().consents ?? []).find((row) => row.accountId === accountId && row.channel === "voice_cell");
+  const rnd = await checkReassignedNumber({ phoneLast4: account.phoneLast4, consentDate: consent?.at ?? null });
+  const scra = await checkScraStatus({
+    lastName: account.consumerName.split(" ").slice(-1)[0] ?? account.consumerName,
+    activeDutyDate: new Date().toISOString().slice(0, 10),
+  });
+  const updated: PortfolioAccount = { ...account, rndStatus: rnd.result, scraStatus: scra.result };
+  mutate((db) => {
+    db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) => (item.id === accountId ? updated : item));
+  });
+  logEvent(
+    workspaceId,
+    "voice_outbound",
+    accountId,
+    rnd.result !== "reassigned" && scra.result !== "active",
+    `RND ${rnd.result}${rnd.sandbox ? " (sandbox)" : ""}. SCRA ${scra.result}${scra.sandbox ? " (sandbox)" : ""}. Unknown is not a clearance.`,
+  );
+  return publicAccount(updated);
+}
+
+const EMPTY_METRO2: Metro2Signoff = {
+  ownerApprovedAt: null,
+  ownerApprovedBy: null,
+  complianceApprovedAt: null,
+  complianceApprovedBy: null,
+};
+
+function metro2Signoff(workspaceId: WorkspaceId, db = loadDb()): Metro2Signoff {
+  const scoped = db.metro2Approvals?.[workspaceId];
+  if (scoped) return scoped;
+  if (workspaceId === "triton" && db.metro2Approval) return db.metro2Approval;
+  return EMPTY_METRO2;
+}
+
+function metro2Status(workspaceId: WorkspaceId) {
+  const approval = metro2Signoff(workspaceId);
+  return {
+    enabled: process.env.MERIDIAN_METRO2_EXPORT === "enabled",
+    ownerApproved: Boolean(approval.ownerApprovedAt),
+    complianceApproved: Boolean(approval.complianceApprovedAt),
+    needsCounselReview: true as const,
+  };
+}
+
+export function approveMetro2(role: CollectionsRole, actor: string, workspaceId: WorkspaceId = "triton"): ReturnType<typeof metro2Status> {
+  if (role !== "admin" && role !== "compliance") throw new Error("Owner and compliance must approve Metro 2");
+  const now = new Date().toISOString();
+  mutate((db) => {
+    const current = metro2Signoff(workspaceId, db);
+    const next: Metro2Signoff =
+      role === "admin"
+        ? { ...current, ownerApprovedAt: now, ownerApprovedBy: actor }
+        : { ...current, complianceApprovedAt: now, complianceApprovedBy: actor };
+    db.metro2Approvals = { ...(db.metro2Approvals ?? {}), [workspaceId]: next };
+    if (workspaceId === "triton") db.metro2Approval = next;
+  });
+  return metro2Status(workspaceId);
+}
+
+export function exportMetro2(workspaceId: WorkspaceId): ReturnType<typeof buildMetro2> {
+  if (process.env.MERIDIAN_METRO2_EXPORT !== "enabled") {
+    throw new Error("Metro 2 export is disabled. Set MERIDIAN_METRO2_EXPORT=enabled only after owner and compliance approval.");
+  }
+  const approval = metro2Signoff(workspaceId);
+  if (!approval.ownerApprovedAt || !approval.complianceApprovedAt) {
+    throw new Error("Owner and compliance must both approve Metro 2 before an export.");
+  }
+  return buildMetro2(accounts(workspaceId));
+}
+
+export function accessReview(workspaceId: WorkspaceId = "triton"): {
+  generatedAt: string;
+  citation: string;
+  needsCounselReview: true;
+  operators: Array<{ email: string; role: CollectionsRole; mfaEnabled: boolean; canRevealPii: boolean; status: string; lastLoginAt: string | null }>;
+} {
+  const otherWorkspace = new Set(
+    (loadDb().operatorRoles ?? [])
+      .filter((row) => row.workspaceId && row.workspaceId !== workspaceId)
+      .map((row) => row.email.toLowerCase()),
+  );
+  const rows = sqliteAll("SELECT id, email, role, status, last_login_at FROM accounts ORDER BY email").filter(
+    (row) => !otherWorkspace.has(String(row.email).toLowerCase()),
+  );
+  return {
+    generatedAt: new Date().toISOString(),
+    citation: "16 CFR § 314.4(c)(1), (c)(5), and (d). Access controls, MFA, and a review of who can see customer information. This is a draft control, not a completed Safeguards program.",
+    needsCounselReview: true,
+    operators: rows.map((row) => {
+      const email = String(row.email);
+      const accountRole = row.role === "member" ? "member" : "owner";
+      const role = collectionsRole(email, accountRole);
+      const mfa = sqliteGet("SELECT enabled FROM account_mfa WHERE account_id = ?", String(row.id));
+      return {
+        email,
+        role,
+        mfaEnabled: Number(mfa?.enabled) === 1,
+        canRevealPii: role === "admin" || role === "compliance",
+        status: String(row.status ?? ""),
+        lastLoginAt: row.last_login_at ? String(row.last_login_at) : null,
+      };
+    }),
+  };
+}
+
+function suppliedDollars(cents: number | null | undefined): string {
+  return cents == null ? "not supplied" : (cents / 100).toFixed(2);
+}
+
+function suppliedPayments(payments: number | null | undefined, credits: number | null | undefined): string {
+  if (payments == null && credits == null) return "not supplied";
+  return (((payments ?? 0) + (credits ?? 0)) / 100).toFixed(2);
+}
+
+export function validationPdfBase64(workspaceId: WorkspaceId, accountId: string): string {
+  const account = ensureValidationNotice(workspaceId, accountId);
+  const end = account.validationMailedAt ? validationEndDate(account.validationMailedAt) : account.disputeDeadline || "";
+  const pdf = modelFormPdf({
+    agencyName: brandFor(workspaceId).name,
+    agencyAddress: "not supplied",
+    agencyPhone: "not supplied",
+    noticeDate: (account.validationMailedAt || new Date().toISOString()).slice(0, 10),
+    consumerName: account.consumerName,
+    consumerAddress: `${account.state} ${account.zip}`,
+    accountRef: account.accountRef,
+    accountType: "not supplied",
+    creditorOnItemizationDate: account.originalCreditor || "not supplied",
+    accountLast4: account.last4 || "0000",
+    itemizationDate: account.itemizationDate || "not supplied",
+    amountOnItemizationDate: suppliedDollars(account.itemizationAmountCents),
+    interestSince: suppliedDollars(account.interestSinceItemizationCents),
+    feesSince: suppliedDollars(account.feesSinceItemizationCents),
+    paymentsCreditsSince: suppliedPayments(account.paymentsSinceItemizationCents, account.creditsSinceItemizationCents),
+    currentBalance: (account.balanceCents / 100).toFixed(2),
+    currentCreditor: account.sellerName,
+    validationEndDate: end,
+    limitationsNote: limitationsDatePassed(account.solExpiresOn, new Date().toISOString()) ? VALIDATION_LIMITATIONS_NOTE : undefined,
+  });
+  return Buffer.from(pdf).toString("base64");
+}
+
+export async function sandboxPayment(workspaceId: WorkspaceId, accountId: string, amountCents: number): Promise<ConsumerPayment> {
+  const account = accounts(workspaceId).find((item) => item.id === accountId);
+  if (!account) throw new Error("Account not found");
+  refusePastLimitations(account);
   const decision = gateFor(workspaceId, account, "payment_portal");
   logEvent(workspaceId, "payment_portal", accountId, decision.allowed, decision.reason);
   if (!decision.allowed) throw new Error(decision.reason);
   if (amountCents < 1 || amountCents > account.balanceCents) throw new Error("Amount must be between one cent and the balance");
+  const stripe = process.env.MERIDIAN_CHANNEL_DELIVER === "live" && process.env.MERIDIAN_PAYMENTS_PROVIDER === "stripe";
+  const checkout = stripe ? await createStripeCheckout({ amountCents, reference: account.accountRef }) : null;
   const payment: ConsumerPayment = {
     id: nextId("pmt"),
     workspaceId,
     accountId,
     amountCents,
-    status: "succeeded",
-    provider: "sandbox",
-    providerId: `sandbox_${nextId("pi")}`,
+    status: checkout ? "pending" : "succeeded",
+    provider: checkout?.provider ?? "sandbox",
+    providerId: checkout?.providerId ?? `sandbox_${nextId("pi")}`,
     at: new Date().toISOString(),
+    checkoutUrl: checkout?.url,
   };
   mutate((db) => {
     db.consumerPayments = [payment, ...(db.consumerPayments ?? [])];
-    db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) =>
-      item.id === accountId ? { ...item, balanceCents: item.balanceCents - amountCents } : item,
-    );
+    if (payment.status === "succeeded") {
+      db.portfolioAccounts = (db.portfolioAccounts ?? []).map((item) =>
+        item.id === accountId ? { ...item, balanceCents: item.balanceCents - amountCents } : item,
+      );
+    }
   });
   return payment;
 }
@@ -761,7 +1255,36 @@ export function collectionReport(workspaceId: WorkspaceId) {
     })),
     exceptions: (db.complianceEvents ?? []).filter((event) => event.workspaceId === workspaceId && !event.allowed).slice(0, 100),
     attempts: (db.complianceEvents ?? []).filter((event) => event.workspaceId === workspaceId).slice(0, 200),
+    remittance: [...byPortfolio.entries()].map(([portfolioId, bucket]) => {
+      const feePercent = Number(process.env.MERIDIAN_AGENCY_FEE_PERCENT ?? "0");
+      const feeCents = Math.round(bucket.collected * (Number.isFinite(feePercent) ? feePercent : 0) / 100);
+      const seller = rows.find((account) => account.portfolioId === portfolioId)?.sellerName ?? "";
+      return {
+        portfolioId,
+        clientName: seller,
+        collectedCents: bucket.collected,
+        feeCents,
+        remittanceCents: bucket.collected - feeCents,
+        paymentCount: payments.filter((payment) => rows.find((account) => account.id === payment.accountId)?.portfolioId === portfolioId).length,
+      };
+    }),
+    collectors: collectorRows(db, workspaceId),
+    needsCounselReview: true as const,
+    label: REPORT_DRAFT_LABEL,
   };
+}
+
+function collectorRows(db: ReturnType<typeof loadDb>, workspaceId: WorkspaceId) {
+  const names = new Set<string>();
+  for (const task of db.collectorTasks ?? []) if (task.workspaceId === workspaceId && task.completedBy) names.add(task.completedBy);
+  for (const call of db.voiceCalls ?? []) if (call.workspaceId === workspaceId) names.add("sandbox desk");
+  if (names.size === 0) names.add("sandbox desk");
+  return [...names].map((name) => ({
+    name,
+    tasksCompleted: (db.collectorTasks ?? []).filter((task) => task.workspaceId === workspaceId && task.status === "done" && (task.completedBy ?? "sandbox desk") === name).length,
+    calls: name === "sandbox desk" ? (db.voiceCalls ?? []).filter((call) => call.workspaceId === workspaceId && !call.blockedReason).length : 0,
+    paymentsPosted: name === "sandbox desk" ? (db.consumerPayments ?? []).filter((payment) => payment.workspaceId === workspaceId).length : 0,
+  }));
 }
 
 export function openPortal(workspaceId: WorkspaceId, accountRef: string, last4: string, zip: string): { token: string; account: PortfolioAccount } {

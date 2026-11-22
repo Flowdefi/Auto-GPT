@@ -232,6 +232,16 @@
     padding-right: var(--safe-r);
   }
 
+  main .grid > * {
+    min-width: 0;
+  }
+
+  main pre,
+  main code {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
   .no-select {
     -webkit-user-select: none;
     user-select: none;
@@ -244,6 +254,18 @@
   .text-balance {
     text-wrap: balance;
   }
+}
+
+.portal-shell a,
+.portal-shell button,
+.portal-shell input,
+.portal-shell textarea {
+  outline: none;
+}
+
+.portal-shell :focus-visible {
+  outline: 3px solid #0b3a66;
+  outline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -202,7 +202,8 @@ CREATE TABLE IF NOT EXISTS api_keys (
   key_prefix TEXT NOT NULL,
   last_used_at TEXT,
   created_at TEXT NOT NULL,
-  revoked_at TEXT
+  revoked_at TEXT,
+  workspace_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_api_keys_account ON api_keys(account_id);
 

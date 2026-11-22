@@ -27,9 +27,9 @@ en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_
 ##Dev
 coverage
 flake8
-numpy
+numpy==1.26.4 # spaCy 3.5 and thinc 8.1 are built for NumPy 1.x
 pre-commit
-black
+black==23.3.0 # same revision as .pre-commit-config.yaml
 isort
 gitpython==3.1.31
 auto-gpt-plugin-template

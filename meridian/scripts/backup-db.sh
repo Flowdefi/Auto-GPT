@@ -1,19 +1,28 @@
 #!/usr/bin/env bash
-# Encrypted SQLite backup of meridian/data/meridian.db. Keeps 14 days.
+# Encrypted SQLite backup of meridian/data/meridian.db.
+# Usage: scripts/backup-db.sh [directory]
+# Default destination is data/backups. Keeps 14 days and at most 14 files.
 # Node AES-256-GCM files (magic MDBC1) restore with:
 #   export MERIDIAN_BACKUP_KEY='...'
 #   node scripts/backup-crypt.mjs dec data/backups/meridian-STAMP.db.enc data/meridian.db
-# OpenSSL enc files, on a host whose enc command accepts AES-GCM, restore with:
-#   openssl enc -d -aes-256-gcm -pbkdf2 -iter 200000 \
-#     -in data/backups/meridian-STAMP.db.enc -out data/meridian.db \
-#     -pass env:MERIDIAN_BACKUP_KEY
-# Stop the app before replacing the live database. chmod 600 the restored file.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DB="${MERIDIAN_DB:-$ROOT/data/meridian.db}"
-DEST="$ROOT/data/backups"
-ITER=200000
+DEST="${1:-$ROOT/data/backups}"
+if [[ "$DEST" == *"'"* ]]; then
+  echo "Backup directory cannot contain a single quote" >&2
+  exit 1
+fi
+
+DB="${MERIDIAN_SQLITE:-${MERIDIAN_DB:-$ROOT/data/meridian.db}}"
+if [[ ! -f "$DB" ]]; then
+  echo "Database not found: $DB" >&2
+  exit 1
+fi
+if [[ "$DB" == *"'"* ]]; then
+  echo "Database path cannot contain a single quote" >&2
+  exit 1
+fi
 
 read_env_file() {
   local file="$1" key val line
@@ -45,15 +54,13 @@ fi
 export MERIDIAN_BACKUP_KEY="$PASSPHRASE"
 
 mkdir -p "$DEST"
-chmod 700 "$DEST"
-
-if [[ ! -f "$DB" ]]; then
-  echo "No database at $DB" >&2
-  exit 1
-fi
+chmod 700 "$DEST" 2>/dev/null || true
 
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 PLAIN="$DEST/meridian-$STAMP.db"
+if [[ -e "$PLAIN" ]]; then
+  PLAIN="$DEST/meridian-${STAMP}-$$.db"
+fi
 OUT="$PLAIN.enc"
 
 cleanup() {
@@ -61,15 +68,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if command -v sqlite3 >/dev/null 2>&1; then
-  sqlite3 "$DB" ".backup $PLAIN"
-else
-  node --experimental-sqlite "$ROOT/scripts/sqlite-backup.mjs" "$DB" "$PLAIN"
-fi
+node "$ROOT/scripts/vacuum-into.mjs" "$DB" "$PLAIN"
 chmod 600 "$PLAIN"
 
-# OpenSSL 3's `enc` command rejects AES-GCM ("AEAD ciphers not supported").
-# Use it when this host accepts it; otherwise Node AES-256-GCM with the same passphrase.
+ITER=200000
 if echo probe | openssl enc -aes-256-gcm -salt -pbkdf2 -iter "$ITER" -pass env:MERIDIAN_BACKUP_KEY >/dev/null 2>&1; then
   openssl enc -aes-256-gcm -salt -pbkdf2 -iter "$ITER" \
     -in "$PLAIN" -out "$OUT" -pass env:MERIDIAN_BACKUP_KEY
@@ -80,5 +82,12 @@ chmod 600 "$OUT"
 rm -f "$PLAIN"
 trap - EXIT
 
-find "$DEST" -type f \( -name 'meridian-*.db' -o -name 'meridian-*.db.enc' \) -mtime +14 -delete
+find "$DEST" -type f \( -name 'meridian-*.db' -o -name 'meridian-*.db.enc' \) -mtime +14 -delete 2>/dev/null || true
+mapfile -t FILES < <(ls -1t "$DEST"/meridian-*.db.enc "$DEST"/meridian-*.db 2>/dev/null || true)
+if ((${#FILES[@]} > 14)); then
+  for old in "${FILES[@]:14}"; do
+    rm -f "$old"
+  done
+fi
+
 echo "$OUT"

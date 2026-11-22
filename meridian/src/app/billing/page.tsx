@@ -10,6 +10,7 @@ interface BillingPayload {
   account: { email: string; name: string; licensed: boolean };
   billing: {
     licensed: boolean;
+    selfHosted?: boolean;
     polar: boolean;
     licenses: Array<{ id: string; prefix: string; kind: string; redeemedAt?: string }>;
     reserved: { hint: string } | null;
@@ -154,7 +155,9 @@ function BillingInner() {
           {data?.billing.licensed ? "Your lifetime seat" : `Unlock Meridian · $${LIFETIME_PRICE_USD}`}
         </h1>
         <p className="mt-2 text-sm text-ink-400">
-          {data?.account.email ?? "Signed in"} — Polar checkout or a minted <code>mdl_</code> license.
+          {data?.billing.selfHosted
+            ? `${data.account.email} — self-hosted mode. Seat and Polar checks are off. Create mk_live_ keys here or with npm run key:create.`
+            : `${data?.account.email ?? "Signed in"} — Polar checkout or a minted mdl_ license.`}
         </p>
         {checkoutId ? (
           <p className="mt-3 text-sm text-emerald-300">
@@ -209,7 +212,7 @@ function BillingInner() {
             <form onSubmit={(event) => void mintKey(event)} className="rounded-3xl border border-white/10 bg-white/5 p-5">
               <div className="text-sm font-medium">Meridian API keys</div>
               <p className="mt-1 text-xs text-ink-400">
-                Send <code>Authorization: Bearer mk_live_…</code> on /api/* after you buy a seat.
+                Send <code>Authorization: Bearer mk_live_…</code> on /api/*. Self-hosted: <code>npm run key:create -- --workspace triton --name email-bot</code>.
               </p>
               <div className="mt-3 flex gap-2">
                 <input

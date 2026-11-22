@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
+import { lookupContact } from "@/server/activities";
 import { requireSeat } from "@/server/api-guard";
-import { getCompany, listContacts } from "@/server/crm-store";
+import { clientIp, rateLimited, tooMany } from "@/server/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  if (rateLimited(`contacts-lookup:${clientIp(request)}`, 60, 60_000)) return tooMany();
   const gate = await requireSeat(request);
   if (!gate.ok) return gate.response;
   const url = new URL(request.url);
@@ -14,15 +16,8 @@ export async function GET(request: Request) {
   if (!email || !email.includes("@")) {
     return NextResponse.json({ error: "email query is required" }, { status: 400 });
   }
-  const workspace = url.searchParams.get("workspace") ?? "triton";
-  if (!isWorkspaceId(workspace)) {
-    return NextResponse.json({ error: "workspace must be triton or aether" }, { status: 400 });
-  }
-  const contact = listContacts(workspace).find((row) => row.email.toLowerCase() === email) ?? null;
-  const company = contact?.companyId ? getCompany(workspace, contact.companyId) : null;
-  return NextResponse.json({
-    ok: true,
-    contact,
-    company: company ? { id: company.id, name: company.name, domain: company.domain } : null,
-  });
+  const workspace = url.searchParams.get("workspace") ?? undefined;
+  const found = lookupContact(email, isWorkspaceId(workspace) ? workspace : undefined);
+  if (!found) return NextResponse.json({ error: "No contact for that email" }, { status: 404 });
+  return NextResponse.json({ ok: true, ...found });
 }

@@ -6,7 +6,10 @@ import { demoSeedEnabled } from "@/server/demo-seed";
 
 export function defaultVoiceSettings(): VoiceSettings {
   return {
-    killSwitch: true,
+    // Outbound starts open. The desk freeze list is per workspace.
+    // A global default of on blocked every workspace, and the desk
+    // could not clear that stored flag.
+    killSwitch: false,
     blockInbound: false,
     dailyOutboundCap: 25,
     maxDiscountPercent: 20,

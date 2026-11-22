@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button, Card, PageHeader } from "@/components/meridian/legacy";
+import { collectionReportCsv } from "@/lib/collections/report-csv";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 
 interface Report {
@@ -9,6 +10,10 @@ interface Report {
   disputes: Array<{ accountRef: string; state: string; deadline: string | null }>;
   exceptions: Array<{ id: string; channel: string; reason: string }>;
   attempts: Array<{ id: string; channel: string; allowed: boolean; reason: string; at: string }>;
+  remittance?: Array<{ portfolioId: string; clientName: string; collectedCents: number; feeCents: number; remittanceCents: number; paymentCount: number }>;
+  collectors?: Array<{ name: string; tasksCompleted: number; calls: number; paymentsPosted: number }>;
+  label?: string;
+  needsCounselReview?: boolean;
 }
 
 function money(cents: number): string {
@@ -36,11 +41,7 @@ export default function CollectionReportsPage() {
 
   function download() {
     if (!report) return;
-    const lines = ["portfolio,accounts,quarantined,face,collected,recovery"];
-    for (const row of report.portfolios) {
-      lines.push([row.portfolioId, row.accounts, row.quarantined, row.faceCents, row.collectedCents, row.recoveryRate.toFixed(4)].join(","));
-    }
-    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const blob = new Blob([collectionReportCsv(report)], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -51,7 +52,7 @@ export default function CollectionReportsPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Collections" title="Reports" subtitle="Recovery, quarantines, disputes, and blocked attempts. No consumer identifiers are included." />
+      <PageHeader eyebrow="Collections" title="Reports" subtitle="Recovery, client remittance, collector activity, disputes, and blocked attempts. This is a draft operations report, not a client invoice. Counsel should confirm the fee percent. Statements omit account numbers." />
       {notice ? <Card className="mb-4 p-4 text-sm">{notice}</Card> : null}
       {report ? (
         <div className="grid gap-4">
@@ -63,6 +64,19 @@ export default function CollectionReportsPage() {
               <p>Face {money(row.faceCents)} · collected {money(row.collectedCents)} · recovery {(row.recoveryRate * 100).toFixed(1)}%</p>
             </Card>
           ))}
+          <Card className="p-4 text-sm">
+            <div className="font-semibold">Client remittance statement</div>
+            <p className="text-muted-foreground">{report.label ?? "Draft operations report. Not a client invoice. Counsel should confirm the fee percent."} Agency fee percent comes from MERIDIAN_AGENCY_FEE_PERCENT and defaults to 0.</p>
+            {(report.remittance ?? []).map((row) => (
+              <p key={row.portfolioId}>{row.clientName || row.portfolioId}: collected {money(row.collectedCents)} · fee {money(row.feeCents)} · remit {money(row.remittanceCents)} · {row.paymentCount} payments</p>
+            ))}
+          </Card>
+          <Card className="p-4 text-sm">
+            <div className="font-semibold">Collector performance</div>
+            {(report.collectors ?? []).map((row) => (
+              <p key={row.name}>{row.name}: {row.tasksCompleted} tasks closed · {row.calls} sandbox calls · {row.paymentsPosted} payments posted</p>
+            ))}
+          </Card>
           <Card className="p-4 text-sm">
             <div className="font-semibold">Disputes</div>
             {report.disputes.length === 0 ? <p>None open.</p> : report.disputes.map((row) => <p key={row.accountRef}>{row.accountRef} · {row.state} · deadline {row.deadline ?? "n/a"}</p>)}

@@ -1,4 +1,8 @@
+import { requiresAllPartyRecording } from "./recording";
+import { limitationsDatePassed } from "./sol";
 import type { CallTranscript, CallTurn, PortfolioAccount, QaFlag, VoiceSettings } from "./types";
+
+export { requiresAllPartyRecording };
 
 export type ConsumerTurn =
   | { type: "consent"; accepted: boolean }
@@ -48,13 +52,6 @@ export function emptyTranscript(agency: string, allParty: boolean, at: string): 
     verified: false,
     turns: [{ role: "agent", text: say, at }],
   };
-}
-
-const ALL_PARTY = new Set(["CA", "CT", "FL", "IL", "MD", "MA", "MI", "MT", "NH", "OR", "PA", "WA"]);
-
-/** Commonly treated as all-party. Confirm every statute with counsel before relying on it. */
-export function requiresAllPartyRecording(state: string): boolean {
-  return ALL_PARTY.has(state.trim().toUpperCase());
 }
 
 function push(transcript: CallTranscript, role: CallTurn["role"], text: string, at: string): CallTranscript {
@@ -157,6 +154,14 @@ export function stepCall(input: {
   }
 
   const lower = heard.toLowerCase();
+  const barred = limitationsDatePassed(input.account?.solExpiresOn, input.at);
+  const asksToPay = /\b(pay|payment|settle|plan)\b/i.test(heard) || Boolean(redacted?.hadCard) || /\b(card number|visa|mastercard)\b/i.test(heard);
+  if (barred && asksToPay) {
+    const say = "The limitations date on file is in the past. I will not offer a payment plan or a payment page. A collector has to use the counsel-reviewed time-barred notice. I can transfer you to a person.";
+    flags.push({ code: "time_barred", detail: "Draft disclosure. Counsel has not approved this sentence or the state's time-barred notice." });
+    transcript = push(transcript, "agent", say, input.at);
+    return finish(transcript, say, "time_barred_hold", {}, null, false, null, flags);
+  }
   if (/\b(cease|stop calling|do not call|don't call)\b/i.test(heard)) {
     const say = "I am noting that you want communications to stop. We will not place further collection calls. Goodbye.";
     transcript = { ...push(transcript, "agent", say, input.at), phase: "ended" };

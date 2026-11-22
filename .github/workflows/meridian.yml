@@ -24,5 +24,13 @@ jobs:
           cache: npm
           cache-dependency-path: meridian/package-lock.json
       - run: npm ci
+      - run: npm audit --audit-level=critical
       - run: npx tsc --noEmit
       - run: npm run test:collections
+      - run: npm run test:desk
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+        env:
+          MERIDIAN_AUTH_SECRET: e2e-only-not-a-real-secret-32chars
+          MERIDIAN_SEED_DEMO: "true"
+          CI: "true"

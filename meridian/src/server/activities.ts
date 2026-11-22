@@ -1,222 +1,209 @@
-import { createHash } from "node:crypto";
-import type { Activity, ActivityType, Contact, WorkspaceId } from "@/lib/types";
-import { parseActivityKind, shouldCreateContact, type ActivityKind } from "./activity-kinds";
-import { listContacts, readCrmJson, readCrmOne, saveContact, writeCrmBlobs } from "./crm-store";
-import { nextId } from "./db";
-import { emailBlockReason } from "./email-block";
+import type { WorkspaceId } from "@/lib/types";
+import { upsertContact, findContactByEmail, findCompanyByDomain, domainOf } from "./crm";
+import { loadDb, mutate, nextId } from "./db";
+import type { DeskActivity, DeskActivityType, Lead } from "./models";
 
-export interface LogActivityInput {
+export { activityLabel, isDeskActivityType } from "@/lib/desk-activity";
+
+export interface ActivityInput {
   workspaceId: WorkspaceId;
-  kind?: unknown;
-  subject?: string;
+  contactEmail: string;
+  contactName?: string;
+  company?: string;
+  type: DeskActivityType;
+  subject: string;
   body?: string;
-  at?: string;
-  email?: string;
-  contactId?: string;
-  companyId?: string;
-  dealId?: string;
-  firstName?: string;
-  lastName?: string;
-  externalId?: string;
-  source?: string;
-  userId?: string;
-  /** Defaults to true. Suppressed addresses are never created. */
-  allowCreate?: boolean;
+  outlookMessageId?: string;
+  outlookConversationId?: string;
+  link?: string;
+  occurredAt?: string;
+  source: DeskActivity["source"];
 }
 
-export interface LogActivityResult {
-  activity: Activity;
-  contact: Contact | null;
+export interface ActivityResult {
+  activity: DeskActivity;
+  duplicate: boolean;
+  contactId: string;
   companyId?: string;
+  leadId?: string;
   createdContact: boolean;
-  suppressed: boolean;
+  doNotEmail: boolean;
 }
 
-function activityType(kind: ActivityKind): ActivityType {
-  switch (kind) {
-    case "inbound":
-    case "outbound":
-    case "draft":
-    case "nda":
-      return "email";
-    case "note":
-      return "note";
-    default: {
-      const neverKind: never = kind;
-      return neverKind;
-    }
-  }
+function splitName(value: string | undefined): { firstName?: string; lastName?: string } {
+  const trimmed = value?.trim();
+  if (!trimmed) return {};
+  const parts = trimmed.split(/\s+/);
+  const firstName = parts[0];
+  const lastName = parts.slice(1).join(" ");
+  return { firstName, lastName: lastName || undefined };
 }
 
-function defaultSubject(kind: ActivityKind): string {
-  switch (kind) {
-    case "inbound":
-      return "Inbound email";
-    case "outbound":
-      return "Outbound email";
-    case "draft":
-      return "Draft email";
-    case "nda":
-      return "NDA";
-    case "note":
-      return "Note";
-    default: {
-      const neverKind: never = kind;
-      return neverKind;
-    }
-  }
-}
-
-function namesFromEmail(email: string): { firstName: string; lastName: string } {
-  const local = email.split("@")[0] ?? "";
-  const parts = local.split(/[._-]+/).filter(Boolean);
-  const title = (value: string) => value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
-  if (parts.length >= 2) {
-    return { firstName: title(parts[0] ?? "Contact"), lastName: parts.slice(1).map(title).join(" ") };
-  }
-  return { firstName: title(local || "Contact"), lastName: "" };
-}
-
-function activityId(externalId?: string): string {
-  if (!externalId) return nextId("act");
-  return `act_${createHash("sha256").update(externalId).digest("hex").slice(0, 20)}`;
-}
-
-function asActivity(row: Record<string, unknown>): Activity | null {
-  if (typeof row.id !== "string" || typeof row.subject !== "string") return null;
-  const type = row.type;
-  if (type !== "note" && type !== "email" && type !== "call" && type !== "meeting" && type !== "task" && type !== "sms" && type !== "ai" && type !== "system") {
-    return null;
-  }
-  return {
-    id: row.id,
-    type,
-    subject: row.subject,
-    body: typeof row.body === "string" ? row.body : "",
-    at: typeof row.at === "string" ? row.at : "",
-    userId: typeof row.userId === "string" ? row.userId : "system",
-    contactId: typeof row.contactId === "string" ? row.contactId : undefined,
-    companyId: typeof row.companyId === "string" ? row.companyId : undefined,
-    dealId: typeof row.dealId === "string" ? row.dealId : undefined,
-    ticketId: typeof row.ticketId === "string" ? row.ticketId : undefined,
-    channel: parseActivityKind(row.channel) ?? undefined,
-    externalId: typeof row.externalId === "string" ? row.externalId : undefined,
-    email: typeof row.email === "string" ? row.email : undefined,
-    source: typeof row.source === "string" ? row.source : undefined,
-  };
-}
-
-export function listActivities(
-  workspaceId: WorkspaceId,
-  filter: { contactId?: string; companyId?: string; dealId?: string; email?: string; limit?: number } = {},
-): Activity[] {
-  const email = filter.email?.trim().toLowerCase();
-  const limit = filter.limit ?? 300;
-  return readCrmJson(workspaceId, "activities")
-    .flatMap((row) => {
-      const activity = asActivity(row);
-      return activity ? [activity] : [];
-    })
-    .filter((activity) => {
-      if (filter.contactId && activity.contactId !== filter.contactId) return false;
-      if (filter.companyId && activity.companyId !== filter.companyId) return false;
-      if (filter.dealId && activity.dealId !== filter.dealId) return false;
-      if (email && activity.email?.toLowerCase() !== email) return false;
-      return true;
-    })
-    .sort((left, right) => right.at.localeCompare(left.at))
-    .slice(0, limit);
-}
-
-export function logActivity(input: LogActivityInput): LogActivityResult {
-  const kind = parseActivityKind(input.kind);
-  if (!kind) throw new Error("kind must be inbound, outbound, draft, nda, or note");
-  const email = input.email?.trim().toLowerCase() ?? "";
-  if (email && !email.includes("@")) throw new Error("email is not valid");
-  const contactId = input.contactId?.trim() ?? "";
-  const companyIdInput = input.companyId?.trim() ?? "";
-  if (!email && !contactId && !companyIdInput) {
-    throw new Error("email, contactId, or companyId is required");
-  }
-  const subject = (input.subject?.trim() || defaultSubject(kind)).slice(0, 300);
-  const body = (input.body ?? "").trim().slice(0, 4000);
-
-  const atDate = input.at ? new Date(input.at) : new Date();
-  const at = Number.isNaN(atDate.getTime()) ? new Date().toISOString() : atDate.toISOString();
-  const contacts = listContacts(input.workspaceId);
-  let contact = contactId ? contacts.find((row) => row.id === contactId) ?? null : null;
-  if (!contact && email) {
-    contact = contacts.find((row) => row.email.toLowerCase() === email) ?? null;
-  }
-  const blocked = email ? emailBlockReason(input.workspaceId, email) !== null : false;
-  let createdContact = false;
-  if (
-    shouldCreateContact({
-      exists: Boolean(contact),
-      suppressed: blocked,
-      allowCreate: input.allowCreate !== false && Boolean(email),
-    })
-  ) {
-    const names = namesFromEmail(email);
-    contact = saveContact(
-      input.workspaceId,
-      {
-        email,
-        firstName: input.firstName?.trim() || names.firstName,
-        lastName: input.lastName?.trim() || names.lastName,
-        companyId: companyIdInput,
-        source: input.source || "api",
-        lifecycle: "lead",
-        lastActivityAt: at,
-      },
-      { retainSuppressions: true },
-    );
-    createdContact = true;
-  } else if (contact && (blocked || kind === "nda" || contact.lastActivityAt !== at)) {
-    const ndaSigned = kind === "nda" && !contact.ndaSigned ? at.slice(0, 10) : contact.ndaSigned;
-    contact = saveContact(
-      input.workspaceId,
-      {
-        ...contact,
-        doNotEmail: contact.doNotEmail === true || blocked,
-        ndaSigned,
-        lastActivityAt: at,
-      },
-      { retainSuppressions: true },
-    );
-  }
-
-  const companyId = companyIdInput || contact?.companyId || undefined;
-  const externalId = input.externalId?.trim() || undefined;
-  const id = activityId(externalId);
-  const previous = asActivity(readCrmOne(input.workspaceId, "activities", id) ?? {});
-  const activity: Activity = {
-    id,
-    type: activityType(kind),
-    subject,
-    body,
-    at,
-    userId: input.userId || previous?.userId || "system",
-    contactId: contact?.id,
+function ensureLead(workspaceId: WorkspaceId, contactId: string, companyId: string, source: string): string {
+  const existing = loadDb().leads.find(
+    (lead) => lead.workspaceId === workspaceId && lead.contactId === contactId && lead.status !== "rejected",
+  );
+  if (existing) return existing.id;
+  const now = new Date().toISOString();
+  const lead: Lead = {
+    id: nextId("ld"),
+    workspaceId,
+    contactId,
     companyId,
-    dealId: input.dealId?.trim() || previous?.dealId,
-    channel: kind,
-    externalId,
-    email: email || contact?.email || undefined,
-    source: input.source || previous?.source || "api",
+    side: "unknown",
+    status: "new",
+    source,
+    fitScore: 0,
+    intentScore: 0,
+    score: 0,
+    band: "nurture",
+    slaBreached: false,
+    notes: "",
+    payload: {},
+    createdAt: now,
+    updatedAt: now,
   };
-  writeCrmBlobs(input.workspaceId, "activities", [
-    {
-      id: activity.id,
-      label: activity.subject,
-      json: JSON.stringify(activity),
-    },
-  ]);
+  mutate((db) => {
+    if (!db.leads.some((row) => row.id === lead.id)) db.leads.push(lead);
+  });
+  return lead.id;
+}
+
+export function recordActivity(input: ActivityInput): ActivityResult {
+  const email = input.contactEmail.trim().toLowerCase();
+  if (!email.includes("@")) throw new Error("contactEmail is required");
+  const subject = input.subject.trim();
+  if (!subject) throw new Error("subject is required");
+  const prior = findContactByEmail(input.workspaceId, email);
+  const priorDoNotEmail = prior?.doNotEmail === true;
+  const names = splitName(input.contactName);
+  const saved = upsertContact({
+    workspaceId: input.workspaceId,
+    email,
+    firstName: names.firstName,
+    lastName: names.lastName,
+    companyName: input.company,
+  });
+  if (prior && saved.contact.doNotEmail !== priorDoNotEmail) {
+    mutate((db) => {
+      const row = db.contacts.find((contact) => contact.id === saved.contact.id);
+      if (row) row.doNotEmail = priorDoNotEmail;
+    });
+    saved.contact.doNotEmail = priorDoNotEmail;
+  }
+  const leadId = ensureLead(input.workspaceId, saved.contact.id, saved.company.id, input.source);
+  const at = input.occurredAt && !Number.isNaN(Date.parse(input.occurredAt)) ? new Date(input.occurredAt).toISOString() : new Date().toISOString();
+  const outlookMessageId = input.outlookMessageId?.trim() || undefined;
+
+  const stored = mutate((db) => {
+    const existing = outlookMessageId
+      ? (db.crmActivities ?? []).find(
+          (row) =>
+            row.workspaceId === input.workspaceId &&
+            row.outlookMessageId === outlookMessageId &&
+            row.type === input.type,
+        )
+      : undefined;
+    if (existing) return { activity: existing, duplicate: true };
+    const activity: DeskActivity = {
+      id: nextId("act"),
+      workspaceId: input.workspaceId,
+      type: input.type,
+      subject: subject.slice(0, 300),
+      body: (input.body ?? "").slice(0, 8000),
+      at,
+      contactId: saved.contact.id,
+      companyId: saved.company.id,
+      leadId,
+      outlookMessageId,
+      outlookConversationId: input.outlookConversationId?.trim() || undefined,
+      link: input.link?.trim() || undefined,
+      source: input.source,
+    };
+    db.crmActivities = [activity, ...(db.crmActivities ?? [])].slice(0, 5000);
+    const contact = db.contacts.find((row) => row.id === saved.contact.id);
+    if (contact) contact.lastActivityAt = at;
+    return { activity, duplicate: false };
+  });
+
   return {
-    activity,
-    contact,
-    companyId: companyId || undefined,
-    createdContact,
-    suppressed: blocked && !createdContact,
+    activity: stored.activity,
+    duplicate: stored.duplicate,
+    contactId: saved.contact.id,
+    companyId: saved.company.id,
+    leadId,
+    createdContact: saved.createdContact,
+    doNotEmail: saved.contact.doNotEmail === true,
   };
+}
+
+/** Timeline row for a contact that already exists. Does not create contacts or change doNotEmail. */
+export function appendLinkedActivity(input: {
+  workspaceId: WorkspaceId;
+  contactId: string;
+  companyId?: string;
+  type: DeskActivityType;
+  subject: string;
+  body?: string;
+  outlookMessageId?: string;
+  outlookConversationId?: string;
+  link?: string;
+  occurredAt?: string;
+  source: DeskActivity["source"];
+}): { activity: DeskActivity; duplicate: boolean } {
+  const outlookMessageId = input.outlookMessageId?.trim() || undefined;
+  const at = input.occurredAt && !Number.isNaN(Date.parse(input.occurredAt)) ? new Date(input.occurredAt).toISOString() : new Date().toISOString();
+  return mutate((db) => {
+    const existing = outlookMessageId
+      ? (db.crmActivities ?? []).find(
+          (row) =>
+            row.workspaceId === input.workspaceId &&
+            row.outlookMessageId === outlookMessageId &&
+            row.type === input.type,
+        )
+      : undefined;
+    if (existing) return { activity: existing, duplicate: true };
+    const activity: DeskActivity = {
+      id: nextId("act"),
+      workspaceId: input.workspaceId,
+      type: input.type,
+      subject: input.subject.slice(0, 300),
+      body: (input.body ?? "").slice(0, 8000),
+      at,
+      contactId: input.contactId,
+      companyId: input.companyId,
+      outlookMessageId,
+      outlookConversationId: input.outlookConversationId,
+      link: input.link,
+      source: input.source,
+    };
+    db.crmActivities = [activity, ...(db.crmActivities ?? [])].slice(0, 5000);
+    const contact = db.contacts.find((row) => row.id === input.contactId);
+    if (contact) contact.lastActivityAt = at;
+    return { activity, duplicate: false };
+  });
+}
+
+export function listActivities(workspaceId: WorkspaceId, filter: { contactId?: string; companyId?: string }): DeskActivity[] {
+  return (loadDb().crmActivities ?? []).filter((row) => {
+    if (row.workspaceId !== workspaceId) return false;
+    if (filter.contactId && row.contactId !== filter.contactId) return false;
+    if (filter.companyId && row.companyId !== filter.companyId) return false;
+    return true;
+  });
+}
+
+export function lookupContact(email: string, workspaceId?: WorkspaceId) {
+  const target = email.trim().toLowerCase();
+  const workspaces: WorkspaceId[] = workspaceId ? [workspaceId] : ["triton", "aether"];
+  for (const id of workspaces) {
+    const contact = findContactByEmail(id, target);
+    if (!contact) continue;
+    const company =
+      loadDb().companies.find((row) => row.id === contact.companyId) ??
+      findCompanyByDomain(id, domainOf(target));
+    const lead = loadDb().leads.find((row) => row.workspaceId === id && row.contactId === contact.id);
+    return { workspaceId: id, contact, company: company ?? null, lead: lead ?? null };
+  }
+  return null;
 }

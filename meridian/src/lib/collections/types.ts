@@ -48,6 +48,12 @@ export interface PortfolioAccount {
   status: AccountStatus;
   quarantineReason: string | null;
   inconvenientWork: boolean;
+  promise?: { amountCents: number; dueOn: string; status: "open" | "kept" | "broken"; createdAt: string } | null;
+  phoneCiphertext?: string | null;
+  emailCiphertext?: string | null;
+  addressCiphertext?: string | null;
+  /** Returned mail pauses letter sequences until someone reviews the address. */
+  addressStatus?: "ok" | "returned";
   importedAt: string;
   returnedAt: string | null;
   originalCreditor?: string;
@@ -60,10 +66,16 @@ export interface PortfolioAccount {
   paymentsSinceItemizationCents?: number;
   creditsSinceItemizationCents?: number;
   feesSinceItemizationCents?: number;
+  /** Omitted when the placement file did not include interest. A missing value is not zero. */
+  interestSinceItemizationCents?: number;
   lastPaymentDate?: string | null;
   solExpiresOn?: string | null;
   solCitation?: string;
   solNeedsCounselReview?: boolean;
+  /** FCC RND result. Unknown is not a clearance. */
+  rndStatus?: "ok" | "reassigned" | "unknown";
+  /** DMDC SCRA result. Unknown is not "not on active duty." */
+  scraStatus?: "active" | "inactive" | "unknown";
   ssnCiphertext?: string | null;
   dobCiphertext?: string | null;
   accountNumberCiphertext?: string | null;
@@ -71,6 +83,7 @@ export interface PortfolioAccount {
   validationMailedAt?: string | null;
   disputeDeadline?: string | null;
   validationNotice?: string | null;
+  paymentPlan?: { months: number; installmentCents: number; createdAt: string; provider: "sandbox" } | null;
   employerEmail?: boolean;
   hardshipReported?: boolean;
   attorneyName?: string;
@@ -78,11 +91,19 @@ export interface PortfolioAccount {
   sensitive?: { ssn?: string; dob?: string; accountNumber?: string };
 }
 
-export type CollectionsRole = "admin" | "manager" | "collector" | "compliance" | "read_only";
+export type CollectionsRole = "admin" | "manager" | "collector" | "compliance" | "read_only" | "client";
 
 export interface OperatorRole {
   email: string;
   role: CollectionsRole;
+  /** When set, the weekly digest for the other workspace does not count this seat. */
+  workspaceId?: WorkspaceId;
+}
+
+/** Binds a client login to one seller. A client cannot read another seller's portfolios. */
+export interface ClientGrant {
+  email: string;
+  sellerName: string;
 }
 
 export interface CollectorTask {
@@ -93,6 +114,7 @@ export interface CollectorTask {
   queue: "collector" | "compliance";
   status: "open" | "done";
   createdAt: string;
+  completedBy?: string;
 }
 
 export interface DraftReply {
@@ -106,6 +128,9 @@ export interface DraftReply {
   gateAllowed: boolean;
   gateReason: string;
   createdAt: string;
+  draftSource?: "model" | "rules";
+  guardNote?: string;
+  model?: string | null;
 }
 
 export interface ConsumerPayment {
@@ -113,10 +138,21 @@ export interface ConsumerPayment {
   workspaceId: WorkspaceId;
   accountId: string;
   amountCents: number;
-  status: "succeeded";
-  provider: "sandbox";
+  status: "succeeded" | "pending" | "reversed" | "nsf";
+  provider: string;
   providerId: string;
+  method?: "sandbox" | "ach" | "card";
   at: string;
+  reconciledAt?: string;
+  checkoutUrl?: string;
+  /** Reg E preauthorized-transfer proof. Bank account numbers are not stored. */
+  authorization?: {
+    text: string;
+    acceptedAt: string;
+    proofId: string;
+    copyProvidedAt: string;
+    recurring: boolean;
+  };
 }
 
 export interface ImportAudit {
@@ -165,6 +201,14 @@ export interface VoiceSettings {
   rndSandboxClear: boolean;
 }
 
+/** Desk limits that must not leak across agencies. Omitted fields fall back to Triton legacy or packaged defaults. */
+export interface VoiceLimits {
+  blockInbound?: boolean;
+  dailyOutboundCap?: number;
+  maxDiscountPercent?: number;
+  maxPlanMonths?: number;
+}
+
 export type CollectionChannel =
   | "voice_outbound"
   | "voice_inbound"
@@ -196,6 +240,12 @@ export type TemplateChannel =
   | "validation"
   | "chat";
 
+/** Per-workspace send approval and counsel sign-off. The template text stays shared. */
+export interface TemplateApproval {
+  ownerApproved: boolean;
+  counselReviewed: boolean;
+}
+
 export interface CollectionTemplate {
   id: string;
   channel: TemplateChannel;
@@ -226,7 +276,7 @@ export interface CallTurn {
 }
 
 export interface QaFlag {
-  code: "threat" | "false_statement" | "third_party_disclosure" | "card_in_transcript" | "missing_ai_disclosure" | "missing_miranda" | "guardrail";
+  code: "threat" | "false_statement" | "third_party_disclosure" | "card_in_transcript" | "missing_ai_disclosure" | "missing_miranda" | "guardrail" | "time_barred";
   detail: string;
 }
 
@@ -258,6 +308,10 @@ export interface VoiceCall {
   provider: string;
   providerId: string | null;
   transferred: boolean;
+  recordingCiphertext?: string | null;
+  operatorEmail?: string | null;
+  callbackAt?: string | null;
+  notesCiphertext?: string | null;
 }
 
 export interface ChannelMessage {
@@ -265,7 +319,7 @@ export interface ChannelMessage {
   workspaceId: WorkspaceId;
   accountId: string;
   channel: CollectionChannel;
-  status: "sandbox_queued" | "blocked";
+  status: "sandbox_queued" | "provider_accepted" | "blocked";
   reason: string | null;
   templateId: string | null;
   provider: string;

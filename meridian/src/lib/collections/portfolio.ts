@@ -1,8 +1,7 @@
 import { normalizeState, parseDate } from "@/lib/debt";
 import { parseCsv, type CsvTable } from "@/server/csv";
 import type { PortfolioAccount, StateEligibility } from "./types";
-import { stateIsEligible } from "./eligibility";
-import { solFor } from "./sol";
+import { solFor, type SolRule } from "./sol";
 import { xlsxToCsv } from "./xlsx";
 
 export interface ColumnMapping {
@@ -26,6 +25,7 @@ export interface ColumnMapping {
   payments_since?: string;
   credits_since?: string;
   fees_since?: string;
+  interest_since?: string;
   last_payment_date?: string;
   ssn?: string;
   dob?: string;
@@ -58,11 +58,14 @@ export function parsePortfolioCsv(input: {
   existingRefs: Set<string>;
   now: string;
   id: () => string;
+  solRules?: SolRule[];
 }): PortfolioImportResult {
   const table = tableFrom(input);
   const accounts: PortfolioAccount[] = [];
   const skipped: Array<{ row: number; reason: string }> = [];
   const seen = new Set(input.existingRefs);
+  const eligibility = new Map(input.eligibility.map((row) => [row.code, row.eligible]));
+  const solByState = new Map((input.solRules ?? []).map((rule) => [rule.code, rule]));
   for (const row of table.rows) {
     const pick = (field: keyof ColumnMapping, ...aliases: string[]) => mapped(row.values, field, input.mapping, aliases);
     const accountRef = pick("account_ref", "account_ref", "account ref", "reference");
@@ -76,14 +79,15 @@ export function parsePortfolioCsv(input: {
       continue;
     }
     seen.add(accountRef.toLowerCase());
-    const eligible = stateIsEligible(input.eligibility, state);
+    const eligible = eligibility.get(state) === true;
     const last4source = pick("last4", "last4", "last 4");
     const accountNumber = pick("account_number", "account_number", "account number");
     const last4 = (last4source || accountNumber).replace(/\D/g, "").slice(-4);
     const chargeOffDate = parseDate(pick("charge_off_date", "charge_off_date", "charge off date"));
     const lastPaymentDate = parseDate(pick("last_payment_date", "last_payment_date", "last payment"));
     const itemizationDate = parseDate(pick("itemization_date", "itemization_date", "itemization date"));
-    const sol = solFor(state, lastPaymentDate, chargeOffDate);
+    const solRule = solByState.get(state);
+    const sol = solFor(state, lastPaymentDate, chargeOffDate, solRule ? [solRule] : input.solRules);
     const ssn = pick("ssn", "ssn", "social security");
     const dob = pick("dob", "dob", "date of birth");
     accounts.push({
@@ -106,10 +110,11 @@ export function parsePortfolioCsv(input: {
       chargeOffDate,
       chargeOffBalanceCents: dollarsToCents(pick("charge_off_balance", "charge_off_balance", "charge off balance")),
       itemizationDate,
-      itemizationAmountCents: dollarsToCents(pick("itemization_amount", "itemization_amount", "itemization amount")),
-      paymentsSinceItemizationCents: dollarsToCents(pick("payments_since", "payments_since", "payments since itemization")),
-      creditsSinceItemizationCents: dollarsToCents(pick("credits_since", "credits_since", "credits since itemization")),
-      feesSinceItemizationCents: dollarsToCents(pick("fees_since", "fees_since", "fees since itemization")),
+      itemizationAmountCents: optionalCents(pick("itemization_amount", "itemization_amount", "itemization amount")),
+      paymentsSinceItemizationCents: optionalCents(pick("payments_since", "payments_since", "payments since itemization")),
+      creditsSinceItemizationCents: optionalCents(pick("credits_since", "credits_since", "credits since itemization")),
+      feesSinceItemizationCents: optionalCents(pick("fees_since", "fees_since", "fees since itemization")),
+      interestSinceItemizationCents: optionalCents(pick("interest_since", "interest_since", "interest since itemization")),
       lastPaymentDate,
       ...sol,
       ssnMasked: ssn ? maskSsn(ssn) : "",
@@ -140,6 +145,9 @@ export function publicAccount(account: PortfolioAccount): PortfolioAccount {
   delete copy.ssnCiphertext;
   delete copy.dobCiphertext;
   delete copy.accountNumberCiphertext;
+  delete copy.phoneCiphertext;
+  delete copy.emailCiphertext;
+  delete copy.addressCiphertext;
   return copy;
 }
 
@@ -195,6 +203,11 @@ function phoneType(value: string): PortfolioAccount["phoneType"] {
   if (raw.includes("land")) return "landline";
   if (raw.includes("cell") || raw.includes("mobile")) return "cell";
   return "unknown";
+}
+
+function optionalCents(value: string): number | undefined {
+  if (!value.trim()) return undefined;
+  return dollarsToCents(value);
 }
 
 function dollarsToCents(value: string): number {

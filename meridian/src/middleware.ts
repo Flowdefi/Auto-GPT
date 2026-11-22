@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { PUBLIC_API_PATHS, SESSION_COOKIE } from "@/lib/commerce";
+import { hostDecision, hostSplit, isConsumerPath, requestHostname } from "@/lib/hosts";
+import { NO_STORE, ROBOTS_NOINDEX, SECURITY_HEADERS, noIndexPath, noStorePath } from "@/server/security-headers";
 import { selfHosted } from "@/server/self-hosted";
 import { safeNextPath, selfHostClosure } from "@/server/self-host-routes";
-import { NO_STORE, SECURITY_HEADERS, noStorePath } from "@/server/security-headers";
 
 const PUBLIC_PAGES = new Set(["/", "/pricing", "/login", "/signup"]);
 
@@ -11,12 +12,16 @@ function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith("/u/")) return true;
   if (pathname.startsWith("/pay/sandbox/")) return true;
   if (pathname === "/collect" || pathname.startsWith("/collect/")) return true;
+  if (pathname === "/agency" || pathname.startsWith("/agency/")) return true;
+  if (pathname.startsWith("/api/agency")) return true;
+  if (pathname === "/api/brand") return true;
   if (pathname.startsWith("/api/portal")) return true;
+  if (pathname.startsWith("/api/webhooks/")) return true;
   if (PUBLIC_API_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
     return true;
   }
   if (pathname.startsWith("/_next/")) return true;
-  if (pathname === "/manifest.json" || pathname === "/robots.txt") return true;
+  if (pathname === "/manifest.json" || pathname === "/robots.txt" || pathname === "/sitemap.xml") return true;
   if (/\.(?:png|jpg|jpeg|gif|svg|webp|ico|txt|xml|webmanifest|map|css|js)$/i.test(pathname)) {
     return true;
   }
@@ -25,6 +30,9 @@ function isPublicPath(pathname: string): boolean {
 
 function harden(response: NextResponse, pathname: string): NextResponse {
   for (const header of SECURITY_HEADERS) response.headers.set(header.key, header.value);
+  if (noIndexPath(pathname)) {
+    for (const header of ROBOTS_NOINDEX) response.headers.set(header.key, header.value);
+  }
   if (noStorePath(pathname)) response.headers.set("Cache-Control", NO_STORE);
   return response;
 }
@@ -71,10 +79,23 @@ function accessHandshake(request: NextRequest): NextResponse | null {
 }
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
   if (pathname.startsWith("/cdn-cgi/")) return harden(NextResponse.next(), pathname);
-  const handshake = accessHandshake(request);
-  if (handshake) return harden(handshake, pathname);
+
+  const decision = hostDecision(requestHostname(request.headers), pathname, search, hostSplit());
+  if (decision.kind === "wrong-host") {
+    return harden(NextResponse.json({ error: "This host does not serve that API" }, { status: 421 }), pathname);
+  }
+  if (decision.kind === "redirect") {
+    return harden(NextResponse.redirect(decision.url, 302), pathname);
+  }
+
+  const publicConsumer = isConsumerPath(pathname) && pathname !== "/";
+  if (!publicConsumer) {
+    const handshake = accessHandshake(request);
+    if (handshake) return harden(handshake, pathname);
+  }
+
   if (isPublicPath(pathname)) {
     return harden(NextResponse.next(), pathname);
   }

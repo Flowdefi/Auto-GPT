@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { DataTable } from "@/components/tables";
 import { Card, PageHeader } from "@/components/meridian/legacy";
+import { activityLabel } from "@/lib/desk-activity";
 import { when } from "@/lib/format";
-import type { Activity } from "@/lib/types";
 import { useActiveWorkspace } from "@/lib/use-workspace";
+import type { DeskActivity } from "@/server/models";
 
 export default function ActivitiesPage() {
   const { workspaceId } = useActiveWorkspace();
-  const [rows, setRows] = useState<Activity[] | null>(null);
+  const [rows, setRows] = useState<DeskActivity[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -17,7 +18,7 @@ export default function ActivitiesPage() {
     void fetch(`/api/activities?workspace=${workspaceId}`)
       .then(async (response) => {
         if (!response.ok) throw new Error("Could not load activities");
-        return (await response.json()) as { activities?: Activity[] };
+        return (await response.json()) as { activities?: DeskActivity[] };
       })
       .then((body) => {
         if (!cancelled) setRows(body.activities ?? []);
@@ -42,15 +43,15 @@ export default function ActivitiesPage() {
       {rows && rows.length === 0 ? <Card className="p-5 text-sm text-muted-foreground">No activities yet.</Card> : null}
       {rows && rows.length > 0 ? (
         <DataTable
-          headers={["When", "Kind", "Subject", "Email", "Contact"]}
+          headers={["When", "Kind", "Subject", "Source", "Contact"]}
           rows={rows.map((activity) => ({
             key: activity.id,
             href: activity.contactId ? `/w/${workspaceId}/crm/contacts/${activity.contactId}` : undefined,
             cells: [
               when(activity.at),
-              activity.channel ?? activity.type,
+              activityLabel(activity.type),
               activity.subject,
-              activity.email || "—",
+              activity.source || "—",
               activity.contactId ? "Open" : "—",
             ],
           }))}
