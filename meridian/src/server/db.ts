@@ -6,18 +6,21 @@ import { seedServerData } from "./seed-db";
 import { persistSqlite, seedCrmSnapshot } from "./sqlite";
 import { seedCrmRecords } from "./crm";
 import { seedSegmentsInto } from "./segments";
+import { ensureCollectionDefaults } from "./collections/defaults";
+import { meridianDataDir } from "./data-dir";
 import { seedDemoLeads, seedWorkflows } from "./workflow";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DATA_FILE = path.join(DATA_DIR, "meridian.json");
 const OWNER_EMAIL = "ayflow@pm.me";
+
+function dataFile(): string {
+  return path.join(meridianDataDir(), "meridian.json");
+}
 
 let cache: DatabaseFile | null = null;
 
 function ensureDir(): void {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true });
-  }
+  const dir = meridianDataDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
 const COLLECTIONS: Array<keyof DatabaseFile> = [
@@ -47,6 +50,8 @@ function migrate(db: DatabaseFile): DatabaseFile {
       (db as unknown as Record<string, unknown[]>)[key] = [];
     }
   }
+  if (!Array.isArray(db.demoPurgedWorkspaces)) db.demoPurgedWorkspaces = [];
+  ensureCollectionDefaults(db);
   seedCrmRecords(db);
   seedWorkflows(db);
   seedDemoLeads(db);
@@ -76,13 +81,13 @@ function migrate(db: DatabaseFile): DatabaseFile {
 export function loadDb(): DatabaseFile {
   if (cache) return cache;
   ensureDir();
-  if (!existsSync(DATA_FILE)) {
+  if (!existsSync(dataFile())) {
     cache = migrate(seedServerData(emptyDb()));
     persist(cache);
     seedCrmSnapshot();
     return cache;
   }
-  const parsed = JSON.parse(readFileSync(DATA_FILE, "utf8")) as DatabaseFile;
+  const parsed = JSON.parse(readFileSync(dataFile(), "utf8")) as DatabaseFile;
   if (!parsed.lists?.length) {
     cache = migrate(seedServerData(parsed.version ? parsed : emptyDb()));
     persist(cache);
@@ -97,9 +102,9 @@ export function loadDb(): DatabaseFile {
 
 export function persist(db: DatabaseFile): void {
   ensureDir();
-  const tmp = `${DATA_FILE}.${process.pid}.tmp`;
+  const tmp = `${dataFile()}.${process.pid}.tmp`;
   writeFileSync(tmp, JSON.stringify(db, null, 2));
-  renameSync(tmp, DATA_FILE);
+  renameSync(tmp, dataFile());
   cache = db;
   try {
     persistSqlite(db);

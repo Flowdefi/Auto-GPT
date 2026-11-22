@@ -3,6 +3,7 @@ import { workspaceOf } from "@/lib/workspaces";
 import { companiesOf, contactsOf } from "../crm";
 import { loadDb, mutate, nextId } from "../db";
 import { enrichCompanyRecord } from "../enrich";
+import { emailBlockReason } from "../email-block";
 import { providerStatus } from "../mailer";
 import { outlookStatus, syncAll } from "../outlook";
 import { queryRag } from "../rag";
@@ -268,7 +269,9 @@ export const TOOLS: ToolDefinition[] = [
             id: list.id,
             name: list.name,
             total: members.length,
-            sendable: members.filter((member) => member.subscribed && !member.seedLocked).length,
+            sendable: members.filter(
+              (member) => member.subscribed && !member.seedLocked && !emailBlockReason(workspaceId, member.email),
+            ).length,
             locked: members.filter((member) => member.seedLocked).length,
           };
         });

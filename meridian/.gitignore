@@ -7,6 +7,10 @@ ios
 android
 tsconfig.tsbuildinfo
 /data/
+/.e2e-data/
+/test-results/
+/playwright-report/
+/uploads/
 *.tmp
 /ios/
 /android/

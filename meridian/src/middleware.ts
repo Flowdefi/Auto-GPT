@@ -1,11 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { PUBLIC_API_PATHS, SESSION_COOKIE } from "@/lib/commerce";
+import { hostDecision, hostSplit, requestHostname } from "@/lib/hosts";
 
 const PUBLIC_PAGES = new Set(["/", "/pricing", "/login", "/signup"]);
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PAGES.has(pathname)) return true;
   if (pathname.startsWith("/u/")) return true;
+  if (pathname.startsWith("/pay/sandbox/")) return true;
+  if (pathname === "/collect" || pathname.startsWith("/collect/")) return true;
+  if (pathname === "/agency" || pathname.startsWith("/agency/")) return true;
+  if (pathname.startsWith("/api/agency")) return true;
+  if (pathname === "/api/brand") return true;
+  if (pathname.startsWith("/api/portal")) return true;
+  if (pathname.startsWith("/api/webhooks/")) return true;
   if (PUBLIC_API_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
     return true;
   }
@@ -24,7 +32,14 @@ function hasCredential(request: NextRequest): boolean {
 }
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
+  const decision = hostDecision(requestHostname(request.headers), pathname, search, hostSplit());
+  if (decision.kind === "wrong-host") {
+    return NextResponse.json({ error: "This host does not serve that API" }, { status: 421 });
+  }
+  if (decision.kind === "redirect") {
+    return NextResponse.redirect(decision.url, 302);
+  }
   if (isPublicPath(pathname)) {
     return NextResponse.next();
   }

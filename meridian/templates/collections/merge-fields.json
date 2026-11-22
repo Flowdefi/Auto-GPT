@@ -1,0 +1,1515 @@
+{
+  "_notice": "Merge-field dictionary. Requires counsel review before use.",
+  "syntax": "Mustache: {{field}} value, {{#flag}}...{{/flag}} if truthy, {{^flag}}...{{/flag}} if falsy",
+  "forbidden_fields": [
+    "ssn",
+    "social_security",
+    "ssn_last4",
+    "dob",
+    "date_of_birth",
+    "full_account_number",
+    "account_number",
+    "card_number",
+    "pan",
+    "cvv",
+    "routing_number",
+    "bank_account_number",
+    "pin",
+    "password"
+  ],
+  "fields": {
+    "accepts_electronic_disputes": {
+      "type": "boolean",
+      "group": "flags",
+      "description": "Agency accepts disputes electronically (1006.34(c)(3)(v))",
+      "used_in": [
+        "LTR-001"
+      ]
+    },
+    "account_last4": {
+      "type": "string",
+      "group": "account",
+      "description": "Last 4 digits of original account number only",
+      "used_in": [
+        "LTR-001",
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-050",
+        "LTR-072",
+        "LTR-073",
+        "LTR-090",
+        "CALL-001"
+      ]
+    },
+    "account_ref": {
+      "type": "string",
+      "group": "account",
+      "description": "Agency-generated reference number (NOT the creditor account number)",
+      "used_in": [
+        "LTR-001",
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-050",
+        "LTR-070",
+        "LTR-071",
+        "LTR-072",
+        "LTR-073",
+        "LTR-074",
+        "LTR-090",
+        "SMS-002",
+        "SMS-006",
+        "EML-002",
+        "EML-005"
+      ]
+    },
+    "account_type": {
+      "type": "string",
+      "group": "account",
+      "description": "Product type, e.g. 'credit card'",
+      "used_in": [
+        "LTR-001"
+      ]
+    },
+    "affiliates_statement": {
+      "type": "string",
+      "group": "agency",
+      "description": "Privacy-notice description of affiliates",
+      "used_in": [
+        "LTR-080"
+      ]
+    },
+    "agency_email": {
+      "type": "string",
+      "group": "agency",
+      "description": "Monitored consumer email address",
+      "used_in": [
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-072",
+        "LTR-073",
+        "LTR-090"
+      ]
+    },
+    "agency_hours": {
+      "type": "string",
+      "group": "agency",
+      "description": "Business hours with time zone label",
+      "used_in": [
+        "LTR-001",
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-050",
+        "LTR-071",
+        "LTR-072",
+        "LTR-073",
+        "LTR-090",
+        "CALL-001",
+        "SMS-008",
+        "EML-001"
+      ]
+    },
+    "agency_legal_name": {
+      "type": "string",
+      "group": "agency",
+      "description": "Legal entity name (privacy notice, agreements)",
+      "used_in": [
+        "LTR-080"
+      ]
+    },
+    "agency_mailing_address": {
+      "type": "string",
+      "group": "agency",
+      "description": "Street address or PO box for correspondence and disputes (Tex. Fin. Code 392.304(a)(6)-(7))",
+      "used_in": [
+        "LTR-001",
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-050",
+        "LTR-070",
+        "LTR-071",
+        "LTR-072",
+        "LTR-073",
+        "LTR-074",
+        "LTR-090",
+        "CALL-001",
+        "SMS-001",
+        "EML-001",
+        "EML-002",
+        "EML-003",
+        "EML-004",
+        "EML-005",
+        "EML-006"
+      ]
+    },
+    "agency_name": {
+      "type": "string",
+      "group": "agency",
+      "description": "Placeholder doing-business name of the collector, printed as-is (never hard-code a real name)",
+      "used_in": [
+        "LTR-001",
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-050",
+        "LTR-070",
+        "LTR-071",
+        "LTR-072",
+        "LTR-073",
+        "LTR-074",
+        "LTR-080",
+        "LTR-090",
+        "CALL-001",
+        "CALL-002",
+        "CALL-005",
+        "CALL-006",
+        "CALL-008",
+        "SMS-001",
+        "SMS-002",
+        "SMS-003",
+        "SMS-004",
+        "SMS-005",
+        "SMS-006",
+        "SMS-007",
+        "SMS-008",
+        "EML-001",
+        "EML-002",
+        "EML-003",
+        "EML-004",
+        "EML-005",
+        "EML-006"
+      ]
+    },
+    "agency_name_caps": {
+      "type": "string",
+      "group": "agency",
+      "description": "agency_name in ALL CAPS (for capitalized statutory notices)",
+      "used_in": [
+        "LTR-080"
+      ]
+    },
+    "agency_phone": {
+      "type": "string",
+      "group": "agency",
+      "description": "Toll-free number for consumers",
+      "used_in": [
+        "LTR-001",
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-050",
+        "LTR-070",
+        "LTR-071",
+        "LTR-072",
+        "LTR-073",
+        "LTR-074",
+        "LTR-080",
+        "LTR-090",
+        "CALL-001",
+        "CALL-004",
+        "CALL-005",
+        "CALL-006",
+        "CALL-008",
+        "SMS-001",
+        "SMS-002",
+        "SMS-003",
+        "SMS-004",
+        "SMS-005",
+        "SMS-007",
+        "SMS-008",
+        "EML-001",
+        "EML-002",
+        "EML-003",
+        "EML-004",
+        "EML-005",
+        "EML-006"
+      ]
+    },
+    "agency_website": {
+      "type": "string",
+      "group": "agency",
+      "description": "Public website",
+      "used_in": [
+        "LTR-001",
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-050",
+        "LTR-072",
+        "LTR-073",
+        "LTR-080",
+        "LTR-090",
+        "SMS-008"
+      ]
+    },
+    "agreement_date": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Agreement date",
+      "used_in": [
+        "LTR-020"
+      ]
+    },
+    "agreement_id": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Agreement ID",
+      "used_in": [
+        "LTR-020",
+        "LTR-022",
+        "LTR-030"
+      ]
+    },
+    "ai_agent_name": {
+      "type": "string",
+      "group": "agency",
+      "description": "Name the AI assistant uses; must not pose as a human",
+      "used_in": [
+        "CALL-008"
+      ]
+    },
+    "amount_on_itemization_date": {
+      "type": "money_or_date",
+      "group": "itemization",
+      "description": "Amount owed on itemization date",
+      "used_in": [
+        "LTR-001",
+        "LTR-041"
+      ]
+    },
+    "attorney_address": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Attorney address",
+      "used_in": [
+        "LTR-074"
+      ]
+    },
+    "attorney_firm": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Attorney firm",
+      "used_in": [
+        "LTR-074"
+      ]
+    },
+    "attorney_name": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Consumer's attorney",
+      "used_in": [
+        "LTR-074"
+      ]
+    },
+    "authorization_date": {
+      "type": "mixed",
+      "group": "payments",
+      "description": "Date recurring authorization captured",
+      "used_in": [
+        "LTR-030"
+      ]
+    },
+    "authorization_method": {
+      "type": "mixed",
+      "group": "payments",
+      "description": "written / e-sign / recorded oral with written copy",
+      "used_in": [
+        "LTR-030"
+      ]
+    },
+    "balance_itemization": {
+      "type": "money_or_date",
+      "group": "itemization",
+      "description": "Rendered itemization table block",
+      "used_in": [
+        "LTR-041"
+      ]
+    },
+    "bankruptcy_case_number": {
+      "type": "mixed",
+      "group": "disputes_status",
+      "description": "Bankruptcy case number",
+      "used_in": [
+        "LTR-070"
+      ]
+    },
+    "bankruptcy_chapter": {
+      "type": "mixed",
+      "group": "disputes_status",
+      "description": "7, 11, 13",
+      "used_in": [
+        "LTR-070"
+      ]
+    },
+    "bankruptcy_court": {
+      "type": "mixed",
+      "group": "disputes_status",
+      "description": "Court name",
+      "used_in": [
+        "LTR-070"
+      ]
+    },
+    "bankruptcy_filing_date": {
+      "type": "date",
+      "group": "dates",
+      "description": "Bankruptcy petition date",
+      "used_in": [
+        "LTR-070"
+      ]
+    },
+    "bankruptcy_notice_date": {
+      "type": "date",
+      "group": "dates",
+      "description": "Date bankruptcy notice received",
+      "used_in": [
+        "LTR-070"
+      ]
+    },
+    "callback_window": {
+      "type": "date",
+      "group": "dates",
+      "description": "Suggested reply window, e.g. 'weekdays 9 a.m. to 5 p.m. Eastern'",
+      "used_in": [
+        "CALL-004"
+      ]
+    },
+    "cease_optional_remedy_statement": {
+      "type": "mixed",
+      "group": "disputes_status",
+      "description": "Optional 1006.6(c)(2)(ii)/(iii) statement (counsel-approved only)",
+      "used_in": [
+        "LTR-050"
+      ]
+    },
+    "cease_received_date": {
+      "type": "date",
+      "group": "dates",
+      "description": "Date written cease received",
+      "used_in": [
+        "LTR-050"
+      ]
+    },
+    "client_contact": {
+      "type": "string",
+      "group": "agency",
+      "description": "Client contact line for returned-account notice",
+      "used_in": [
+        "LTR-090"
+      ]
+    },
+    "client_name": {
+      "type": "string",
+      "group": "agency",
+      "description": "Original placing client (contingency) name",
+      "used_in": [
+        "LTR-090"
+      ]
+    },
+    "collector_name": {
+      "type": "string",
+      "group": "agency",
+      "description": "Natural-person (or AI-agent) name making the call",
+      "used_in": [
+        "CALL-001",
+        "CALL-003",
+        "CALL-004"
+      ]
+    },
+    "confirmation_channel": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "mail / email / text",
+      "used_in": [
+        "CALL-001"
+      ]
+    },
+    "confirmation_number": {
+      "type": "mixed",
+      "group": "payments",
+      "description": "Processor confirmation number",
+      "used_in": [
+        "CALL-006",
+        "SMS-003",
+        "EML-003"
+      ]
+    },
+    "consumer_first_name": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Consumer first or preferred name",
+      "used_in": [
+        "CALL-001",
+        "CALL-002",
+        "CALL-003",
+        "SMS-001",
+        "SMS-002",
+        "EML-001",
+        "EML-002",
+        "EML-003",
+        "EML-004",
+        "EML-005"
+      ]
+    },
+    "consumer_mailing_address": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Consumer mailing address block",
+      "used_in": [
+        "LTR-001",
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-050",
+        "LTR-072",
+        "LTR-073",
+        "LTR-090"
+      ]
+    },
+    "consumer_name": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Consumer full name",
+      "used_in": [
+        "LTR-001",
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-050",
+        "LTR-070",
+        "LTR-072",
+        "LTR-073",
+        "LTR-074",
+        "LTR-090",
+        "CALL-001",
+        "CALL-003",
+        "CALL-008"
+      ]
+    },
+    "consumer_state": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Two-letter state of residence (drives state_disclosures and scope gate)",
+      "used_in": [
+        "LTR-060"
+      ]
+    },
+    "creditor_on_itemization_date": {
+      "type": "string",
+      "group": "account",
+      "description": "Creditor as of itemization date (1006.34(c)(2)(iv))",
+      "used_in": [
+        "LTR-001"
+      ]
+    },
+    "current_balance": {
+      "type": "money_or_date",
+      "group": "itemization",
+      "description": "Current amount owed",
+      "used_in": [
+        "LTR-001",
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-020",
+        "LTR-030",
+        "LTR-041",
+        "LTR-071",
+        "CALL-001",
+        "CALL-005",
+        "EML-002",
+        "EML-005"
+      ]
+    },
+    "current_creditor": {
+      "type": "string",
+      "group": "account",
+      "description": "Creditor to whom the debt is currently owed (debt owner)",
+      "used_in": [
+        "LTR-001",
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-050",
+        "LTR-060",
+        "LTR-071",
+        "LTR-072",
+        "LTR-073",
+        "LTR-074",
+        "LTR-090",
+        "CALL-001",
+        "CALL-005",
+        "CALL-008",
+        "EML-001",
+        "EML-002",
+        "EML-005"
+      ]
+    },
+    "debt_buyer_name_caps": {
+      "type": "string",
+      "group": "account",
+      "description": "Debt buyer name in caps for Tex. Fin. Code 392.307(e)(1)",
+      "used_in": [
+        "LTR-061"
+      ]
+    },
+    "decedent_name": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Name of deceased consumer",
+      "used_in": [
+        "LTR-071"
+      ]
+    },
+    "dispute_outcome_statement": {
+      "type": "mixed",
+      "group": "disputes_status",
+      "description": "Counsel-approved outcome text",
+      "used_in": [
+        "LTR-042"
+      ]
+    },
+    "dispute_partial": {
+      "type": "boolean",
+      "group": "flags",
+      "description": "Dispute covers part of balance",
+      "used_in": [
+        "LTR-040",
+        "CALL-001"
+      ]
+    },
+    "dispute_portal_url": {
+      "type": "string",
+      "group": "agency",
+      "description": "URL for electronic disputes/original-creditor requests",
+      "used_in": [
+        "LTR-001",
+        "LTR-040",
+        "CALL-001",
+        "CALL-005",
+        "EML-002"
+      ]
+    },
+    "dispute_received_date": {
+      "type": "date",
+      "group": "dates",
+      "description": "Date dispute received",
+      "used_in": [
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-073"
+      ]
+    },
+    "dispute_requests_original_creditor": {
+      "type": "boolean",
+      "group": "flags",
+      "description": "Consumer requested original creditor info",
+      "used_in": [
+        "LTR-040"
+      ]
+    },
+    "disputed_amount": {
+      "type": "mixed",
+      "group": "disputes_status",
+      "description": "Amount disputed",
+      "used_in": [
+        "LTR-040",
+        "CALL-001"
+      ]
+    },
+    "email_optout_link": {
+      "type": "string",
+      "group": "agency",
+      "description": "One-click email opt-out URL (token only; no PII in URL)",
+      "used_in": [
+        "EML-001",
+        "EML-002",
+        "EML-003",
+        "EML-004",
+        "EML-005"
+      ]
+    },
+    "escalation_role": {
+      "type": "string",
+      "group": "agency",
+      "description": "Role transferred to (e.g., 'a supervisor')",
+      "used_in": [
+        "CALL-007"
+      ]
+    },
+    "estate_representative_address": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Estate representative address",
+      "used_in": [
+        "LTR-071"
+      ]
+    },
+    "estate_representative_name": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Executor/administrator name",
+      "used_in": [
+        "LTR-071"
+      ]
+    },
+    "estate_representative_title": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Executor, administrator, personal representative, etc.",
+      "used_in": [
+        "LTR-071"
+      ]
+    },
+    "fees_since_itemization": {
+      "type": "money_or_date",
+      "group": "itemization",
+      "description": "Fees since itemization date (0.00 if none; never blank)",
+      "used_in": [
+        "LTR-001"
+      ]
+    },
+    "furnishes_credit": {
+      "type": "boolean",
+      "group": "flags",
+      "description": "Agency/debt buyer furnishes to CRAs",
+      "used_in": [
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-040",
+        "LTR-042"
+      ]
+    },
+    "grace_days": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Days late before a plan is considered missed",
+      "used_in": [
+        "LTR-011",
+        "LTR-012",
+        "LTR-030"
+      ]
+    },
+    "hardship_lump_sum": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Hardship lump-sum option",
+      "used_in": [
+        "LTR-013"
+      ]
+    },
+    "hardship_plan": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Hardship plan option",
+      "used_in": [
+        "LTR-013"
+      ]
+    },
+    "hardship_review_date": {
+      "type": "date",
+      "group": "dates",
+      "description": "Date hardship reviewed",
+      "used_in": [
+        "LTR-013"
+      ]
+    },
+    "has_reverse_disclosures": {
+      "type": "boolean",
+      "group": "flags",
+      "description": "State disclosures printed on reverse",
+      "used_in": [
+        "LTR-001"
+      ]
+    },
+    "interest_since_itemization": {
+      "type": "money_or_date",
+      "group": "itemization",
+      "description": "Interest since itemization date (0.00 if none; never blank)",
+      "used_in": [
+        "LTR-001"
+      ]
+    },
+    "is_ai_agent": {
+      "type": "boolean",
+      "group": "flags",
+      "description": "Call handled by AI voice agent",
+      "used_in": [
+        "CALL-001",
+        "CALL-002"
+      ]
+    },
+    "is_settlement": {
+      "type": "boolean",
+      "group": "flags",
+      "description": "Payment is part of settlement",
+      "used_in": [
+        "CALL-006"
+      ]
+    },
+    "is_settlement_plan": {
+      "type": "boolean",
+      "group": "flags",
+      "description": "Plan is a settlement plan",
+      "used_in": [
+        "LTR-030"
+      ]
+    },
+    "itemization_date": {
+      "type": "money_or_date",
+      "group": "itemization",
+      "description": "Reg F itemization date (1006.34(b)(3)); one of last statement, charge-off, last payment, transaction, judgment",
+      "used_in": [
+        "LTR-001",
+        "LTR-041"
+      ]
+    },
+    "itemization_date_basis": {
+      "type": "money_or_date",
+      "group": "itemization",
+      "description": "Which of the five itemization-date options was used",
+      "used_in": [
+        "LTR-041"
+      ]
+    },
+    "legal_status_statement": {
+      "type": "mixed",
+      "group": "disputes_status",
+      "description": "Counsel-approved factual statement on legal status; only source of any legal-consequence wording",
+      "used_in": [
+        "CALL-005"
+      ]
+    },
+    "letter_date": {
+      "type": "date",
+      "group": "dates",
+      "description": "Date letter generated",
+      "used_in": [
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-050",
+        "LTR-070",
+        "LTR-071",
+        "LTR-072",
+        "LTR-073",
+        "LTR-074",
+        "LTR-090"
+      ]
+    },
+    "link_expiry_minutes": {
+      "type": "mixed",
+      "group": "payments",
+      "description": "Secure payment link lifetime",
+      "used_in": [
+        "CALL-006"
+      ]
+    },
+    "location_trade_name": {
+      "type": "string",
+      "group": "agency",
+      "description": "Counsel-approved business name not indicating debt collection, given to third parties only on express request (1692b(1))",
+      "used_in": [
+        "CALL-003"
+      ]
+    },
+    "masked_destination": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Masked phone/email for payment link, e.g. ***-***-1234",
+      "used_in": [
+        "CALL-006"
+      ]
+    },
+    "masked_email": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Masked email, e.g. j***@example.com",
+      "used_in": [
+        "EML-006"
+      ]
+    },
+    "message_date": {
+      "type": "date",
+      "group": "dates",
+      "description": "Date of voicemail",
+      "used_in": [
+        "CALL-004"
+      ]
+    },
+    "message_time": {
+      "type": "date",
+      "group": "dates",
+      "description": "Time of voicemail with zone",
+      "used_in": [
+        "CALL-004"
+      ]
+    },
+    "min_plan_payment": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Minimum monthly plan payment from matrix",
+      "used_in": [
+        "LTR-004"
+      ]
+    },
+    "missed_payment_date": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Date of missed installment",
+      "used_in": [
+        "SMS-005"
+      ]
+    },
+    "next_payment_amount": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Next installment amount",
+      "used_in": [
+        "SMS-004",
+        "EML-003",
+        "EML-004"
+      ]
+    },
+    "next_payment_date": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Next installment date",
+      "used_in": [
+        "SMS-004",
+        "EML-003",
+        "EML-004"
+      ]
+    },
+    "next_step_statement": {
+      "type": "mixed",
+      "group": "disputes_status",
+      "description": "Owner/counsel-approved, truthful next-step statement chosen from an approved list",
+      "used_in": [
+        "LTR-005"
+      ]
+    },
+    "notice_date": {
+      "type": "date",
+      "group": "dates",
+      "description": "Date validation notice sent",
+      "used_in": [
+        "LTR-001",
+        "CALL-001"
+      ]
+    },
+    "offer_expiration_date": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Real offer deadline recorded in CRM (settlement-matrix offer_validity_days)",
+      "used_in": [
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "CALL-005",
+        "SMS-006",
+        "EML-005"
+      ]
+    },
+    "original_creditor": {
+      "type": "string",
+      "group": "account",
+      "description": "Original creditor name",
+      "used_in": [
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-050",
+        "LTR-072",
+        "LTR-073",
+        "LTR-090",
+        "CALL-001"
+      ]
+    },
+    "original_creditor_address": {
+      "type": "string",
+      "group": "account",
+      "description": "Original creditor address (1692g(a)(5) request)",
+      "used_in": [
+        "LTR-041",
+        "LTR-043"
+      ]
+    },
+    "payment_amount": {
+      "type": "mixed",
+      "group": "payments",
+      "description": "Payment amount",
+      "used_in": [
+        "LTR-021",
+        "CALL-006",
+        "SMS-003",
+        "EML-003"
+      ]
+    },
+    "payment_date": {
+      "type": "mixed",
+      "group": "payments",
+      "description": "Payment date",
+      "used_in": [
+        "LTR-021",
+        "LTR-022",
+        "CALL-006",
+        "SMS-003",
+        "EML-003"
+      ]
+    },
+    "payment_method_description": {
+      "type": "mixed",
+      "group": "payments",
+      "description": "e.g. 'Visa ending 1234' or 'checking account ending 5678' (last 4 only)",
+      "used_in": [
+        "LTR-030",
+        "CALL-006",
+        "EML-003",
+        "EML-004"
+      ]
+    },
+    "payment_schedule_summary": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Human-readable schedule",
+      "used_in": [
+        "LTR-020",
+        "EML-005"
+      ]
+    },
+    "payment_status": {
+      "type": "mixed",
+      "group": "payments",
+      "description": "approved / declined / pending",
+      "used_in": [
+        "CALL-006"
+      ]
+    },
+    "payments_credits_since_itemization": {
+      "type": "money_or_date",
+      "group": "itemization",
+      "description": "Payments/credits since itemization date (0.00 if none; never blank)",
+      "used_in": [
+        "LTR-001"
+      ]
+    },
+    "plan_end_date": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Final installment date",
+      "used_in": [
+        "LTR-011",
+        "LTR-012",
+        "LTR-030"
+      ]
+    },
+    "plan_first_payment_date": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "First installment date",
+      "used_in": [
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-030",
+        "CALL-006"
+      ]
+    },
+    "plan_frequency": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "weekly / biweekly / monthly",
+      "used_in": [
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-030",
+        "CALL-006"
+      ]
+    },
+    "plan_number_of_payments": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Number of plan payments",
+      "used_in": [
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-030",
+        "CALL-006"
+      ]
+    },
+    "plan_payment_amount": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Installment amount",
+      "used_in": [
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-030",
+        "CALL-006"
+      ]
+    },
+    "plan_payments_remaining": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Installments left",
+      "used_in": [
+        "EML-004"
+      ]
+    },
+    "plan_total": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Total of all plan payments",
+      "used_in": [
+        "LTR-030"
+      ]
+    },
+    "portal_url": {
+      "type": "string",
+      "group": "agency",
+      "description": "Authenticated consumer payment portal URL (no account data in URL)",
+      "used_in": [
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-072",
+        "LTR-073",
+        "LTR-090",
+        "CALL-006",
+        "SMS-001",
+        "SMS-002",
+        "SMS-004",
+        "SMS-005",
+        "SMS-006",
+        "EML-001",
+        "EML-002",
+        "EML-004",
+        "EML-005"
+      ]
+    },
+    "post_return_payment_handling": {
+      "type": "mixed",
+      "group": "payments",
+      "description": "Where to send payments after return to client",
+      "used_in": [
+        "LTR-090"
+      ]
+    },
+    "prior_letter_date": {
+      "type": "date",
+      "group": "dates",
+      "description": "Date of a prior letter referenced",
+      "used_in": [
+        "LTR-003"
+      ]
+    },
+    "privacy_notice_revision_date": {
+      "type": "string",
+      "group": "agency",
+      "description": "Privacy notice revision date",
+      "used_in": [
+        "LTR-080"
+      ]
+    },
+    "recap_statement": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Call recap generated from CRM agreement record",
+      "used_in": [
+        "CALL-001"
+      ]
+    },
+    "recipient_mailing_address": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Addressee mailing address",
+      "used_in": [
+        "LTR-070"
+      ]
+    },
+    "recipient_name": {
+      "type": "string",
+      "group": "consumer",
+      "description": "Addressee when not the consumer (estate rep, attorney)",
+      "used_in": [
+        "LTR-070"
+      ]
+    },
+    "recurring_authorized": {
+      "type": "boolean",
+      "group": "flags",
+      "description": "Recurring debit authorized",
+      "used_in": [
+        "LTR-030",
+        "EML-004"
+      ]
+    },
+    "remaining_balance": {
+      "type": "money_or_date",
+      "group": "itemization",
+      "description": "Balance after payment",
+      "used_in": [
+        "SMS-003",
+        "EML-003"
+      ]
+    },
+    "return_date": {
+      "type": "date",
+      "group": "dates",
+      "description": "Date account returned to client",
+      "used_in": [
+        "LTR-090"
+      ]
+    },
+    "returned_reason_statement": {
+      "type": "mixed",
+      "group": "disputes_status",
+      "description": "Why account returned",
+      "used_in": [
+        "LTR-090"
+      ]
+    },
+    "scra_effective_date": {
+      "type": "date",
+      "group": "dates",
+      "description": "SCRA protection effective date",
+      "used_in": [
+        "LTR-072"
+      ]
+    },
+    "scra_notice_date": {
+      "type": "date",
+      "group": "dates",
+      "description": "Date SCRA notice received",
+      "used_in": [
+        "LTR-072"
+      ]
+    },
+    "scra_rate_cap_applied": {
+      "type": "boolean",
+      "group": "flags",
+      "description": "6% cap applied",
+      "used_in": [
+        "LTR-072"
+      ]
+    },
+    "settlement_amount": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Agreed/offered settlement amount",
+      "used_in": [
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-022",
+        "LTR-030",
+        "CALL-006",
+        "SMS-006",
+        "EML-005"
+      ]
+    },
+    "settlement_percent": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "Settlement as % of balance",
+      "used_in": [
+        "LTR-010",
+        "LTR-011"
+      ]
+    },
+    "settlement_savings": {
+      "type": "mixed",
+      "group": "offers_plans",
+      "description": "current_balance minus settlement_amount",
+      "used_in": [
+        "LTR-010"
+      ]
+    },
+    "state_disclosures": {
+      "type": "block",
+      "group": "blocks",
+      "description": "Rendered state-required disclosures (reverse of validation notice)",
+      "used_in": [
+        "LTR-001",
+        "LTR-002",
+        "LTR-003",
+        "LTR-004",
+        "LTR-005",
+        "LTR-010",
+        "LTR-011",
+        "LTR-012",
+        "LTR-013",
+        "LTR-020",
+        "LTR-021",
+        "LTR-022",
+        "LTR-030",
+        "LTR-040",
+        "LTR-041",
+        "LTR-042",
+        "LTR-043",
+        "LTR-072",
+        "LTR-073",
+        "LTR-090"
+      ]
+    },
+    "time_barred": {
+      "type": "boolean",
+      "group": "flags",
+      "description": "Debt is past statute of limitations",
+      "used_in": [
+        "CALL-001"
+      ]
+    },
+    "time_barred_front_disclosure": {
+      "type": "block",
+      "group": "blocks",
+      "description": "Time-barred disclosure printed on front below total (1006.34(d)(3)(iv)(B))",
+      "used_in": [
+        "LTR-001"
+      ]
+    },
+    "validation_end_date": {
+      "type": "money_or_date",
+      "group": "itemization",
+      "description": "CRM-computed end of validation period (1006.34(b)(5)); never hand-entered",
+      "used_in": [
+        "LTR-001",
+        "CALL-001"
+      ]
+    },
+    "validation_notice_block": {
+      "type": "block",
+      "group": "blocks",
+      "description": "Rendered LTR-001 content for electronic delivery",
+      "used_in": [
+        "EML-001"
+      ]
+    },
+    "verification_documents_list": {
+      "type": "mixed",
+      "group": "disputes_status",
+      "description": "List of enclosed verification documents",
+      "used_in": [
+        "LTR-041"
+      ]
+    },
+    "voicemail_business_name": {
+      "type": "string",
+      "group": "agency",
+      "description": "Counsel-approved business name not indicating debt collection for limited-content messages (1006.2(j))",
+      "used_in": [
+        "CALL-004"
+      ]
+    },
+    "within_validation_period": {
+      "type": "boolean",
+      "group": "flags",
+      "description": "Today <= validation_end_date",
+      "used_in": [
+        "CALL-001"
+      ]
+    }
+  }
+}

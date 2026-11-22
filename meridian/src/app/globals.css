@@ -246,6 +246,18 @@
   }
 }
 
+.portal-shell a,
+.portal-shell button,
+.portal-shell input,
+.portal-shell textarea {
+  outline: none;
+}
+
+.portal-shell :focus-visible {
+  outline: 3px solid #0b3a66;
+  outline-offset: 3px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

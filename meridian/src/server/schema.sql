@@ -161,6 +161,12 @@ CREATE TABLE IF NOT EXISTS accounts (
   last_login_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS account_mfa (
+  account_id TEXT PRIMARY KEY,
+  secret_ciphertext TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
   account_id TEXT NOT NULL,

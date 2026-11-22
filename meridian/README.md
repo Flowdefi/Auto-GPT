@@ -1,5 +1,15 @@
 # Meridian
 
+## Collections agency demo
+
+One command, from this directory, starts the desk with sandbox delivery and two agencies of clearly fake accounts. Triton gets `DEMO-OH-1`, `DEMO-TX-1`, and `DEMO-CA-1`. The second workspace, Aether, gets `HBR-OH-1`, `HBR-TX-1`, and `HBR-CA-1` under Example Harbor Seller. The workspaces cannot read each other's accounts.
+
+```bash
+docker compose up --build
+```
+
+Open [http://localhost:3000](http://localhost:3000). Nothing is dialed, mailed, or charged. Live voice, skip-trace, letters, and the compliance digest stay off until `MERIDIAN_CHANNEL_DELIVER=live` and that feature's own flag are both set. Replace the demo `MERIDIAN_AUTH_SECRET` before any real portfolio. The owner checklist and the 15-minute first-hour script are in [docs/OWNER-ONBOARDING.md](docs/OWNER-ONBOARDING.md). The capability list is [docs/CHANGELOG.md](docs/CHANGELOG.md). Live hosts are `crm.debtmarket.net` (desk, behind Access) and `collect.debtmarket.net` (public). The env list is [docs/DEPLOY.md](docs/DEPLOY.md).
+
 Enterprise customer platform — a HubSpot-class suite (Smart CRM, Sales, Marketing, Service, Content/CMS, SEO, Automation, Reporting, Compliance, and integrated AI) with a native-feeling **iOS + web** client.
 
 Two workspaces ship fully wired:
@@ -101,15 +111,98 @@ Production requires `MERIDIAN_AUTH_SECRET` (32+ characters). Polar webhook: `POS
 npm run build && npm run start
 ```
 
-Docker (persists `data/`):
+Docker (persists `data/` on the `meridian-data` volume, mounted at `/app/data`):
 
 ```bash
-docker compose up --build
+cp .env.example .env
+# set MERIDIAN_AUTH_SECRET to 32+ characters
+docker compose up --build -d
 ```
+
+Compose sets `MERIDIAN_SEED_DEMO=false` unless you override it, so a fresh volume does not load demo buyers and sellers. `npm run dev` still seeds demo data when that variable is unset.
 
 Public health stub: `GET /api/health`
 
-Demo CRM state persists in the browser. Server mail/graph data persists in `data/meridian.json`. Use **Reset demo** in the header to restore seed CRM data.
+Demo CRM state in the browser persists separately from the server. Server mail, graph, and CRM rows persist in `data/meridian.json` and `data/meridian.db`. Use **Reset demo** in the header to restore the in-browser seed. To remove server-side demo companies, contacts, leads, and `crm_records` from a workspace:
+
+```bash
+MERIDIAN_SEED_DEMO=false npm run purge:demo -- --workspace triton
+```
+
+## Debt-desk CRM and CSV import
+
+Contact and company records carry DebtMarket fields (lead type, asset class, buying states, NDA, do-not-email, HubSpot id, and outbound prospect segment/size). They are stored as JSON in `crm_records`, so no SQL migration is required. Open a record to view them, and use **Create** / **Edit** on Contacts and Companies. The contact list filters by lead type, asset class, state, NDA, and do-not-email.
+
+**Contacts → Import** accepts three CSV shapes:
+
+- Contacts — `First Name`, `Last Name`, `Email`, `Phone`, `Mobile`, `Job Title`, `Company Name`, `Company Domain`, `Website`, `Street`, `City`, `State`, `Zip`, `Country`, `LinkedIn`, `Lead Type`, `Stage`, `Lead Source`, `Owner`, `Created Date`, `Last Contacted`, `Asset Class Preference`, `Budget`, `Paper Age Preference`, `Coverage`, `Buying States`, `Collect or Litigate`, `NDA Signed`, `Closed Deal`, `Desk Replied`, `Email Status`, `Message Summary`, `Notes`, `Tags`, `HubSpot Record ID`, `Source`, plus optional `Reason` / `Removal Reason`
+- Companies — `Company Name`, `Domain`, `Website`, `Phone`, `Industry`, `Company Type / Debt Roles`, `Description`, `Additional Preferences`, `Street`, `City`, `State`, `Zip`, `Country`, `Employees`, `Year Founded`, `Lead Status`, `Lifecycle`, `Owner`, `LinkedIn`, `Target Account`, `Close Date`, `Notes`, `HubSpot Record ID`, `Contact Count`
+- Prospects — `segment`, `sub_type`, `company`, `website`, `hq_state`, `size_signal`, `why_fit`, `source_url`, `contact_name`, `title`, `linkedin`, `email`, `phone`, `confidence` (stored with lead source `outbound prospect`)
+
+Contacts link to companies by domain, then by name. Re-runs match HubSpot Record ID, then email, then name plus company, and update the existing row. `--dry-run` prints counts and does not write. Rows that cannot be identified are skipped and listed with a reason.
+
+```bash
+npm run import:csv -- --workspace triton \
+  --contacts ./contacts.csv \
+  --companies ./companies.csv \
+  --prospects ./prospects.csv
+
+# Mark every row do-not-email, or invalid, and insert those addresses into suppressions:
+npm run import:csv -- --workspace triton --contacts ./removed.csv --do-not-email
+npm run import:csv -- --workspace triton --contacts ./bounced.csv --invalid-email
+```
+
+Inside Docker, copy the files into the data volume and run the same script:
+
+```bash
+docker compose exec meridian mkdir -p /app/data/import
+docker compose cp ./contacts.csv meridian:/app/data/import/contacts.csv
+docker compose cp ./companies.csv meridian:/app/data/import/companies.csv
+docker compose exec meridian npm run import:csv -- \
+  --workspace triton \
+  --contacts /app/data/import/contacts.csv \
+  --companies /app/data/import/companies.csv
+```
+
+Do not commit lead files. Bulk send skips suppressed addresses and any contact with `doNotEmail`, including test sends.
+
+## Collections desk (sandbox)
+
+The collections desk is a separate path from the buyer/seller CRM. It is for a third-party operation that only collects where the consumer lives in a state with no collector or debt-buyer license, plus Texas. Texas still requires the **$10,000** surety bond in Tex. Fin. Code § 392.101 and the time-barred rules in § 392.307. The eligibility table is editable at **State eligibility**. Uncertain states stay quarantined until counsel marks them eligible. This is not legal advice.
+
+Outbound AI calls, SMS, email, Lob-style letters, limited-content voicemail, portal chat, and the payment handoff all pass the same gate: kill switch, daily cap, state eligibility, cease/dispute/bankruptcy/attorney holds, Reg F calling hours and the 7-in-7 / 7-day conversation cap, TCPA consent for AI voice on cell phones (FCC 24-17), internal DNC, and a reassigned-number scrub. The default scrub is "unknown", which blocks cell calls. The sandbox clear switch is not the FCC database. Transcripts are encrypted. Card numbers and SSNs are redacted and are not stored. Payment goes to `/pay/sandbox/[token]`, which does not collect a card.
+
+```bash
+npm run test:collections
+```
+
+The consumer portal is public at `/collect`. Lookup uses a reference number, the last four of the original account, and ZIP. Do not put an SSN in a URL. Test-mode payment records a receipt and does not collect a card. Collection reports are at `/w/triton/collections/reports` after a seat is signed in. Portfolio import on the desk accepts a column map, a first-sheet xlsx upload, or fixed-width rows. Full SSNs are encrypted and masked. This repository is public: do not load a real portfolio here. Move the app to a private repository first. What is done, stubbed, and still waiting on the owner is in `docs/COLLECTIONS-STATUS.md`.
+
+Put counsel-reviewed Markdown templates in `templates/collections/` and use **Sync templates**. Nothing in that folder is sent until `counselReviewed: true`. The public repo must stay free of real debtor files.
+
+## Environment
+
+Copy `.env.example` to `.env.local` (dev) or `.env` (Compose). Empty values are fine until you use that feature.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `MERIDIAN_AUTH_SECRET` | Production | Session signing secret, 32+ characters |
+| `MERIDIAN_SECRET_KEY` | Production if you store BYOK secrets | Encryption key for provider secrets |
+| `MERIDIAN_SEED_DEMO` | No | `false` disables `seedCrmRecords` and `seedDemoLeads`. Unset/`true` seeds demo data. Compose defaults to `false` |
+| `MERIDIAN_CHANNEL_DELIVER` | No | `sandbox` records collection attempts locally. `live` is refused |
+| `MERIDIAN_PUBLIC_URL` | Recommended | Public origin for unsubscribe and tracking links |
+| `NEXT_PUBLIC_APP_URL` | Recommended | Same origin for the client |
+| `RESEND_API_KEY` | To send as `portfolios@debtmarket.net` | Resend |
+| `AGENTMAIL_API_KEY` | Alternate sender | AgentMail |
+| `AGENTMAIL_INBOX_TRITON` | No | Triton AgentMail inbox |
+| `AGENTMAIL_INBOX_AETHER` | No | Aether AgentMail inbox |
+| `AETHER_FROM_EMAIL` | No | Aether From address |
+| `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_MAILBOXES` | For Office 365 sync | Microsoft Graph app-only |
+| `OPENAI_BASE_URL` or `OLLAMA_BASE_URL`, `OPENAI_API_KEY`, `MERIDIAN_MODEL`, `MERIDIAN_FAST_MODEL`, `MERIDIAN_EMBED_MODEL` | For free-form model answers | OpenAI-compatible endpoint |
+| `SERP_PROVIDER_URL`, `SERP_PROVIDER_KEY`, `SERP_PROVIDER_NAME` | For live rank tracking | SERP provider |
+| `POLAR_ACCESS_TOKEN`, `POLAR_PRODUCT_ID`, `POLAR_WEBHOOK_SECRET`, `POLAR_SERVER` | To sell seats | Polar |
+
+`MERIDIAN_AUTH_SECRET` is the one production boot will not function correctly without. Mail, Graph, model, SERP, and Polar keys are required only for those features.
 
 ## Product notes
 

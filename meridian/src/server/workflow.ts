@@ -2,6 +2,8 @@ import { seedAether } from "@/lib/seed/aether";
 import { seedTriton } from "@/lib/seed/triton";
 import type { WorkspaceId } from "@/lib/types";
 import { loadDb, mutate, nextId } from "./db";
+import { demoSeedEnabled } from "./demo-seed";
+import { emailBlockReason } from "./email-block";
 import { inferSide, scoreLead, slaMinutes } from "./scoring";
 import { upsertContact, type UpsertContactInput } from "./crm";
 import type {
@@ -379,6 +381,8 @@ function applyAction(
       const lead = db.leads.find((row) => row.id === subjectId);
       const contact = db.contacts.find((row) => row.id === lead?.contactId);
       if (!contact) return "skipped: no contact";
+      const blocked = emailBlockReason(workspaceId, contact.email);
+      if (blocked) return `skipped: ${blocked === "do_not_email" ? "do not email" : "suppressed"}`;
       const listId = String(params.listId ?? `${workspaceId}_list_test`);
       mutate((state) => {
         const already = state.members.find(
@@ -555,7 +559,8 @@ export function seedWorkflows(db: DatabaseFile): void {
 
 /** Demo pipeline so Leads is not an empty board on first boot. */
 export function seedDemoLeads(db: DatabaseFile): void {
-  if (db.leads.length > 0) return;
+  if (!demoSeedEnabled()) return;
+  const purged = new Set(db.demoPurgedWorkspaces ?? []);
   const now = Date.now();
   const rows: Array<Omit<Lead, "id"> & { id: string }> = [
     {
@@ -700,6 +705,8 @@ export function seedDemoLeads(db: DatabaseFile): void {
   ];
 
   for (const row of rows) {
+    if (purged.has(row.workspaceId)) continue;
+    if (db.leads.some((lead) => lead.id === row.id)) continue;
     if (db.contacts.some((contact) => contact.id === row.contactId)) {
       db.leads.push(row);
     }

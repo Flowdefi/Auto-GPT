@@ -1,0 +1,2055 @@
+{
+  "library": "Meridian collections template library",
+  "version": "1.0.0",
+  "generated": "2026-11-04",
+  "status": "Requires counsel review before use",
+  "not_legal_advice": true,
+  "scope": "U.S. consumer debt; owner-approved no-license states plus Texas",
+  "template_count": 50,
+  "templates": [
+    {
+      "id": "CALL-001",
+      "path": "call-scripts/outbound-right-party-contact.md",
+      "title": "Outbound Call: Right-Party Contact",
+      "channel": "voice",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Live-agent or voice-AI outbound collection call. Verifies identity BEFORE disclosing anything about the debt, then gives mini-Miranda.",
+      "merge_fields": [
+        "account_last4",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "collector_name",
+        "confirmation_channel",
+        "consumer_first_name",
+        "consumer_name",
+        "current_balance",
+        "current_creditor",
+        "dispute_partial",
+        "dispute_portal_url",
+        "disputed_amount",
+        "is_ai_agent",
+        "notice_date",
+        "original_creditor",
+        "recap_statement",
+        "time_barred",
+        "validation_end_date",
+        "within_validation_period"
+      ],
+      "required_disclosures": [
+        "recording notice",
+        "AI disclosure (if AI)",
+        "1006.18(e)(1) or (e)(2)",
+        "meaningful identity disclosure (1006.14(g))"
+      ],
+      "send_rules": [],
+      "legal_citations": [
+        "15 U.S.C. 1692b (acquisition of location information)",
+        "15 U.S.C. 1692c (communication in connection with debt collection)",
+        "15 U.S.C. 1692e(11) (mini-Miranda / debt collector disclosure)",
+        "12 CFR 1006.6(b)(1) (inconvenient times/places; 8 a.m.-9 p.m. presumption)",
+        "12 CFR 1006.14(b) (call frequency; 7-in-7 presumptions)",
+        "12 CFR 1006.14(g) (meaningful disclosure of identity)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "47 U.S.C. 227 (TCPA)",
+        "FCC 24-17, CG Docket No. 23-362 (Feb. 8, 2024) Declaratory Ruling: AI-generated voices are 'artificial' under the TCPA",
+        "Tex. Fin. Code 392.302 (harassment; abuse)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)"
+      ]
+    },
+    {
+      "id": "CALL-002",
+      "path": "call-scripts/inbound.md",
+      "title": "Inbound Call",
+      "channel": "voice",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Consumer calls in. Verify first; give mini-Miranda if this is the first communication.",
+      "merge_fields": [
+        "agency_name",
+        "consumer_first_name",
+        "is_ai_agent"
+      ],
+      "required_disclosures": [
+        "recording notice",
+        "AI disclosure (if AI)",
+        "1006.18(e)"
+      ],
+      "send_rules": [],
+      "legal_citations": [
+        "15 U.S.C. 1692c (communication in connection with debt collection)",
+        "15 U.S.C. 1692e(11) (mini-Miranda / debt collector disclosure)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)",
+        "FCC 24-17, CG Docket No. 23-362 (Feb. 8, 2024) Declaratory Ruling: AI-generated voices are 'artificial' under the TCPA"
+      ]
+    },
+    {
+      "id": "CALL-003",
+      "path": "call-scripts/third-party-location.md",
+      "title": "Third-Party / Location Information Call (1692b)",
+      "channel": "voice",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Speaking with someone other than the consumer. Goal is ONLY to confirm or correct the consumer's location information (home address and home phone, or place of employment). Never reveal debt.",
+      "merge_fields": [
+        "collector_name",
+        "consumer_first_name",
+        "consumer_name",
+        "location_trade_name"
+      ],
+      "required_disclosures": [
+        "caller name; employer name only if expressly requested"
+      ],
+      "send_rules": [],
+      "legal_citations": [
+        "15 U.S.C. 1692b (acquisition of location information)",
+        "12 CFR 1006.10 (acquisition of location information)",
+        "15 U.S.C. 1692c (communication in connection with debt collection)",
+        "12 CFR 1006.6(d) (third-party communications; email/text reasonable procedures (d)(3)-(5))",
+        "Tex. Fin. Code 392.302 (harassment; abuse)"
+      ]
+    },
+    {
+      "id": "CALL-004",
+      "path": "call-scripts/limited-content-voicemail.md",
+      "title": "Reg F Limited-Content Voicemail (1006.2(j))",
+      "channel": "voicemail",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "The only voicemail allowed without making it a 'communication'. Contains ONLY the required and optional elements of 1006.2(j). Adding anything else, including 'debt collector', the creditor name, or 'regarding an account', removes the safe harbor and creates third-party disclosure risk.",
+      "merge_fields": [
+        "agency_phone",
+        "callback_window",
+        "collector_name",
+        "message_date",
+        "message_time",
+        "voicemail_business_name"
+      ],
+      "required_disclosures": [
+        "none (limited-content message is not a communication; 1006.18(e) comment 18(e)-1)"
+      ],
+      "send_rules": [],
+      "legal_citations": [
+        "12 CFR 1006.2(j) (limited-content message)",
+        "12 CFR 1006.14(b) (call frequency; 7-in-7 presumptions)",
+        "12 CFR 1006.14(g) (meaningful disclosure of identity)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "47 CFR 64.1200 (TCPA rules; (a)(10) consent revocation; (b) artificial-voice identification)",
+        "FCC 24-17, CG Docket No. 23-362 (Feb. 8, 2024) Declaratory Ruling: AI-generated voices are 'artificial' under the TCPA"
+      ]
+    },
+    {
+      "id": "CALL-005",
+      "path": "call-scripts/negotiation-settlement-objections.md",
+      "title": "Negotiation, Settlement, and Objection Handling",
+      "channel": "voice",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Branching script for payment negotiation within settlement-matrix.json authority, plus compliant responses to the most common objections.",
+      "merge_fields": [
+        "agency_name",
+        "agency_phone",
+        "current_balance",
+        "current_creditor",
+        "dispute_portal_url",
+        "legal_status_statement",
+        "offer_expiration_date"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2) (already given in opener)"
+      ],
+      "send_rules": [],
+      "legal_citations": [
+        "15 U.S.C. 1692c (communication in connection with debt collection)",
+        "15 U.S.C. 1692c(c) (ceasing communication)",
+        "15 U.S.C. 1692d (harassment or abuse)",
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "15 U.S.C. 1692f (unfair practices)",
+        "15 U.S.C. 1692g(b) (disputed debts; no overshadowing)",
+        "12 CFR 1006.6(b)(2) (consumer represented by attorney)",
+        "12 CFR 1006.6(c) (cease communication; permitted exceptions)",
+        "12 CFR 1006.26 (time-barred debt; no suits or threats of suit)",
+        "11 U.S.C. 362 (automatic stay)",
+        "FTC Statement of Policy re Collection of Decedents' Debts, 76 FR 44915 (July 27, 2011)",
+        "50 U.S.C. 3937 (SCRA 6% interest cap)",
+        "Tex. Fin. Code 392.301 (threats or coercion)",
+        "Tex. Fin. Code 392.302 (harassment; abuse)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)",
+        "Evory v. RJM Acquisitions Funding LLC, 505 F.3d 769 (7th Cir. 2007) (settlement-offer safe-harbor language)"
+      ]
+    },
+    {
+      "id": "CALL-006",
+      "path": "call-scripts/payment-handoff.md",
+      "title": "Payment-Taking Handoff (PCI-safe)",
+      "channel": "voice",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Moves the consumer to a secure payment capture so no card or bank numbers are spoken into a recorded or AI-transcribed channel.",
+      "merge_fields": [
+        "agency_name",
+        "agency_phone",
+        "confirmation_number",
+        "is_settlement",
+        "link_expiry_minutes",
+        "masked_destination",
+        "payment_amount",
+        "payment_date",
+        "payment_method_description",
+        "payment_status",
+        "plan_first_payment_date",
+        "plan_frequency",
+        "plan_number_of_payments",
+        "plan_payment_amount",
+        "portal_url",
+        "settlement_amount"
+      ],
+      "required_disclosures": [
+        "no-fee statement",
+        "amount/date confirmation",
+        "Reg E authorization for recurring debits"
+      ],
+      "send_rules": [],
+      "legal_citations": [
+        "PCI DSS v4.0 / PCI SSC guidance on protecting telephone-based payment card data",
+        "12 CFR 1005.10(b) (preauthorized electronic fund transfers: written authorization, copy to consumer)",
+        "15 U.S.C. 1692f (unfair practices)",
+        "15 U.S.C. 1692f(1) (no amounts not authorized by agreement or law)",
+        "Tex. Fin. Code 392.303 (unfair or unconscionable means; unauthorized fees)"
+      ]
+    },
+    {
+      "id": "CALL-007",
+      "path": "call-scripts/escalation-to-human.md",
+      "title": "Escalation to Human",
+      "channel": "voice",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "When and how the AI or a junior collector must hand off to a supervisor or human collector.",
+      "merge_fields": [
+        "escalation_role"
+      ],
+      "required_disclosures": [],
+      "send_rules": [],
+      "legal_citations": [
+        "15 U.S.C. 1692d (harassment or abuse)",
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "FCC 24-17, CG Docket No. 23-362 (Feb. 8, 2024) Declaratory Ruling: AI-generated voices are 'artificial' under the TCPA"
+      ]
+    },
+    {
+      "id": "CALL-008",
+      "path": "call-scripts/voice-ai-system-prompt.md",
+      "title": "Voice AI Agent System Prompt",
+      "channel": "voice_ai",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "System prompt for the live inbound/outbound voice AI. Must be used together with voice-ai-guardrails.json, which the runtime enforces independently of the model.",
+      "merge_fields": [
+        "agency_name",
+        "agency_phone",
+        "ai_agent_name",
+        "consumer_name",
+        "current_creditor"
+      ],
+      "required_disclosures": [
+        "AI disclosure",
+        "recording notice",
+        "1006.18(e)",
+        "meaningful identity disclosure"
+      ],
+      "send_rules": [],
+      "legal_citations": [
+        "FCC 24-17, CG Docket No. 23-362 (Feb. 8, 2024) Declaratory Ruling: AI-generated voices are 'artificial' under the TCPA",
+        "47 U.S.C. 227 (TCPA)",
+        "47 CFR 64.1200 (TCPA rules; (a)(10) consent revocation; (b) artificial-voice identification)",
+        "FCC consent-revocation order, 2026-21821 (Fed. Reg. Oct. 26, 2026), revised 47 CFR 64.1200(a)(10) effective Nov. 25, 2026",
+        "15 U.S.C. 1692b (acquisition of location information)",
+        "15 U.S.C. 1692c (communication in connection with debt collection)",
+        "15 U.S.C. 1692d (harassment or abuse)",
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "15 U.S.C. 1692e(3) (false representation that communication is from an attorney)",
+        "15 U.S.C. 1692f (unfair practices)",
+        "12 CFR 1006.14(b) (call frequency; 7-in-7 presumptions)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "12 CFR 1006.26 (time-barred debt; no suits or threats of suit)",
+        "Tex. Fin. Code 392.301 (threats or coercion)",
+        "Tex. Fin. Code 392.302 (harassment; abuse)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)",
+        "PCI DSS v4.0 / PCI SSC guidance on protecting telephone-based payment card data"
+      ]
+    },
+    {
+      "id": "CALL-009",
+      "path": "call-scripts/voice-ai-guardrails.json",
+      "title": "Voice AI runtime guardrails",
+      "channel": "voice_ai",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "purpose": "Machine-enforced runtime rules for the voice AI (pre-call gates, disclosures, banned phrases, stop triggers, payment security).",
+      "merge_fields": [
+        "agency_name",
+        "agency_phone",
+        "current_creditor"
+      ],
+      "required_disclosures": [
+        "AI disclosure",
+        "recording notice",
+        "1006.18(e)",
+        "64.1200(b) identification"
+      ],
+      "send_rules": [],
+      "legal_citations": [
+        "15 U.S.C. 1692b-1692f",
+        "12 CFR 1006.6",
+        "12 CFR 1006.14",
+        "12 CFR 1006.18",
+        "12 CFR 1006.26",
+        "47 U.S.C. 227",
+        "47 CFR 64.1200",
+        "FCC 24-17",
+        "Tex. Fin. Code 392.301-392.304, 392.307"
+      ]
+    },
+    {
+      "id": "EML-001",
+      "path": "email/first-contact.md",
+      "title": "Email First Contact (with electronic validation notice)",
+      "channel": "email",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "subject": "Message from {{agency_name}} for {{consumer_first_name}}",
+      "purpose": "First email. If E-SIGN consent or 1006.6(d)(4) procedures support it, the validation notice is delivered in the body (or as a secure hyperlink per 1006.42(b)).",
+      "merge_fields": [
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "consumer_first_name",
+        "current_creditor",
+        "email_optout_link",
+        "portal_url",
+        "validation_notice_block"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(1)",
+        "validation information (if included)",
+        "opt-out method"
+      ],
+      "send_rules": [
+        "Email address must satisfy 1006.6(d)(4) procedures; never a known employer-provided address (1006.22(f)(3))",
+        "Every email includes a clear opt-out method; opt-out requires no info other than preference + address (1006.6(e))",
+        "Required disclosures (e.g., validation notice) delivered electronically only per 1006.42 / E-SIGN",
+        "Subject line and preview text must not reveal debt to a third party",
+        "If validation notice included: render LTR-001 into {{validation_notice_block}} and include electronic-dispute lines (1006.34(c)(3)(v))"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.6(d) (third-party communications; email/text reasonable procedures (d)(3)-(5))",
+        "12 CFR 1006.6(e) (opt-out notice for electronic communications)",
+        "12 CFR 1006.22(f) (no postcards; envelope language; employer email)",
+        "12 CFR 1006.42 (sending required disclosures; electronic delivery)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "15 U.S.C. 7001(c) (E-SIGN consumer consent)",
+        "12 CFR 1006.34 (validation notice)"
+      ]
+    },
+    {
+      "id": "EML-002",
+      "path": "email/reminder.md",
+      "title": "Email Reminder",
+      "channel": "email",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "subject": "Your account options with {{agency_name}}",
+      "purpose": "General follow-up.",
+      "merge_fields": [
+        "account_ref",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "consumer_first_name",
+        "current_balance",
+        "current_creditor",
+        "dispute_portal_url",
+        "email_optout_link",
+        "portal_url"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "opt-out method"
+      ],
+      "send_rules": [
+        "Email address must satisfy 1006.6(d)(4) procedures; never a known employer-provided address (1006.22(f)(3))",
+        "Every email includes a clear opt-out method; opt-out requires no info other than preference + address (1006.6(e))",
+        "Required disclosures (e.g., validation notice) delivered electronically only per 1006.42 / E-SIGN",
+        "Subject line and preview text must not reveal debt to a third party",
+        "Not during validation period in a way that overshadows rights"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.6(d) (third-party communications; email/text reasonable procedures (d)(3)-(5))",
+        "12 CFR 1006.6(e) (opt-out notice for electronic communications)",
+        "12 CFR 1006.22(f) (no postcards; envelope language; employer email)",
+        "12 CFR 1006.42 (sending required disclosures; electronic delivery)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "15 U.S.C. 7001(c) (E-SIGN consumer consent)",
+        "12 CFR 1006.38 (disputes, overshadowing, original-creditor requests)"
+      ]
+    },
+    {
+      "id": "EML-003",
+      "path": "email/payment-confirmation.md",
+      "title": "Email Payment Confirmation",
+      "channel": "email",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "subject": "Payment received: confirmation {{confirmation_number}}",
+      "purpose": "Receipt after payment.",
+      "merge_fields": [
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "confirmation_number",
+        "consumer_first_name",
+        "email_optout_link",
+        "next_payment_amount",
+        "next_payment_date",
+        "payment_amount",
+        "payment_date",
+        "payment_method_description",
+        "remaining_balance"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "opt-out method"
+      ],
+      "send_rules": [
+        "Email address must satisfy 1006.6(d)(4) procedures; never a known employer-provided address (1006.22(f)(3))",
+        "Every email includes a clear opt-out method; opt-out requires no info other than preference + address (1006.6(e))",
+        "Required disclosures (e.g., validation notice) delivered electronically only per 1006.42 / E-SIGN",
+        "Subject line and preview text must not reveal debt to a third party"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.6(d) (third-party communications; email/text reasonable procedures (d)(3)-(5))",
+        "12 CFR 1006.6(e) (opt-out notice for electronic communications)",
+        "12 CFR 1006.22(f) (no postcards; envelope language; employer email)",
+        "12 CFR 1006.42 (sending required disclosures; electronic delivery)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "15 U.S.C. 7001(c) (E-SIGN consumer consent)"
+      ]
+    },
+    {
+      "id": "EML-004",
+      "path": "email/plan-reminder.md",
+      "title": "Email Plan Payment Reminder",
+      "channel": "email",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "subject": "Upcoming payment on your plan",
+      "purpose": "Upcoming plan payment reminder.",
+      "merge_fields": [
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "consumer_first_name",
+        "email_optout_link",
+        "next_payment_amount",
+        "next_payment_date",
+        "payment_method_description",
+        "plan_payments_remaining",
+        "portal_url",
+        "recurring_authorized"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "opt-out method"
+      ],
+      "send_rules": [
+        "Email address must satisfy 1006.6(d)(4) procedures; never a known employer-provided address (1006.22(f)(3))",
+        "Every email includes a clear opt-out method; opt-out requires no info other than preference + address (1006.6(e))",
+        "Required disclosures (e.g., validation notice) delivered electronically only per 1006.42 / E-SIGN",
+        "Subject line and preview text must not reveal debt to a third party"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.6(d) (third-party communications; email/text reasonable procedures (d)(3)-(5))",
+        "12 CFR 1006.6(e) (opt-out notice for electronic communications)",
+        "12 CFR 1006.22(f) (no postcards; envelope language; employer email)",
+        "12 CFR 1006.42 (sending required disclosures; electronic delivery)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "15 U.S.C. 7001(c) (E-SIGN consumer consent)"
+      ]
+    },
+    {
+      "id": "EML-005",
+      "path": "email/settlement-offer.md",
+      "title": "Email Settlement Offer",
+      "channel": "email",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "subject": "An option to resolve your account",
+      "purpose": "Electronic version of lump-sum/plan settlement offer.",
+      "merge_fields": [
+        "account_ref",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "consumer_first_name",
+        "current_balance",
+        "current_creditor",
+        "email_optout_link",
+        "offer_expiration_date",
+        "payment_schedule_summary",
+        "portal_url",
+        "settlement_amount"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "non-renewal language",
+        "opt-out method"
+      ],
+      "send_rules": [
+        "Email address must satisfy 1006.6(d)(4) procedures; never a known employer-provided address (1006.22(f)(3))",
+        "Every email includes a clear opt-out method; opt-out requires no info other than preference + address (1006.6(e))",
+        "Required disclosures (e.g., validation notice) delivered electronically only per 1006.42 / E-SIGN",
+        "Subject line and preview text must not reveal debt to a third party",
+        "Offer terms pulled from CRM offer record; same as letter version"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.6(d) (third-party communications; email/text reasonable procedures (d)(3)-(5))",
+        "12 CFR 1006.6(e) (opt-out notice for electronic communications)",
+        "12 CFR 1006.22(f) (no postcards; envelope language; employer email)",
+        "12 CFR 1006.42 (sending required disclosures; electronic delivery)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "15 U.S.C. 7001(c) (E-SIGN consumer consent)",
+        "Evory v. RJM Acquisitions Funding LLC, 505 F.3d 769 (7th Cir. 2007) (settlement-offer safe-harbor language)",
+        "15 U.S.C. 1692e (false or misleading representations)"
+      ]
+    },
+    {
+      "id": "EML-006",
+      "path": "email/opt-out-confirmation.md",
+      "title": "Email Opt-Out Confirmation",
+      "channel": "email",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "subject": "You've been unsubscribed",
+      "purpose": "Confirms email opt-out. No collection content.",
+      "merge_fields": [
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "masked_email"
+      ],
+      "required_disclosures": [],
+      "send_rules": [
+        "Send once; then suppress address on email channel"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.6(e) (opt-out notice for electronic communications)",
+        "12 CFR 1006.14(h) (prohibited communication media)"
+      ]
+    },
+    {
+      "id": "LTR-001",
+      "path": "letters/validation-notice-regf.md",
+      "title": "Reg F Validation Notice (Model Form B-1 structure)",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Initial written validation notice sent with or within 5 days of initial communication. Mirrors CFPB Model Form B-1 for the safe harbor; do not add, remove, or reorder required sections.",
+      "merge_fields": [
+        "accepts_electronic_disputes",
+        "account_last4",
+        "account_ref",
+        "account_type",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "amount_on_itemization_date",
+        "consumer_mailing_address",
+        "consumer_name",
+        "creditor_on_itemization_date",
+        "current_balance",
+        "current_creditor",
+        "dispute_portal_url",
+        "fees_since_itemization",
+        "has_reverse_disclosures",
+        "interest_since_itemization",
+        "itemization_date",
+        "notice_date",
+        "payments_credits_since_itemization",
+        "state_disclosures",
+        "time_barred_front_disclosure",
+        "validation_end_date"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(1) initial-communication disclosure",
+        "validation information 1006.34(c)(1)-(4)",
+        "CFPB website reference",
+        "consumer-response section",
+        "Tex. Fin. Code 392.304(a)(4)-(6) creditor name/address/phone"
+      ],
+      "send_rules": [
+        "Send in the initial communication or within 5 days after it (1006.34(a)(1))",
+        "validation_end_date = 30 days after assumed receipt; assumed receipt = at least 5 days after sending excluding Sat, Sun, federal holidays (1006.34(b)(5)); CRM must compute, never hand-type",
+        "Itemization fields may never be blank; use 0.00 or 'none' (1006.34(c)(2)(viii) comment 1)",
+        "Envelope: return address only, optional business name only if it does not indicate debt collection (1006.22(f)(2))",
+        "If time-barred and state law specifies a disclosure (e.g., Texas 392.307), the time-barred block prints on the FRONT below the total amount (1006.34(d)(3)(iv)(B))",
+        "Other state disclosures print on the REVERSE, not behind the tear-off (1006.34(d)(3)(iv)(A))",
+        "Electronic delivery requires 1006.42 compliance (E-SIGN consent or 1006.6(d)(4) procedures); include electronic dispute lines when sent electronically (1006.34(c)(3)(v))"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.34 (validation notice)",
+        "12 CFR 1006.34(b)(5) (validation period; 5-business-day assumed receipt)",
+        "12 CFR 1006.34(d)(3)(iv) (state disclosures on reverse; time-barred disclosures on front)",
+        "12 CFR Part 1006, Appendix B, Model Form B-1",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "15 U.S.C. 1692g (validation of debts)",
+        "12 CFR 1006.42 (sending required disclosures; electronic delivery)",
+        "12 CFR 1006.22(f) (no postcards; envelope language; employer email)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)",
+        "Tex. Fin. Code 392.307 (debt buyers; time-barred debt notice, no revival)"
+      ]
+    },
+    {
+      "id": "LTR-002",
+      "path": "letters/initial-demand-post-validation.md",
+      "title": "Initial Payment Request (after validation period)",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "First stand-alone payment request. Send only AFTER validation_end_date has passed with no open dispute or original-creditor request.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_balance",
+        "current_creditor",
+        "letter_date",
+        "original_creditor",
+        "portal_url",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2) subsequent-communication disclosure",
+        "creditor name (Tex. Fin. Code 392.304(a)(4))",
+        "address/phone (392.304(a)(6))"
+      ],
+      "send_rules": [
+        "Block if today <= validation_end_date (prevents overshadowing, 1006.38(b))",
+        "Block if account has open dispute, cease, attorney rep, bankruptcy, deceased, SCRA-unverified, or out-of-scope state flag",
+        "No deadline language unless an actual offer with an actual expiration is attached"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "15 U.S.C. 1692e(11) (mini-Miranda / debt collector disclosure)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "12 CFR 1006.38 (disputes, overshadowing, original-creditor requests)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)"
+      ]
+    },
+    {
+      "id": "LTR-003",
+      "path": "letters/follow-up-1.md",
+      "title": "Follow-up Letter 1 (friendly reminder)",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Gentle reminder ~30 days after initial payment request with no response.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_balance",
+        "current_creditor",
+        "letter_date",
+        "original_creditor",
+        "portal_url",
+        "prior_letter_date",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "creditor name",
+        "address/phone"
+      ],
+      "send_rules": [
+        "Minimum 21 days after prior letter (owner-configurable cadence)",
+        "Same block conditions as LTR-002"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)"
+      ]
+    },
+    {
+      "id": "LTR-004",
+      "path": "letters/follow-up-2.md",
+      "title": "Follow-up Letter 2 (options outline)",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Second follow-up summarizing plan and settlement availability; no urgency claims.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_balance",
+        "current_creditor",
+        "letter_date",
+        "min_plan_payment",
+        "original_creditor",
+        "portal_url",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "creditor name",
+        "address/phone"
+      ],
+      "send_rules": [
+        "Minimum 30 days after LTR-003",
+        "Settlement range shown only if within settlement-matrix authority for this account"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)"
+      ]
+    },
+    {
+      "id": "LTR-005",
+      "path": "letters/follow-up-3-final-courtesy.md",
+      "title": "Follow-up Letter 3 (last scheduled letter in default sequence)",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Last scheduled letter in the default sequence. States ONLY true next steps configured by the owner (e.g., account may be returned to the creditor). No litigation, credit-reporting, or 'final notice' threats unless that action is actually intended and lawful (counsel sign-off).",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_balance",
+        "current_creditor",
+        "letter_date",
+        "next_step_statement",
+        "original_creditor",
+        "portal_url",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "creditor name",
+        "address/phone"
+      ],
+      "send_rules": [
+        "{{next_step_statement}} must be selected from an owner-approved list of actions the agency actually intends and is legally permitted to take",
+        "Never use for time-barred accounts with any litigation reference (1006.26(b))"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "15 U.S.C. 1692e(11) (mini-Miranda / debt collector disclosure)",
+        "12 CFR 1006.26 (time-barred debt; no suits or threats of suit)",
+        "Tex. Fin. Code 392.301 (threats or coercion)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)"
+      ]
+    },
+    {
+      "id": "LTR-010",
+      "path": "letters/settlement-offer-lump-sum.md",
+      "title": "Settlement Offer: Lump Sum",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Single-payment reduced payoff within the account's settlement authority tier.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_balance",
+        "current_creditor",
+        "furnishes_credit",
+        "letter_date",
+        "offer_expiration_date",
+        "original_creditor",
+        "portal_url",
+        "settlement_amount",
+        "settlement_percent",
+        "settlement_savings",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "creditor name",
+        "address/phone",
+        "non-renewal safe-harbor language (Evory)"
+      ],
+      "send_rules": [
+        "settlement_amount must be >= settlement-matrix floor for the account tier",
+        "offer_expiration_date must be real and honored; CRM logs offer and expiry",
+        "Not sent during validation period unless counsel approves non-overshadowing layout"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "12 CFR 1006.18 (false, deceptive, or misleading representations)",
+        "Evory v. RJM Acquisitions Funding LLC, 505 F.3d 769 (7th Cir. 2007) (settlement-offer safe-harbor language)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)",
+        "12 CFR 1006.38 (disputes, overshadowing, original-creditor requests)"
+      ]
+    },
+    {
+      "id": "LTR-011",
+      "path": "letters/settlement-offer-short-term-plan.md",
+      "title": "Settlement Offer: Short-Term Plan (2-6 payments)",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Reduced payoff split into a small number of installments.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_balance",
+        "current_creditor",
+        "furnishes_credit",
+        "grace_days",
+        "letter_date",
+        "offer_expiration_date",
+        "original_creditor",
+        "plan_end_date",
+        "plan_first_payment_date",
+        "plan_frequency",
+        "plan_number_of_payments",
+        "plan_payment_amount",
+        "portal_url",
+        "settlement_amount",
+        "settlement_percent",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "creditor name",
+        "address/phone",
+        "non-renewal language",
+        "missed-payment consequence stated truthfully"
+      ],
+      "send_rules": [
+        "plan_number_of_payments within matrix max_short_term_installments",
+        "Total of installments = settlement_amount"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "Evory v. RJM Acquisitions Funding LLC, 505 F.3d 769 (7th Cir. 2007) (settlement-offer safe-harbor language)",
+        "12 CFR 1005.10(b) (preauthorized electronic fund transfers: written authorization, copy to consumer)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)"
+      ]
+    },
+    {
+      "id": "LTR-012",
+      "path": "letters/settlement-offer-long-term-plan.md",
+      "title": "Settlement Offer: Long-Term Plan",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Smaller reduction spread over a longer schedule (e.g., 7-24 months).",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_balance",
+        "current_creditor",
+        "furnishes_credit",
+        "grace_days",
+        "letter_date",
+        "offer_expiration_date",
+        "original_creditor",
+        "plan_end_date",
+        "plan_first_payment_date",
+        "plan_frequency",
+        "plan_number_of_payments",
+        "plan_payment_amount",
+        "portal_url",
+        "settlement_amount",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "creditor name",
+        "address/phone",
+        "non-renewal language"
+      ],
+      "send_rules": [
+        "plan length within matrix max_long_term_months",
+        "Show total paid over life of plan"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "Evory v. RJM Acquisitions Funding LLC, 505 F.3d 769 (7th Cir. 2007) (settlement-offer safe-harbor language)",
+        "12 CFR 1005.10(b) (preauthorized electronic fund transfers: written authorization, copy to consumer)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)"
+      ]
+    },
+    {
+      "id": "LTR-013",
+      "path": "letters/settlement-offer-hardship.md",
+      "title": "Hardship Settlement / Hardship Plan Offer",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Offer after consumer reports hardship (job loss, medical, disability, fixed income, disaster). Uses the matrix hardship tier.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_creditor",
+        "furnishes_credit",
+        "hardship_lump_sum",
+        "hardship_plan",
+        "hardship_review_date",
+        "letter_date",
+        "offer_expiration_date",
+        "original_creditor",
+        "plan_first_payment_date",
+        "plan_frequency",
+        "plan_number_of_payments",
+        "plan_payment_amount",
+        "portal_url",
+        "settlement_amount",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "creditor name",
+        "address/phone",
+        "non-renewal language"
+      ],
+      "send_rules": [
+        "Only after hardship_reported = true; do not request medical records",
+        "Hardship info is used only to evaluate the offer; never disclosed to third parties"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "15 U.S.C. 1692c (communication in connection with debt collection)",
+        "Evory v. RJM Acquisitions Funding LLC, 505 F.3d 769 (7th Cir. 2007) (settlement-offer safe-harbor language)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)"
+      ]
+    },
+    {
+      "id": "LTR-020",
+      "path": "letters/settlement-accepted-confirmation.md",
+      "title": "Settlement Accepted Confirmation",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Written confirmation of agreed settlement terms, sent within 2 business days of acceptance.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "agreement_date",
+        "agreement_id",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_balance",
+        "current_creditor",
+        "furnishes_credit",
+        "letter_date",
+        "original_creditor",
+        "payment_schedule_summary",
+        "portal_url",
+        "settlement_amount",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "creditor name",
+        "address/phone"
+      ],
+      "send_rules": [
+        "Must match recorded terms exactly; generated from the CRM agreement record"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)"
+      ]
+    },
+    {
+      "id": "LTR-021",
+      "path": "letters/paid-in-full-confirmation.md",
+      "title": "Paid-in-Full Confirmation",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Confirms the full balance has been paid; collection activity has ended.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_creditor",
+        "furnishes_credit",
+        "letter_date",
+        "original_creditor",
+        "payment_amount",
+        "payment_date",
+        "portal_url",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "creditor name"
+      ],
+      "send_rules": [
+        "Send within 5 business days after final payment clears",
+        "Trigger credit-reporting update (if furnishing) and 1006.30(b) no-sale flag"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.30(b) (prohibited sale/transfer: paid, settled, bankruptcy-discharged, ID theft)",
+        "15 U.S.C. 1681s-2 (furnisher accuracy and dispute duties)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)"
+      ]
+    },
+    {
+      "id": "LTR-022",
+      "path": "letters/settled-in-full-confirmation.md",
+      "title": "Settled-in-Full Confirmation",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Confirms the agreed settlement was paid and the account is resolved for less than the full balance.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "agreement_id",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_creditor",
+        "furnishes_credit",
+        "letter_date",
+        "original_creditor",
+        "payment_date",
+        "portal_url",
+        "settlement_amount",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "creditor name"
+      ],
+      "send_rules": [
+        "Send within 5 business days after final settlement payment clears",
+        "Set no-sale/no-transfer flag (1006.30(b))"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.30(b) (prohibited sale/transfer: paid, settled, bankruptcy-discharged, ID theft)",
+        "15 U.S.C. 1681s-2 (furnisher accuracy and dispute duties)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)"
+      ]
+    },
+    {
+      "id": "LTR-030",
+      "path": "letters/payment-plan-agreement.md",
+      "title": "Payment Plan Agreement and Payment Authorization",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Written plan terms plus optional recurring-payment authorization (Reg E written authorization; copy to consumer). Can be e-signed in the portal.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "agreement_id",
+        "authorization_date",
+        "authorization_method",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_balance",
+        "current_creditor",
+        "grace_days",
+        "is_settlement_plan",
+        "letter_date",
+        "original_creditor",
+        "payment_method_description",
+        "plan_end_date",
+        "plan_first_payment_date",
+        "plan_frequency",
+        "plan_number_of_payments",
+        "plan_payment_amount",
+        "plan_total",
+        "portal_url",
+        "recurring_authorized",
+        "settlement_amount",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "creditor name",
+        "address/phone",
+        "right to cancel authorization",
+        "no fees"
+      ],
+      "send_rules": [
+        "Recurring debits require signed/similarly authenticated authorization and a copy to the consumer (Reg E 1005.10(b))",
+        "Never print full bank or card numbers; use last 4 only",
+        "Post-dated payments >5 days out: send 3-10 business-day pre-deposit notice (15 U.S.C. 1692f(2))"
+      ],
+      "legal_citations": [
+        "12 CFR 1005.10(b) (preauthorized electronic fund transfers: written authorization, copy to consumer)",
+        "15 U.S.C. 1692f (unfair practices)",
+        "15 U.S.C. 1692f(1) (no amounts not authorized by agreement or law)",
+        "15 U.S.C. 7001(c) (E-SIGN consumer consent)",
+        "Tex. Fin. Code 392.303 (unfair or unconscionable means; unauthorized fees)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)"
+      ]
+    },
+    {
+      "id": "LTR-040",
+      "path": "letters/dispute-acknowledgment.md",
+      "title": "Dispute Acknowledgment",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Acknowledges a dispute (written or oral) and confirms collection on the disputed portion is paused pending verification.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_creditor",
+        "dispute_partial",
+        "dispute_portal_url",
+        "dispute_received_date",
+        "dispute_requests_original_creditor",
+        "disputed_amount",
+        "furnishes_credit",
+        "letter_date",
+        "original_creditor",
+        "portal_url",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)"
+      ],
+      "send_rules": [
+        "Pause collection on disputed portion immediately when written dispute is received within validation period (1692g(b))",
+        "Texas: written dispute of file accuracy triggers 392.202 duties: written response within 30 days",
+        "Mark account 'disputed' in any credit furnishing (FCRA 1681s-2(a)(3))"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692g(b) (disputed debts; no overshadowing)",
+        "12 CFR 1006.38 (disputes, overshadowing, original-creditor requests)",
+        "Tex. Fin. Code 392.202 (dispute of file accuracy; 30-day written response)",
+        "15 U.S.C. 1681s-2 (furnisher accuracy and dispute duties)",
+        "15 U.S.C. 1692e (false or misleading representations)"
+      ]
+    },
+    {
+      "id": "LTR-041",
+      "path": "letters/verification-response.md",
+      "title": "Debt Verification Response",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Sends verification of the debt (or copy of judgment) after a dispute; collection may resume only after this is mailed.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "amount_on_itemization_date",
+        "balance_itemization",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_balance",
+        "current_creditor",
+        "dispute_received_date",
+        "itemization_date",
+        "itemization_date_basis",
+        "letter_date",
+        "original_creditor",
+        "original_creditor_address",
+        "portal_url",
+        "state_disclosures",
+        "verification_documents_list"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "creditor name"
+      ],
+      "send_rules": [
+        "Attach verification documents listed in {{verification_documents_list}} with SSN/DOB/full account numbers redacted",
+        "Collection may resume only after mailing (1692g(b))",
+        "If dispute was 'not my debt' and documents do not tie to consumer, route to LTR-042 closure instead"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692g(b) (disputed debts; no overshadowing)",
+        "12 CFR 1006.38 (disputes, overshadowing, original-creditor requests)",
+        "Tex. Fin. Code 392.202 (dispute of file accuracy; 30-day written response)"
+      ]
+    },
+    {
+      "id": "LTR-042",
+      "path": "letters/dispute-resolved-account-closed.md",
+      "title": "Dispute Resolved in Consumer's Favor / Account Closed",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Tells the consumer the dispute was resolved in their favor (or the debt could not be verified) and collection has ended.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_creditor",
+        "dispute_outcome_statement",
+        "dispute_received_date",
+        "furnishes_credit",
+        "letter_date",
+        "original_creditor",
+        "portal_url",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)"
+      ],
+      "send_rules": [
+        "Close account; delete or correct any furnished tradeline; flag no-sale (1006.30(b) for ID theft)"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692g(b) (disputed debts; no overshadowing)",
+        "Tex. Fin. Code 392.202 (dispute of file accuracy; 30-day written response)",
+        "Tex. Fin. Code 392.308 (identity theft victims; cease within 7 business days)",
+        "15 U.S.C. 1681s-2 (furnisher accuracy and dispute duties)"
+      ]
+    },
+    {
+      "id": "LTR-043",
+      "path": "letters/original-creditor-information.md",
+      "title": "Original Creditor Information Response",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Responds to a request for name and address of the original creditor (1692g(a)(5), 1006.38(c)).",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_creditor",
+        "letter_date",
+        "original_creditor",
+        "original_creditor_address",
+        "portal_url",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)"
+      ],
+      "send_rules": [
+        "Collection paused until this is mailed when request was made in writing within the validation period"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692g (validation of debts)",
+        "12 CFR 1006.38 (disputes, overshadowing, original-creditor requests)"
+      ]
+    },
+    {
+      "id": "LTR-050",
+      "path": "letters/cease-communication-acknowledgment.md",
+      "title": "Cease-Communication Acknowledgment",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "The ONE permitted response after a written cease/refusal-to-pay request: confirms further efforts are terminated. Optional sentences only if true.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "cease_optional_remedy_statement",
+        "cease_received_date",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_creditor",
+        "letter_date",
+        "original_creditor"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)"
+      ],
+      "send_rules": [
+        "Stop ALL outbound channels immediately on receipt (letter, phone, SMS, email, voice AI)",
+        "Send at most this one letter; it must contain only 1006.6(c)(2) content",
+        "Options in 1006.6(c)(2)(ii)-(iii) may be included only if the remedy is one the owner/creditor ordinarily invokes and actually intends; counsel sign-off"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692c(c) (ceasing communication)",
+        "12 CFR 1006.6(c) (cease communication; permitted exceptions)",
+        "15 U.S.C. 1692e (false or misleading representations)"
+      ]
+    },
+    {
+      "id": "LTR-060",
+      "path": "letters/time-barred-disclosure-variants.md",
+      "title": "Time-Barred Debt Disclosure Variants (non-Texas)",
+      "channel": "letter_block",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Insertable block for accounts past the statute of limitations in states that have no prescribed wording. Federal law: never sue or threaten suit on time-barred debt.",
+      "merge_fields": [
+        "consumer_state",
+        "current_creditor"
+      ],
+      "required_disclosures": [
+        "no-suit statement"
+      ],
+      "send_rules": [
+        "CRM must compute SOL per state table (counsel-maintained); when uncertain treat as time-barred",
+        "Never include any litigation reference on time-barred accounts (1006.26(b))",
+        "Revival warnings are state-specific; Variant C only where counsel confirms partial payment can revive",
+        "Where a state prescribes exact wording, use that state's block instead"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.26 (time-barred debt; no suits or threats of suit)",
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "15 U.S.C. 1692f (unfair practices)"
+      ]
+    },
+    {
+      "id": "LTR-061",
+      "path": "letters/time-barred-disclosure-texas.md",
+      "title": "Texas Time-Barred Debt Notice (Tex. Fin. Code 392.307(e))",
+      "channel": "letter_block",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Statutory wording required in the INITIAL written communication when a debt buyer (or a collector for a debt buyer) collects a Texas consumer debt barred under Tex. Civ. Prac. & Rem. Code 16.004 / Bus. & Com. Code 3.118. Wording is verbatim from the statute; only the debt buyer name is merged.",
+      "merge_fields": [
+        "debt_buyer_name_caps"
+      ],
+      "required_disclosures": [
+        "392.307(e) verbatim notice"
+      ],
+      "send_rules": [
+        "Select exactly one variant from FCRA 605 reporting status and furnishing flag",
+        "Minimum 12-point type, boldfaced, capitalized, or underlined or otherwise conspicuous (392.307(f))",
+        "Place on front of validation notice below total amount (1006.34(d)(3)(iv)(B))",
+        "Payment does NOT revive a barred Texas cause of action (392.307(d)); never include a revival warning for Texas",
+        "Debt buyers may not sue or arbitrate once barred (392.307(c))"
+      ],
+      "legal_citations": [
+        "Tex. Fin. Code 392.307 (debt buyers; time-barred debt notice, no revival)",
+        "Tex. Civ. Prac. & Rem. Code 16.004 (four-year limitations period for debt)",
+        "12 CFR 1006.26 (time-barred debt; no suits or threats of suit)",
+        "12 CFR 1006.34(d)(3)(iv) (state disclosures on reverse; time-barred disclosures on front)"
+      ]
+    },
+    {
+      "id": "LTR-070",
+      "path": "letters/bankruptcy-acknowledgment.md",
+      "title": "Bankruptcy Notice Acknowledgment / Collection Stopped",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Sent to the consumer (or their bankruptcy attorney if represented) confirming collection stopped after notice of a bankruptcy filing. Contains NO demand for payment.",
+      "merge_fields": [
+        "account_ref",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "bankruptcy_case_number",
+        "bankruptcy_chapter",
+        "bankruptcy_court",
+        "bankruptcy_filing_date",
+        "bankruptcy_notice_date",
+        "consumer_name",
+        "letter_date",
+        "recipient_mailing_address",
+        "recipient_name"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)"
+      ],
+      "send_rules": [
+        "On any bankruptcy notice: freeze all channels immediately, remove from dialer/SMS/email/voice AI queues, notify client/owner",
+        "If consumer has a bankruptcy attorney, send to attorney only (1006.6(b)(2))",
+        "Counsel decides whether ANY letter is sent; default = send to attorney if known, otherwise consumer",
+        "No payment request, no portal link"
+      ],
+      "legal_citations": [
+        "11 U.S.C. 362 (automatic stay)",
+        "11 U.S.C. 524 (discharge injunction)",
+        "12 CFR 1006.6(b)(2) (consumer represented by attorney)",
+        "12 CFR 1006.30(b) (prohibited sale/transfer: paid, settled, bankruptcy-discharged, ID theft)",
+        "15 U.S.C. 1692e (false or misleading representations)"
+      ]
+    },
+    {
+      "id": "LTR-071",
+      "path": "letters/deceased-estate-notice.md",
+      "title": "Deceased Consumer: Letter to Estate Representative",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Communicates only with a person authorized to act for the estate (executor/administrator/personal representative or other person with authority to pay from estate assets). Makes clear that family members are not personally liable.",
+      "merge_fields": [
+        "account_ref",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "current_balance",
+        "current_creditor",
+        "decedent_name",
+        "estate_representative_address",
+        "estate_representative_name",
+        "estate_representative_title",
+        "letter_date"
+      ],
+      "required_disclosures": [
+        "1006.18(e)",
+        "not personally liable statement"
+      ],
+      "send_rules": [
+        "Before sending: confirm recipient authority (letters testamentary, small-estate affidavit, or equivalent) and log it",
+        "Never contact relatives without authority except to locate the representative using 1692b-style location script (no debt disclosure)",
+        "If validation notice not previously sent to the consumer, send LTR-001 addressed to the estate representative (1006.34(a)(1) comment on deceased consumers)",
+        "Suppress all marketing/plan pressure; no sympathy-based urgency"
+      ],
+      "legal_citations": [
+        "FTC Statement of Policy re Collection of Decedents' Debts, 76 FR 44915 (July 27, 2011)",
+        "12 CFR 1006.6(a) (definition of consumer incl. spouse, executor, administrator)",
+        "15 U.S.C. 1692c (communication in connection with debt collection)",
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "12 CFR 1006.34 (validation notice)"
+      ]
+    },
+    {
+      "id": "LTR-072",
+      "path": "letters/scra-servicemember-notice.md",
+      "title": "SCRA Servicemember Protections Acknowledgment",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Confirms receipt of military-service notice, applies 6% interest cap where eligible, and pauses collection pending review.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_creditor",
+        "letter_date",
+        "original_creditor",
+        "portal_url",
+        "scra_effective_date",
+        "scra_notice_date",
+        "scra_rate_cap_applied",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)"
+      ],
+      "send_rules": [
+        "Run DMDC SCRA status check at import and before any legal action; log certificate",
+        "On notice of active duty: pause collection pending owner/counsel review",
+        "Apply 6% cap on pre-service obligations upon written notice + orders (50 U.S.C. 3937); forgiven interest, not deferred",
+        "No default judgments without SCRA affidavit (50 U.S.C. 3931)"
+      ],
+      "legal_citations": [
+        "50 U.S.C. 3937 (SCRA 6% interest cap)",
+        "50 U.S.C. 3931 (SCRA default-judgment protections)",
+        "15 U.S.C. 1692e (false or misleading representations)"
+      ]
+    },
+    {
+      "id": "LTR-073",
+      "path": "letters/identity-theft-acknowledgment.md",
+      "title": "Identity Theft Claim Acknowledgment",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Acknowledges an identity-theft dispute; stops collection; requests (but does not require) an identity theft report.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_creditor",
+        "dispute_received_date",
+        "letter_date",
+        "original_creditor",
+        "portal_url",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)"
+      ],
+      "send_rules": [
+        "Texas: on receipt of court order or notice per 392.308, cease within 7 business days, notify prior report recipients, no sale/transfer",
+        "All states: no sale/transfer of debt the collector knows is the subject of an ID-theft report (1006.30(b))",
+        "Honor FCRA 605B blocks"
+      ],
+      "legal_citations": [
+        "Tex. Fin. Code 392.308 (identity theft victims; cease within 7 business days)",
+        "12 CFR 1006.30(b) (prohibited sale/transfer: paid, settled, bankruptcy-discharged, ID theft)",
+        "15 U.S.C. 1681c-2 (FCRA 605B identity-theft block)",
+        "15 U.S.C. 1692g(b) (disputed debts; no overshadowing)"
+      ]
+    },
+    {
+      "id": "LTR-074",
+      "path": "letters/attorney-representation-acknowledgment.md",
+      "title": "Attorney Representation Acknowledgment (to consumer's attorney)",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Confirms future communications will go only to the consumer's attorney.",
+      "merge_fields": [
+        "account_ref",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "attorney_address",
+        "attorney_firm",
+        "attorney_name",
+        "consumer_name",
+        "current_creditor",
+        "letter_date"
+      ],
+      "required_disclosures": [
+        "1006.18(e)"
+      ],
+      "send_rules": [
+        "On knowledge of attorney representation: stop direct consumer contact on all channels (1006.6(b)(2)) unless attorney fails to respond in a reasonable period or consents",
+        "Address to attorney only"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.6(b)(2) (consumer represented by attorney)",
+        "15 U.S.C. 1692c (communication in connection with debt collection)"
+      ]
+    },
+    {
+      "id": "LTR-080",
+      "path": "letters/privacy-notice-glba.md",
+      "title": "Privacy Notice (GLBA / Regulation P, model-form style)",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Annual/initial privacy notice for accounts owned by the operation as a debt buyer. Patterned on the Reg P Appendix A model form. Default answers assume NO sharing for marketing and NO affiliate sharing.",
+      "merge_fields": [
+        "affiliates_statement",
+        "agency_legal_name",
+        "agency_name",
+        "agency_name_caps",
+        "agency_phone",
+        "agency_website",
+        "privacy_notice_revision_date"
+      ],
+      "required_disclosures": [
+        "Reg P model form disclosures"
+      ],
+      "send_rules": [
+        "Counsel to confirm whether an initial/annual notice is required for purchased accounts vs. accounts serviced for clients (Reg P exceptions 1016.13-1016.15)",
+        "If any 'Yes' sharing answer changes, an opt-out mechanism becomes mandatory",
+        "Can be delivered electronically only with E-SIGN consent"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 6801-6809 (GLBA privacy)",
+        "12 CFR Part 1016 (Regulation P) incl. Appendix A model privacy form",
+        "15 U.S.C. 7001(c) (E-SIGN consumer consent)"
+      ]
+    },
+    {
+      "id": "LTR-090",
+      "path": "letters/returned-to-client-notice.md",
+      "title": "Account Returned to Creditor / No Longer Handled by Us",
+      "channel": "letter",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Tells the consumer this office no longer handles the account (e.g., placement ended, account outside authorized states, recalled by client). States only facts; no implication of escalation.",
+      "merge_fields": [
+        "account_last4",
+        "account_ref",
+        "agency_email",
+        "agency_hours",
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "agency_website",
+        "client_contact",
+        "client_name",
+        "consumer_mailing_address",
+        "consumer_name",
+        "current_creditor",
+        "letter_date",
+        "original_creditor",
+        "portal_url",
+        "post_return_payment_handling",
+        "return_date",
+        "returned_reason_statement",
+        "state_disclosures"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)"
+      ],
+      "send_rules": [
+        "Use returned_reason_statement from an owner-approved list; never imply legal action or a 'more aggressive' collector",
+        "Out-of-scope state accounts: counsel to decide whether ANY letter is sent (default: no consumer letter; return quietly with report)",
+        "Suppress all channels after send; set do-not-contact"
+      ],
+      "legal_citations": [
+        "15 U.S.C. 1692e (false or misleading representations)",
+        "12 CFR 1006.18 (false, deceptive, or misleading representations)",
+        "Tex. Fin. Code 392.304 (misleading representations; (a)(4) creditor name, (a)(5) debt collector disclosures, (a)(6) address/phone, (a)(16)-(17) attorney)"
+      ]
+    },
+    {
+      "id": "SMS-001",
+      "path": "sms/first-contact.md",
+      "title": "SMS First Contact",
+      "channel": "sms",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "First text to a consumer (only if no prior communication by another channel requires subsequent wording). Directs to verified portal; no balance in text.",
+      "merge_fields": [
+        "agency_mailing_address",
+        "agency_name",
+        "agency_phone",
+        "consumer_first_name",
+        "portal_url"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(1)",
+        "opt-out method"
+      ],
+      "send_rules": [
+        "Number must satisfy 1006.6(d)(5) reasonable procedures (consumer-provided/consented number, no notice of reassignment) before ANY debt content is sent",
+        "Autodialed/automated texts to cell phones need prior express consent (47 U.S.C. 227(b)); check reassigned-numbers database",
+        "Send only 8 a.m.-9 p.m. consumer local time (1006.6(b)(1)); respect channel opt-outs (1006.14(h))",
+        "Every text includes the opt-out method (1006.6(e)); honor STOP and synonyms per 47 CFR 64.1200(a)(10)",
+        "10DLC/short-code campaign registration with carriers; CTIA HELP/STOP support"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.6(d) (third-party communications; email/text reasonable procedures (d)(3)-(5))",
+        "12 CFR 1006.6(e) (opt-out notice for electronic communications)",
+        "12 CFR 1006.6(b)(1) (inconvenient times/places; 8 a.m.-9 p.m. presumption)",
+        "12 CFR 1006.14(h) (prohibited communication media)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "47 U.S.C. 227 (TCPA)",
+        "47 CFR 64.1200 (TCPA rules; (a)(10) consent revocation; (b) artificial-voice identification)",
+        "FCC consent-revocation order, 2026-21821 (Fed. Reg. Oct. 26, 2026), revised 47 CFR 64.1200(a)(10) effective Nov. 25, 2026",
+        "CTIA Messaging Principles and Best Practices (STOP/HELP keywords)"
+      ]
+    },
+    {
+      "id": "SMS-002",
+      "path": "sms/reminder.md",
+      "title": "SMS Reminder",
+      "channel": "sms",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "General reminder after prior communication.",
+      "merge_fields": [
+        "account_ref",
+        "agency_name",
+        "agency_phone",
+        "consumer_first_name",
+        "portal_url"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "opt-out method"
+      ],
+      "send_rules": [
+        "Number must satisfy 1006.6(d)(5) reasonable procedures (consumer-provided/consented number, no notice of reassignment) before ANY debt content is sent",
+        "Autodialed/automated texts to cell phones need prior express consent (47 U.S.C. 227(b)); check reassigned-numbers database",
+        "Send only 8 a.m.-9 p.m. consumer local time (1006.6(b)(1)); respect channel opt-outs (1006.14(h))",
+        "Every text includes the opt-out method (1006.6(e)); honor STOP and synonyms per 47 CFR 64.1200(a)(10)",
+        "10DLC/short-code campaign registration with carriers; CTIA HELP/STOP support"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.6(d) (third-party communications; email/text reasonable procedures (d)(3)-(5))",
+        "12 CFR 1006.6(e) (opt-out notice for electronic communications)",
+        "12 CFR 1006.6(b)(1) (inconvenient times/places; 8 a.m.-9 p.m. presumption)",
+        "12 CFR 1006.14(h) (prohibited communication media)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "47 U.S.C. 227 (TCPA)",
+        "47 CFR 64.1200 (TCPA rules; (a)(10) consent revocation; (b) artificial-voice identification)",
+        "FCC consent-revocation order, 2026-21821 (Fed. Reg. Oct. 26, 2026), revised 47 CFR 64.1200(a)(10) effective Nov. 25, 2026",
+        "CTIA Messaging Principles and Best Practices (STOP/HELP keywords)"
+      ]
+    },
+    {
+      "id": "SMS-003",
+      "path": "sms/payment-confirmation.md",
+      "title": "SMS Payment Confirmation",
+      "channel": "sms",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Transactional receipt after a payment posts.",
+      "merge_fields": [
+        "agency_name",
+        "agency_phone",
+        "confirmation_number",
+        "payment_amount",
+        "payment_date",
+        "remaining_balance"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "opt-out method"
+      ],
+      "send_rules": [
+        "Number must satisfy 1006.6(d)(5) reasonable procedures (consumer-provided/consented number, no notice of reassignment) before ANY debt content is sent",
+        "Autodialed/automated texts to cell phones need prior express consent (47 U.S.C. 227(b)); check reassigned-numbers database",
+        "Send only 8 a.m.-9 p.m. consumer local time (1006.6(b)(1)); respect channel opt-outs (1006.14(h))",
+        "Every text includes the opt-out method (1006.6(e)); honor STOP and synonyms per 47 CFR 64.1200(a)(10)",
+        "10DLC/short-code campaign registration with carriers; CTIA HELP/STOP support"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.6(d) (third-party communications; email/text reasonable procedures (d)(3)-(5))",
+        "12 CFR 1006.6(e) (opt-out notice for electronic communications)",
+        "12 CFR 1006.6(b)(1) (inconvenient times/places; 8 a.m.-9 p.m. presumption)",
+        "12 CFR 1006.14(h) (prohibited communication media)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "47 U.S.C. 227 (TCPA)",
+        "47 CFR 64.1200 (TCPA rules; (a)(10) consent revocation; (b) artificial-voice identification)",
+        "FCC consent-revocation order, 2026-21821 (Fed. Reg. Oct. 26, 2026), revised 47 CFR 64.1200(a)(10) effective Nov. 25, 2026",
+        "CTIA Messaging Principles and Best Practices (STOP/HELP keywords)"
+      ]
+    },
+    {
+      "id": "SMS-004",
+      "path": "sms/plan-reminder.md",
+      "title": "SMS Plan Payment Reminder",
+      "channel": "sms",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Upcoming scheduled plan payment, 3 days before due date (owner-configurable).",
+      "merge_fields": [
+        "agency_name",
+        "agency_phone",
+        "next_payment_amount",
+        "next_payment_date",
+        "portal_url"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "opt-out method"
+      ],
+      "send_rules": [
+        "Number must satisfy 1006.6(d)(5) reasonable procedures (consumer-provided/consented number, no notice of reassignment) before ANY debt content is sent",
+        "Autodialed/automated texts to cell phones need prior express consent (47 U.S.C. 227(b)); check reassigned-numbers database",
+        "Send only 8 a.m.-9 p.m. consumer local time (1006.6(b)(1)); respect channel opt-outs (1006.14(h))",
+        "Every text includes the opt-out method (1006.6(e)); honor STOP and synonyms per 47 CFR 64.1200(a)(10)",
+        "10DLC/short-code campaign registration with carriers; CTIA HELP/STOP support"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.6(d) (third-party communications; email/text reasonable procedures (d)(3)-(5))",
+        "12 CFR 1006.6(e) (opt-out notice for electronic communications)",
+        "12 CFR 1006.6(b)(1) (inconvenient times/places; 8 a.m.-9 p.m. presumption)",
+        "12 CFR 1006.14(h) (prohibited communication media)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "47 U.S.C. 227 (TCPA)",
+        "47 CFR 64.1200 (TCPA rules; (a)(10) consent revocation; (b) artificial-voice identification)",
+        "FCC consent-revocation order, 2026-21821 (Fed. Reg. Oct. 26, 2026), revised 47 CFR 64.1200(a)(10) effective Nov. 25, 2026",
+        "CTIA Messaging Principles and Best Practices (STOP/HELP keywords)"
+      ]
+    },
+    {
+      "id": "SMS-005",
+      "path": "sms/plan-missed-payment.md",
+      "title": "SMS Missed Plan Payment",
+      "channel": "sms",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Courtesy notice that a scheduled plan payment was not received; no threats.",
+      "merge_fields": [
+        "agency_name",
+        "agency_phone",
+        "missed_payment_date",
+        "portal_url"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "opt-out method"
+      ],
+      "send_rules": [
+        "Number must satisfy 1006.6(d)(5) reasonable procedures (consumer-provided/consented number, no notice of reassignment) before ANY debt content is sent",
+        "Autodialed/automated texts to cell phones need prior express consent (47 U.S.C. 227(b)); check reassigned-numbers database",
+        "Send only 8 a.m.-9 p.m. consumer local time (1006.6(b)(1)); respect channel opt-outs (1006.14(h))",
+        "Every text includes the opt-out method (1006.6(e)); honor STOP and synonyms per 47 CFR 64.1200(a)(10)",
+        "10DLC/short-code campaign registration with carriers; CTIA HELP/STOP support"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.6(d) (third-party communications; email/text reasonable procedures (d)(3)-(5))",
+        "12 CFR 1006.6(e) (opt-out notice for electronic communications)",
+        "12 CFR 1006.6(b)(1) (inconvenient times/places; 8 a.m.-9 p.m. presumption)",
+        "12 CFR 1006.14(h) (prohibited communication media)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "47 U.S.C. 227 (TCPA)",
+        "47 CFR 64.1200 (TCPA rules; (a)(10) consent revocation; (b) artificial-voice identification)",
+        "FCC consent-revocation order, 2026-21821 (Fed. Reg. Oct. 26, 2026), revised 47 CFR 64.1200(a)(10) effective Nov. 25, 2026",
+        "CTIA Messaging Principles and Best Practices (STOP/HELP keywords)"
+      ]
+    },
+    {
+      "id": "SMS-006",
+      "path": "sms/settlement-offer.md",
+      "title": "SMS Settlement Offer",
+      "channel": "sms",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Short settlement offer pointing to full written terms in the portal.",
+      "merge_fields": [
+        "account_ref",
+        "agency_name",
+        "offer_expiration_date",
+        "portal_url",
+        "settlement_amount"
+      ],
+      "required_disclosures": [
+        "1006.18(e)(2)",
+        "opt-out method",
+        "non-renewal language in linked terms"
+      ],
+      "send_rules": [
+        "Number must satisfy 1006.6(d)(5) reasonable procedures (consumer-provided/consented number, no notice of reassignment) before ANY debt content is sent",
+        "Autodialed/automated texts to cell phones need prior express consent (47 U.S.C. 227(b)); check reassigned-numbers database",
+        "Send only 8 a.m.-9 p.m. consumer local time (1006.6(b)(1)); respect channel opt-outs (1006.14(h))",
+        "Every text includes the opt-out method (1006.6(e)); honor STOP and synonyms per 47 CFR 64.1200(a)(10)",
+        "10DLC/short-code campaign registration with carriers; CTIA HELP/STOP support",
+        "Offer and expiry must exist in CRM and match LTR-010/011/012"
+      ],
+      "legal_citations": [
+        "12 CFR 1006.6(d) (third-party communications; email/text reasonable procedures (d)(3)-(5))",
+        "12 CFR 1006.6(e) (opt-out notice for electronic communications)",
+        "12 CFR 1006.6(b)(1) (inconvenient times/places; 8 a.m.-9 p.m. presumption)",
+        "12 CFR 1006.14(h) (prohibited communication media)",
+        "12 CFR 1006.18(e) (initial/subsequent communication disclosures)",
+        "47 U.S.C. 227 (TCPA)",
+        "47 CFR 64.1200 (TCPA rules; (a)(10) consent revocation; (b) artificial-voice identification)",
+        "FCC consent-revocation order, 2026-21821 (Fed. Reg. Oct. 26, 2026), revised 47 CFR 64.1200(a)(10) effective Nov. 25, 2026",
+        "CTIA Messaging Principles and Best Practices (STOP/HELP keywords)",
+        "Evory v. RJM Acquisitions Funding LLC, 505 F.3d 769 (7th Cir. 2007) (settlement-offer safe-harbor language)"
+      ]
+    },
+    {
+      "id": "SMS-007",
+      "path": "sms/opt-out-confirmation.md",
+      "title": "SMS Opt-Out Confirmation",
+      "channel": "sms",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Single confirmation after STOP. No collection content. Must be sent within 5 minutes and no further texts to that number.",
+      "merge_fields": [
+        "agency_name",
+        "agency_phone"
+      ],
+      "required_disclosures": [],
+      "send_rules": [
+        "Send once, within 5 minutes of the opt-out; contains no marketing or collection content (47 CFR 64.1200(a)(10) confirmation text)",
+        "Suppress number on SMS immediately; log revocation"
+      ],
+      "legal_citations": [
+        "47 CFR 64.1200 (TCPA rules; (a)(10) consent revocation; (b) artificial-voice identification)",
+        "FCC consent-revocation order, 2026-21821 (Fed. Reg. Oct. 26, 2026), revised 47 CFR 64.1200(a)(10) effective Nov. 25, 2026",
+        "12 CFR 1006.6(e) (opt-out notice for electronic communications)",
+        "CTIA Messaging Principles and Best Practices (STOP/HELP keywords)"
+      ]
+    },
+    {
+      "id": "SMS-008",
+      "path": "sms/help-response.md",
+      "title": "SMS HELP Response",
+      "channel": "sms",
+      "status": "Requires counsel review before use",
+      "needs_counsel_review": true,
+      "template_syntax": "mustache",
+      "purpose": "Auto-reply to HELP keyword (CTIA).",
+      "merge_fields": [
+        "agency_hours",
+        "agency_name",
+        "agency_phone",
+        "agency_website"
+      ],
+      "required_disclosures": [
+        "opt-out method"
+      ],
+      "send_rules": [
+        "Auto-reply only to HELP/INFO"
+      ],
+      "legal_citations": [
+        "CTIA Messaging Principles and Best Practices (STOP/HELP keywords)",
+        "12 CFR 1006.6(e) (opt-out notice for electronic communications)"
+      ]
+    }
+  ]
+}
