@@ -3,6 +3,8 @@ import { Source_Sans_3 } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/meridian/theme-provider";
+import { SelfHostProvider } from "@/components/self-host";
+import { selfHosted } from "@/server/self-hosted";
 import "./globals.css";
 
 const sans = Source_Sans_3({
@@ -19,6 +21,13 @@ export const metadata: Metadata = {
   description:
     "HubSpot-class CRM, sales, marketing, SEO, service, and AI — purpose-built for Triton Financial Solutions and Aether Digital Markets.",
   applicationName: "Meridian",
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    noarchive: true,
+    nosnippet: true,
+  },
   appleWebApp: {
     capable: true,
     title: "Meridian",
@@ -60,10 +69,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={sans.variable} data-scroll-behavior="smooth" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        <ThemeProvider>
-          <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
-          <Toaster position="top-center" richColors closeButton />
-        </ThemeProvider>
+        <SelfHostProvider enabled={selfHosted()}>
+          <ThemeProvider>
+            <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
+            <Toaster position="top-center" richColors closeButton />
+          </ThemeProvider>
+        </SelfHostProvider>
       </body>
     </html>
   );

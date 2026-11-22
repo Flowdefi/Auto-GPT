@@ -18,11 +18,12 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { haptic, isIos } from "@/lib/ios";
-import { hubFromPath, navFor, type NavItem } from "@/lib/nav";
+import { hubFromPath, mobileNav, navFor, type NavItem } from "@/lib/nav";
 import { useMeridian } from "@/lib/store";
 import { useActiveWorkspace } from "@/lib/use-workspace";
 import { cn } from "@/lib/utils";
 import { WORKSPACES } from "@/lib/workspaces";
+import { useSelfHosted } from "./self-host";
 import { AiDrawer } from "./ai-drawer";
 import { CommandPalette } from "./meridian/command-palette";
 import { NavIcon } from "./meridian/icon";
@@ -98,10 +99,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [aiOpen, setAiOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [ios, setIos] = useState(false);
+  const privateDesk = useSelfHosted();
 
   const hub = hubFromPath(pathname);
   const nav = navFor(workspaceId);
-  const mobileTabs = nav.filter((item) => item.mobile).slice(0, 5);
+  const mobileTabs = mobileNav(workspaceId);
 
   useEffect(() => setIos(isIos()), []);
 
@@ -262,10 +264,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <NavIcon name="Plug" className="size-4" />
                   Integrations
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => router.push("/billing")}>
-                  <NavIcon name="KeyRound" className="size-4" />
-                  Billing &amp; keys
-                </DropdownMenuItem>
+                {privateDesk ? null : (
+                  <DropdownMenuItem onSelect={() => router.push("/billing")}>
+                    <NavIcon name="KeyRound" className="size-4" />
+                    Billing &amp; keys
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onSelect={() => {
                     resetWorkspace(workspaceId);
@@ -277,10 +281,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => {
-                    void fetch("/api/auth/logout", { method: "POST" }).then(() => {
-                      router.push("/login");
-                      router.refresh();
-                    });
+                    void fetch("/api/auth/logout", { method: "POST" })
+                      .then(async (response) => {
+                        const payload = (await response.json()) as { next?: string };
+                        window.location.assign(payload.next || "/login");
+                      })
+                      .catch(() => {
+                        window.location.assign(privateDesk ? "/cdn-cgi/access/logout" : "/login");
+                      });
                   }}
                 >
                   Sign out
@@ -297,12 +305,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* iOS-style bottom tab bar */}
       <nav
-        className="ios-blur fixed inset-x-0 bottom-0 z-30 border-t bg-background/90 pb-[var(--safe-b)] lg:hidden"
+        className="ios-blur fixed inset-x-0 bottom-0 z-30 border-t bg-background/90 pb-[var(--safe-b)] pl-[var(--safe-l)] pr-[var(--safe-r)] lg:hidden"
         aria-label="Primary"
       >
         <div className="grid grid-cols-5">
           {mobileTabs.map((item) => {
-            const active = pathname.startsWith(item.href) || hub === item.hub;
+            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link
                 key={item.href}
@@ -315,7 +323,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 )}
               >
                 <NavIcon name={item.icon} className="size-5" />
-                <span className="max-w-full truncate px-1">{item.label}</span>
+                <span className="max-w-full truncate px-1">{item.short ?? item.label}</span>
               </Link>
             );
           })}

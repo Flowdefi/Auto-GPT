@@ -12,6 +12,7 @@ import { assertSameOrigin, scanUpload } from "../../server/security";
 
 const PUBLIC_ROUTES = [
   "/api/auth/login/route.ts",
+  "/api/auth/access/route.ts",
   "/api/auth/signup/route.ts",
   "/api/billing/webhook/route.ts",
   "/api/email/track/open/route.ts",

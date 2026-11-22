@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { isWorkspaceId } from "@/lib/workspace-id";
 import { requireSeat } from "@/server/api-guard";
+import { listCompanies } from "@/server/crm-store";
 import { attachInventoryFile, getInventory, importInventory, linkInventory, listInventory } from "@/server/inventory";
+import { listDealRefs, listPortfolios } from "@/server/inventory-import";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,7 +20,25 @@ export async function GET(request: Request) {
     if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ item });
   }
-  return NextResponse.json({ items: listInventory(workspaceId) });
+  const companies = listCompanies(workspaceId).map((company) => ({ id: company.id, name: company.name }));
+  const names = new Map(companies.map((company) => [company.id, company.name]));
+  const deals = listDealRefs(workspaceId);
+  const dealNames = new Map(deals.map((deal) => [deal.id, deal.name]));
+  const portfolios = listPortfolios(workspaceId)
+    .map((item) => ({
+      ...item,
+      sellerName: item.sellerName || names.get(item.sellerCompanyId) || "",
+      buyerName: item.buyerName || (item.buyerCompanyId ? names.get(item.buyerCompanyId) : "") || "",
+      dealName: item.dealName || (item.dealId ? dealNames.get(item.dealId) : "") || "",
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+  return NextResponse.json({
+    ok: true,
+    items: listInventory(workspaceId),
+    portfolios,
+    companies,
+    deals,
+  });
 }
 
 export async function POST(request: Request) {

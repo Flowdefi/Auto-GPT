@@ -1,8 +1,21 @@
 import Link from "next/link";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { WORKSPACES } from "@/lib/workspaces";
 import { LIFETIME_PRICE_USD } from "@/lib/commerce";
+import { seatFromNextCookies } from "@/server/auth";
+import { selfHosted } from "@/server/self-hosted";
 
-export default function LandingPage() {
+export const dynamic = "force-dynamic";
+
+export default async function LandingPage() {
+  if (selfHosted()) {
+    const seat = await seatFromNextCookies();
+    if (seat) redirect("/w/triton/home");
+    const jwt = (await headers()).get("cf-access-jwt-assertion");
+    if (jwt) redirect("/api/auth/access?next=/w/triton/home");
+    redirect("/login");
+  }
   return (
     <div className="min-h-dvh bg-ink-950 text-white">
       <div className="mx-auto flex min-h-dvh max-w-5xl flex-col px-5 py-10">

@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import {
   API_KEY_PREFIX,
@@ -5,7 +6,7 @@ import {
   SESSION_COOKIE,
   SESSION_HOURS,
 } from "@/lib/commerce";
-import { hashPassword, hashSecret, keyPrefix, mintApiKey, randomId, signPayload, verifyPassword, verifySignedPayload } from "./auth-crypto";
+import { hashPassword, hashSecret, keyPrefix, mintApiKey, mintLicenseKey, randomId, signPayload, verifyPassword, verifySignedPayload } from "./auth-crypto";
 import { selfHosted } from "./self-host";
 import { clientIp } from "./rate-limit";
 import { enterAccountContext, masterSecret } from "./secrets";
@@ -89,8 +90,46 @@ export function accountByEmail(email: string): Account | null {
   return row ? asAccount(row) : null;
 }
 
+let selfHostedSeatReady = false;
+
+/** Writes a redeemed lifetime seat for the earliest owner when self-hosting. */
+function ensureSelfHostedOwnerSeat(): void {
+  if (!selfHosted() || selfHostedSeatReady) return;
+  if (!sqliteReady()) return;
+  const owner = sqliteGet(
+    "SELECT id, email FROM accounts WHERE role = 'owner' ORDER BY created_at ASC LIMIT 1",
+  );
+  if (!owner?.id) return;
+  const accountId = String(owner.id);
+  const existing = sqliteGet(
+    "SELECT id FROM licenses WHERE account_id = ? AND redeemed_at IS NOT NULL LIMIT 1",
+    accountId,
+  );
+  if (!existing?.id) {
+    const key = mintLicenseKey();
+    const now = new Date().toISOString();
+    sqliteRun(
+      `INSERT INTO licenses (id, key_hash, key_prefix, kind, email, account_id, redeemed_at, created_at, notes)
+       VALUES (?, ?, ?, 'minted', ?, ?, ?, ?, ?)`,
+      randomId("lic"),
+      hashSecret(key),
+      keyPrefix(key, 12),
+      String(owner.email ?? ""),
+      accountId,
+      now,
+      now,
+      "Self-hosted owner seat",
+    );
+    markAccountActive(accountId);
+  }
+  selfHostedSeatReady = true;
+}
+
 export function accountHasSeat(accountId: string): boolean {
-  if (selfHosted()) return true;
+  if (selfHosted()) {
+    ensureSelfHostedOwnerSeat();
+    return true;
+  }
   const row = sqliteGet(
     "SELECT id FROM licenses WHERE account_id = ? AND redeemed_at IS NOT NULL LIMIT 1",
     accountId,
@@ -124,6 +163,47 @@ export function createAccount(input: { email: string; name: string; password: st
   const created = accountById(id);
   if (!created) throw new Error("Could not create account");
   return created;
+}
+
+/** Owner row for the triton desk. Creates one with an unusable password when missing. */
+export function ensureOwnerAccount(email: string): Account {
+  const clean = assertEmail(email);
+  const existing = accountByEmail(clean);
+  if (existing) {
+    sqliteRun(
+      "UPDATE accounts SET role = 'owner', status = 'active', failed_logins = 0, locked_until = NULL WHERE id = ?",
+      existing.id,
+    );
+    accountHasSeat(existing.id);
+    const fresh = accountById(existing.id);
+    if (!fresh) throw new Error("Could not load owner account");
+    return fresh;
+  }
+  const created = createAccount({
+    email: clean,
+    name: clean.split("@")[0] || "Owner",
+    password: randomBytes(32).toString("hex"),
+  });
+  markAccountActive(created.id);
+  accountHasSeat(created.id);
+  const fresh = accountById(created.id);
+  if (!fresh) throw new Error("Could not create owner account");
+  return fresh;
+}
+
+export function setOwnerPassword(email: string, password: string): Account {
+  const account = ensureOwnerAccount(email);
+  const clean = assertPassword(password);
+  const { hash, salt } = hashPassword(clean);
+  sqliteRun(
+    "UPDATE accounts SET password_hash = ?, password_salt = ?, failed_logins = 0, locked_until = NULL, status = 'active' WHERE id = ?",
+    hash,
+    salt,
+    account.id,
+  );
+  const fresh = accountById(account.id);
+  if (!fresh) throw new Error("Could not update owner password");
+  return fresh;
 }
 
 export function authenticate(email: string, password: string): Account {
@@ -196,7 +276,7 @@ export function sessionCookieOptions(): {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    secure: publicUrl.startsWith("https://") || process.env.NODE_ENV === "production",
+    secure: publicUrl.startsWith("https://") || process.env.NODE_ENV === "production" || selfHosted(),
     maxAge: SESSION_HOURS * 60 * 60,
   };
 }

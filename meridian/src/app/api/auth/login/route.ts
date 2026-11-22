@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE } from "@/lib/commerce";
 import { accountById, accountHasSeat, authenticate, issueSessionCookie, publicAccount, sessionCookieOptions } from "@/server/auth";
+import { isOwnerEmail } from "@/server/owner-policy";
+import { selfHosted } from "@/server/self-hosted";
 import { decryptSecret } from "@/server/auth-crypto";
 import { masterSecret } from "@/server/secrets";
 import { sqliteGet } from "@/server/sqlite";
@@ -19,8 +21,13 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Unreadable body" }, { status: 400 });
   }
+  const email = body.email?.trim().toLowerCase() ?? "";
+  if (email && rateLimited(`login-email:${email}`, 10, 15 * 60_000)) return tooMany();
   try {
-    const account = authenticate(body.email ?? "", body.password ?? "");
+    if (selfHosted() && !isOwnerEmail(email)) {
+      return NextResponse.json({ error: "Email or password is incorrect" }, { status: 401 });
+    }
+    const account = authenticate(email, body.password ?? "");
     const mfa = sqliteGet("SELECT secret_ciphertext, enabled FROM account_mfa WHERE account_id = ?", account.id);
     if (mfa && Number(mfa.enabled) === 1) {
       const secret = decryptSecret(String(mfa.secret_ciphertext), masterSecret());
@@ -34,7 +41,7 @@ export async function POST(request: Request) {
     const session = issueSessionCookie(fresh, request);
     const response = NextResponse.json({
       account: publicAccount(fresh, licensed),
-      next: licensed ? "/w/triton/home" : "/billing",
+      next: licensed || selfHosted() ? "/w/triton/home" : "/billing",
     });
     response.cookies.set(SESSION_COOKIE, session.cookie, sessionCookieOptions());
     return response;

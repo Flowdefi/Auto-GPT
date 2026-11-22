@@ -1,9 +1,14 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { agencyPages } from "@/lib/agency/site";
 import { currentBrand } from "@/server/brand";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  robots: { index: true, follow: true },
+};
 
 export default function AgencyLayout({ children }: { children: ReactNode }) {
   const brand = currentBrand();

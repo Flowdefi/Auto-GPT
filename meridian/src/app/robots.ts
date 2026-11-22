@@ -3,7 +3,11 @@ import type { MetadataRoute } from "next";
 export default function robots(): MetadataRoute.Robots {
   const base = process.env.MERIDIAN_PUBLIC_URL || "http://localhost:3000";
   return {
-    rules: { userAgent: "*", allow: ["/agency", "/agency/"], disallow: ["/w/", "/collect", "/api/", "/pay/"] },
+    rules: {
+      userAgent: "*",
+      allow: ["/agency", "/agency/"],
+      disallow: ["/w/", "/collect", "/api/", "/pay/", "/login", "/signup", "/billing", "/pricing"],
+    },
     sitemap: `${base}/sitemap.xml`,
   };
 }

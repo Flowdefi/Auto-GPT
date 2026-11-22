@@ -1,31 +1,25 @@
 import { readFileSync } from "node:fs";
+import "./load-env";
+import { flag, flags } from "./load-env";
 import { isWorkspaceId } from "../src/lib/workspace-id";
 import { formatImportReport, runCsvImport } from "../src/server/csv-import";
-
-function option(flag: string): string | undefined {
-  const index = process.argv.indexOf(flag);
-  if (index < 0) return undefined;
-  const value = process.argv[index + 1];
-  if (!value || value.startsWith("--")) return undefined;
-  return value;
-}
 
 function read(path: string | undefined): string | undefined {
   if (!path) return undefined;
   return readFileSync(path, "utf8");
 }
 
-const workspaceId = option("--workspace");
+const workspaceId = flag("--workspace");
 if (!isWorkspaceId(workspaceId)) {
   console.error(
-    "Usage: npm run import:csv -- --workspace <triton|aether> [--contacts file.csv] [--companies file.csv] [--prospects file.csv] [--do-not-email] [--invalid-email] [--dry-run]",
+    "Usage: npm run import:csv -- --workspace <triton|aether> [--contacts file.csv] [--companies file.csv] [--prospects file.csv] [--tag label] [--do-not-email] [--invalid-email] [--dry-run]",
   );
   process.exit(1);
 }
 
-const contactsPath = option("--contacts");
-const companiesPath = option("--companies");
-const prospectsPath = option("--prospects");
+const contactsPath = flag("--contacts");
+const companiesPath = flag("--companies");
+const prospectsPath = flag("--prospects");
 if (!contactsPath && !companiesPath && !prospectsPath) {
   console.error("Provide --contacts, --companies, and/or --prospects");
   process.exit(1);
@@ -37,6 +31,7 @@ try {
     contactsCsv: read(contactsPath),
     companiesCsv: read(companiesPath),
     prospectsCsv: read(prospectsPath),
+    tags: flags("--tag"),
     doNotEmail: process.argv.includes("--do-not-email"),
     invalidEmail: process.argv.includes("--invalid-email"),
     dryRun: process.argv.includes("--dry-run"),

@@ -46,8 +46,8 @@ export function outlookStatus(): {
       "Files.Read.All (application)",
     ],
     hint: config
-      ? "App-only credentials present. Sync pulls Inbox, Sent Items, Drafts, and mailbox contacts."
-      : "Set MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, and MS_MAILBOXES. Grant admin consent for Mail.Read, Contacts.Read, and Files.Read.All, then scope mail with an application access policy. The desk still runs when these are empty.",
+      ? "App-only credentials present. npm run sync:graph or npm run graph:sync pulls Inbox, Sent Items, Drafts, and mailbox contacts."
+      : "Set MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, and MS_MAILBOXES. Grant admin consent for Mail.Read, Contacts.Read, and Files.Read.All, then scope mail with an application access policy. Sync no-ops until those are set.",
   };
 }
 

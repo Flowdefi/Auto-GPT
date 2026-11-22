@@ -86,8 +86,8 @@ export default function HomePage() {
       <Card className="mt-4 p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-semibold">{config.inventoryNounPlural}</h2>
-          <Link href={`/w/${workspaceId}/marketplace`} className="text-sm text-[var(--accent-text)]">
-            Marketplace
+          <Link href={`/w/${workspaceId}/inventory`} className="text-sm text-[var(--accent-text)]">
+            Inventory
           </Link>
         </div>
         <div className="grid gap-3 md:grid-cols-2">

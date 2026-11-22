@@ -74,6 +74,8 @@ export interface CsvImportInput {
   doNotEmail?: boolean;
   invalidEmail?: boolean;
   dryRun?: boolean;
+  /** Added to every contact and prospect this run. Does not remove existing tags. */
+  tags?: string[];
 }
 
 interface WorkingState {
@@ -87,6 +89,8 @@ interface WorkingState {
   now: string;
   doNotEmail: boolean;
   invalidEmail: boolean;
+  extraTags: string[];
+  suppressedEmails: Set<string>;
 }
 
 const MAX_CSV_CHARS = 25_000_000;
@@ -168,6 +172,10 @@ export function planCsvImport(bundle: Bundle, input: CsvImportInput): CsvPlan {
     now,
     doNotEmail: input.doNotEmail === true,
     invalidEmail: input.invalidEmail === true,
+    extraTags: [...new Set((input.tags ?? []).map((tag) => tag.trim()).filter(Boolean))],
+    suppressedEmails: new Set(
+      bundle.suppressions.map((row) => row.email.trim().toLowerCase()).filter(Boolean),
+    ),
   };
 
   let contactsCsv = input.contactsCsv ?? "";
@@ -215,7 +223,7 @@ export function planCsvImport(bundle: Bundle, input: CsvImportInput): CsvPlan {
   const seenAdd = new Set<string>();
   const seenDrop = new Set<string>();
   for (const contact of suppressionContacts) {
-    const edits = suppressionEdits(bundle.suppressions, contact);
+    const edits = suppressionEdits(bundle.suppressions, contact, { retainExisting: true });
     for (const reason of edits.add) {
       const key = `${contact.email.toLowerCase()}|${reason}`;
       if (seenAdd.has(key)) continue;
@@ -262,7 +270,9 @@ function applyCsvPlan(workspaceId: WorkspaceId, plan: CsvPlan): void {
   mutate((db) => {
     for (const company of plan.companies) mergeCompany(db, workspaceId, company);
     for (const contact of plan.contacts) mergeContact(db, workspaceId, contact);
-    for (const contact of plan.suppressionContacts) reconcileContactSuppression(db, workspaceId, contact);
+    for (const contact of plan.suppressionContacts) {
+      reconcileContactSuppression(db, workspaceId, contact, new Date().toISOString(), { retainExisting: true });
+    }
   });
   writeCrmBlobs(
     workspaceId,
@@ -358,7 +368,7 @@ function assignCompany(
 function applyContactRow(state: WorkingState, row: CsvRow, headers: Set<string>): void {
   const firstName = cell(row, "First Name");
   const lastName = cell(row, "Last Name");
-  const email = firstEmail(cell(row, "Email"));
+  const email = firstEmail(firstNonEmpty(row, "Email", "contact_email", "Contact Email"));
   const hubspot = canonicalHubspotId(cell(row, "HubSpot Record ID", "Record ID", "hs_object_id"));
   const companyName = cell(row, "Company Name");
   if (!firstName && !lastName && !email && !hubspot) {
@@ -387,17 +397,23 @@ function assignContact(
 ): void {
   if (hasHeader(headers, "First Name")) contact.firstName = identity.firstName;
   if (hasHeader(headers, "Last Name")) contact.lastName = identity.lastName;
-  if (hasHeader(headers, "Email")) contact.email = identity.email;
-  if (hasHeader(headers, "Phone")) contact.phone = cell(row, "Phone");
+  if (hasHeader(headers, "Email", "contact_email", "Contact Email")) contact.email = identity.email;
+  if (hasHeader(headers, "Phone", "contact_phone", "Contact Phone")) {
+    contact.phone = firstNonEmpty(row, "Phone", "contact_phone", "Contact Phone");
+  }
   if (hasHeader(headers, "Mobile")) contact.mobile = cell(row, "Mobile");
-  if (hasHeader(headers, "Job Title", "Title")) contact.title = cell(row, "Job Title", "Title");
+  if (hasHeader(headers, "Job Title", "Title", "contact_title", "Contact Title")) {
+    contact.title = firstNonEmpty(row, "Job Title", "Title", "contact_title", "Contact Title");
+  }
   if (hasHeader(headers, "Website")) contact.website = cell(row, "Website");
   if (hasHeader(headers, "Street", "Address")) contact.street = cell(row, "Street", "Address");
   if (hasHeader(headers, "City")) contact.city = cell(row, "City");
   if (hasHeader(headers, "State")) contact.state = normalizeState(cell(row, "State"));
   if (hasHeader(headers, "Zip", "Postal Code")) contact.zip = cell(row, "Zip", "Postal Code");
   if (hasHeader(headers, "Country")) contact.country = normalizeCountry(cell(row, "Country"));
-  if (hasHeader(headers, "LinkedIn")) contact.linkedin = cell(row, "LinkedIn");
+  if (hasHeader(headers, "LinkedIn", "contact_linkedin", "Contact LinkedIn")) {
+    contact.linkedin = firstNonEmpty(row, "LinkedIn", "contact_linkedin", "Contact LinkedIn");
+  }
   if (hasHeader(headers, "Lead Type")) contact.leadType = normalizeLeadType(cell(row, "Lead Type"));
   if (hasHeader(headers, "Stage")) {
     contact.stage = cell(row, "Stage");
@@ -434,7 +450,7 @@ function assignContact(
   if (hasHeader(headers, "Desk Replied")) contact.deskReplied = parseYes(cell(row, "Desk Replied")) === true;
   if (hasHeader(headers, "Message Summary")) contact.messageSummary = cell(row, "Message Summary");
   if (hasHeader(headers, "Notes")) contact.notes = cell(row, "Notes").slice(0, 8000);
-  if (hasHeader(headers, "Tags")) contact.tags = splitTags(cell(row, "Tags"));
+  contact.tags = mergeTags(contact.tags, splitTags(cell(row, "Tags", "Tag")), state.extraTags);
   if (hasHeader(headers, "HubSpot Record ID", "Record ID", "hs_object_id")) contact.hubspotRecordId = identity.hubspot;
   if (hasHeader(headers, "Source")) contact.source = cell(row, "Source");
   if (hasHeader(headers, "Reason", "Removal Reason")) {
@@ -444,6 +460,7 @@ function assignContact(
   const reason = `${contact.removalReason ?? ""} ${cell(row, "Reason")} ${cell(row, "Removal Reason")}`;
   const tags = contact.tags ?? [];
   contact.doNotEmail = Boolean(state.doNotEmail || indicatesDoNotEmail(reason, tags) || contact.doNotEmail);
+  stickSuppression(state, contact);
   contact.emailStatus = resolveEmailStatus(state, headers, row, contact.emailStatus, reason, tags);
 
   const domain = contactDomain(row, contact.email);
@@ -455,7 +472,7 @@ function applyProspectRow(state: WorkingState, row: CsvRow): void {
   const companyName = cell(row, "company", "Company");
   const website = cell(row, "website", "Website");
   const domain = websiteDomain(website);
-  const email = firstEmail(cell(row, "email", "Email"));
+  const email = firstEmail(firstNonEmpty(row, "email", "Email", "contact_email", "Contact Email"));
   const person = splitPersonName(cell(row, "contact_name", "Contact Name", "Name"));
   if (!companyName && !domain && !person.firstName && !person.lastName && !email) {
     state.skipped.push({
@@ -516,9 +533,9 @@ function applyProspectRow(state: WorkingState, row: CsvRow): void {
   next.firstName = next.firstName || person.firstName;
   next.lastName = next.lastName || person.lastName;
   next.email = next.email || email;
-  next.title = next.title || cell(row, "title", "Title");
-  next.phone = next.phone || cell(row, "phone", "Phone");
-  next.linkedin = next.linkedin || cell(row, "linkedin", "LinkedIn");
+  next.title = next.title || firstNonEmpty(row, "title", "Title", "contact_title", "Contact Title");
+  next.phone = next.phone || firstNonEmpty(row, "phone", "Phone", "contact_phone", "Contact Phone");
+  next.linkedin = next.linkedin || firstNonEmpty(row, "linkedin", "LinkedIn", "contact_linkedin", "Contact LinkedIn");
   next.state = next.state || hq;
   next.companyId = company?.id || next.companyId;
   next.prospectSegment = prospectSegment || next.prospectSegment;
@@ -532,8 +549,11 @@ function applyProspectRow(state: WorkingState, row: CsvRow): void {
   tags.add("outbound-prospect");
   if (segment) tags.add(segment);
   if (subType) tags.add(subType);
+  for (const tag of splitTags(cell(row, "tags", "Tags", "Tag"))) tags.add(tag);
+  for (const tag of state.extraTags) tags.add(tag);
   next.tags = [...tags];
   next.doNotEmail = Boolean(state.doNotEmail || next.doNotEmail);
+  stickSuppression(state, next);
   if (state.invalidEmail) next.emailStatus = "invalid";
   const normalized = normalizeContact({ ...next, id: next.id, score: existing?.score ?? 0 });
   storeContact(state, existing, normalized);
@@ -671,6 +691,23 @@ function matchOwner(name: string, users: User[]): string {
   return found?.id ?? "";
 }
 
+function mergeTags(existing: string[] | undefined, column: string[], extra: string[]): string[] {
+  return [...new Set([...(existing ?? []), ...column, ...extra].map((tag) => tag.trim()).filter(Boolean))];
+}
+
+function stickSuppression(state: WorkingState, contact: Contact): void {
+  const email = contact.email.trim().toLowerCase();
+  if (email && state.suppressedEmails.has(email)) contact.doNotEmail = true;
+}
+
+function firstNonEmpty(row: CsvRow, ...names: string[]): string {
+  for (const name of names) {
+    const value = cell(row, name).trim();
+    if (value) return value;
+  }
+  return "";
+}
+
 function firstEmail(value: string): string {
   const match = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   return match?.[0]?.toLowerCase() ?? "";
@@ -683,7 +720,11 @@ function isProspectTable(table: CsvTable): boolean {
     headers.has("segment") ||
     headers.has("why_fit") ||
     headers.has("size_signal") ||
-    (headers.has("contact_name") && headers.has("company"))
+    (headers.has("contact_name") && headers.has("company")) ||
+    headers.has("contact_email") ||
+    headers.has("contact_title") ||
+    headers.has("contact_linkedin") ||
+    headers.has("contact_phone")
   );
 }
 

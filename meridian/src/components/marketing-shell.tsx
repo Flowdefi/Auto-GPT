@@ -5,9 +5,11 @@ import { LIFETIME_PRICE_USD } from "@/lib/commerce";
 export function MarketingShell({
   children,
   action,
+  commercial = true,
 }: {
   children: ReactNode;
   action?: ReactNode;
+  commercial?: boolean;
 }) {
   return (
     <div className="min-h-dvh bg-ink-950 text-white">
@@ -17,10 +19,12 @@ export function MarketingShell({
             MERIDIAN
           </Link>
           <div className="flex items-center gap-3 text-xs text-ink-300">
-            <Link href="/pricing" className="hover:text-white">
-              ${LIFETIME_PRICE_USD} lifetime
-            </Link>
-            {action}
+            {commercial ? (
+              <Link href="/pricing" className="hover:text-white">
+                ${LIFETIME_PRICE_USD} lifetime
+              </Link>
+            ) : null}
+            {commercial ? action : null}
           </div>
         </div>
         <div className="flex flex-1 flex-col justify-center py-12">{children}</div>
